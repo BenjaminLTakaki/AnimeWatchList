@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Anime Tracker{% endblock %}
+
+{% block content %}
+<h2>{{ title }}</h2>
+  {% if anime_list %}
+<div class="anime-list">
+    {% for anime in anime_list %}
+    <div class="anime-item">
+        <h3>
+            <a href="https://myanimelist.net/anime/{{ anime.id }}" target="_blank" class="anime-title-link">
+                {{ anime.title }}
+            </a>
+        </h3>
+        {% if anime.main_picture and anime.main_picture.medium %}
+        <img src="{{ anime.main_picture.medium }}" alt="{{ anime.title }}">
+        {% endif %}
+        <p><strong>Episodes:</strong> {{ anime.episodes }}</p>
+        <p><strong>Score:</strong> {{ anime.score }}</p>
+
+        {% if title == "Watched Anime" %}
+        <!-- Option to move to Not Watched -->
+        <div class="status-actions">
+            <a href="{{ url_for('change_status', anime_id=anime.id, status='not_watched') }}" class="status-change-btn not-watched">
+                Mark as Not Watched
+            </a>
+        </div>
+        {% elif title == "Not Watched Anime" %}
+        <!-- Option to move to Watched -->
+        <div class="status-actions">
+            <a href="{{ url_for('change_status', anime_id=anime.id, status='watched') }}" class="status-change-btn watched">
+                Mark as Watched
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+  {% else %}
+<p>No anime in this list yet.</p>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Anime Tracker{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <h2>Login to MyAnimeList</h2>
+    <p>To track your anime and sync with MyAnimeList, you need to login with your MAL account.</p>
+
+    <div class="login-button">
+        <a href="{{ auth_url }}" class="mal-login-btn">Login with MyAnimeList</a>
+    </div>
+
+    <div class="login-info">
+        <h3>Why login?</h3>
+        <ul>
+            <li>Mark anime as watched or not watched on MyAnimeList</li>
+            <li>Sync your existing MAL lists with this app</li>
+            <li>Keep your anime tracking consistent across devices</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

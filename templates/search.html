@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Search Anime - Anime Tracker{% endblock %}
+
+{% block content %}
+<div class="search-container">
+    <h2>Search Anime</h2>
+    <form method="POST" action="{{ url_for('search') }}" class="search-form">
+        <div class="search-input">
+            <input type="text" name="query" placeholder="Enter anime title..." value="{{ query }}" required>
+            <button type="submit">Search</button>
+        </div>
+    </form>
+
+    {% if results %}
+    <h3>Search Results</h3>
+    <div class="anime-list">
+        {% for anime in results %}
+        <div class="anime-item">
+            <h3>
+                <a href="https://myanimelist.net/anime/{{ anime.id }}" target="_blank" class="anime-title-link">
+                    {{ anime.title }}
+                </a>
+            </h3>
+            {% if anime.main_picture and anime.main_picture.medium %}
+            <img src="{{ anime.main_picture.medium }}" alt="{{ anime.title }}">
+            {% endif %}
+            <p><strong>Episodes:</strong> {{ anime.episodes }}</p>
+            <p><strong>Score:</strong> {{ anime.score }}</p>
+
+            {% if anime.status == "watched" %}
+            <div class="status-badge watched">Watched</div>
+            <div class="status-actions">
+                <a href="{{ url_for('change_status', anime_id=anime.id, status='not_watched') }}" class="status-change-btn not-watched">
+                    Mark as Not Watched
+                </a>
+            </div>
+            {% elif anime.status == "not_watched" %}
+            <div class="status-badge not-watched">Not Watched</div>
+            <div class="status-actions">
+                <a href="{{ url_for('change_status', anime_id=anime.id, status='watched') }}" class="status-change-btn watched">
+                    Mark as Watched
+                </a>
+            </div>
+            {% else %}
+            <form action="{{ url_for('mark_search') }}" method="POST" class="mark-buttons">
+                <input type="hidden" name="anime_id" value="{{ anime.id }}">
+                <button type="submit" name="status" value="watched" class="btn-watched">Watched</button>
+                <button type="submit" name="status" value="not_watched" class="btn-not-watched">Not Watched</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% elif query %}
+    <p>No results found for "{{ query }}". Try a different search term.</p>
+    {% endif %}
+</div>
+{% endblock %}
