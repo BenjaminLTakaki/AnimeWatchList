@@ -1,6 +1,7 @@
 import os
 import sys
 from flask import Flask, send_from_directory, redirect
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
 # Create a main application to serve both static files and the AnimeWatchList app
 main_app = Flask(__name__, static_folder='.')
@@ -20,16 +21,18 @@ def serve_static(path):
         return send_from_directory('.', path)
     return "File not found", 404
 
-# Route /projects/animewatchlist/app to the anime app
+# Define routes for the anime app prefix
 @main_app.route('/projects/animewatchlist/app')
 @main_app.route('/projects/animewatchlist/app/<path:subpath>')
-def anime_index(subpath=''):
-    if subpath:
-        return anime_app.handle_request('/'+subpath)
-    return anime_app.handle_request('/')
+def anime_redirect(subpath=''):
+    # Redirect to the AnimeWatchList app
+    return redirect(f'/animewatchlist/{subpath}' if subpath else '/animewatchlist/')
 
-# Mount the anime_app at the /projects/animewatchlist/app URL prefix
-application = main_app
+# Mount the anime_app at the /animewatchlist prefix
+application = DispatcherMiddleware(main_app, {
+    '/animewatchlist': anime_app
+})
 
 if __name__ == "__main__":
-    application.run(debug=True)
+    from werkzeug.serving import run_simple
+    run_simple('localhost', 5000, application, use_reloader=True)

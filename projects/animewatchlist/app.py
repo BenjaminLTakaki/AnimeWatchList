@@ -11,10 +11,18 @@ is_production = os.environ.get('RENDER', False)
 # Configure Flask app
 app = Flask(
     __name__,
-    static_url_path='/projects/animewatchlist/static' if is_production else '/static',
+    static_url_path='/static' if not is_production else '/animewatchlist/static',
     template_folder='templates'
 )
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "anime_tracker_secret")
+
+# Helper function to handle URLs in production vs development
+def get_url_for(*args, **kwargs):
+    """Generate URL considering the application root in production."""
+    url = url_for(*args, **kwargs)
+    if is_production:
+        url = f"/animewatchlist{url}"
+    return url
 
 # Set application root if in production
 if is_production:
