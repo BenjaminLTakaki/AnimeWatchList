@@ -18,8 +18,8 @@
 
     <!-- Direct links that work -->
     <div class="action-buttons">
-        <a href="{{ url_for('direct_mark', anime_id=anime.id, status='watched') }}" class="link-btn watched">Mark as Watched</a>
-        <a href="{{ url_for('direct_mark', anime_id=anime.id, status='not_watched') }}" class="link-btn not-watched">Mark as Not Watched</a>
+        <a href="{{ get_url_for('direct_mark', anime_id=anime.id, status='watched') }}" class="link-btn watched">Mark as Watched</a>
+        <a href="{{ get_url_for('direct_mark', anime_id=anime.id, status='not_watched') }}" class="link-btn not-watched">Mark as Not Watched</a>
     </div>
 </div>
 
@@ -31,8 +31,8 @@
     <h2>No more anime available</h2>
     <p>Try fetching more anime or search for specific titles.</p>
     <div class="action-buttons">
-        <a href="{{ url_for('fetch') }}" class="btn-fetch">Fetch More Anime</a>
-        <a href="{{ url_for('search') }}" class="btn-search">Search Anime</a>
+        <a href="{{ get_url_for('fetch') }}" class="btn-fetch">Fetch More Anime</a>
+        <a href="{{ get_url_for('search') }}" class="btn-search">Search Anime</a>
     </div>
 </div>
   {% endif %}

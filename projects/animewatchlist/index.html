@@ -106,43 +106,32 @@
         <p>This is a Flask web application for tracking anime you've watched and want to watch. The app allows you to discover, search, and organize anime series.</p>
 
         <div class="info">
-            <p>To run this project locally:</p>
-            <ol style="text-align: left;">
-                <li>Make sure you have Python and Flask installed</li>
-                <li>Navigate to the project directory in your terminal</li>
-                <li>Run <code>pip install -r requirements.txt</code> to install dependencies</li>
-                <li>Start the app with <code>python app.py</code></li>
-                <li>Open your browser to <code>http://localhost:5000</code></li>
-            </ol>
+            <p>Features of this application:</p>
+            <ul style="text-align: left;">
+                <li>Discover popular anime from MyAnimeList</li>
+                <li>Search for specific anime titles</li>
+                <li>Mark anime as watched or not watched</li>
+                <li>Build and maintain your personal anime lists</li>
+                <li>View detailed information about each anime</li>
+            </ul>
         </div>
 
         <div class="buttons">
-            <a href="https://github.com/BenjaminLTakaki/AnimeWatchList" target="_blank" class="btn btn-primary">View on GitHub</a>
-            <a href="../index.html" class="btn btn-secondary">Back to Portfolio</a>
+            <a href="/projects/animewatchlist/app" class="btn btn-primary">Launch AnimeWatchList</a>
+            <a href="https://github.com/BenjaminLTakaki/AnimeWatchList" target="_blank" class="btn btn-secondary">View on GitHub</a>
+            <a href="../../index.html" class="btn btn-secondary">Back to Portfolio</a>
         </div>
 
         <div id="loading" class="loader hidden"></div>
-        <p id="status" class="hidden">Starting AnimeWatchList application...</p>
+        <p id="status" class="hidden">Loading AnimeWatchList application...</p>
     </div>
 
     <script>
-        // This script would handle any needed logic for launching the app
-        // In a real deployment environment, you would modify this based on how
-        // your application is hosted and accessed
+        document.addEventListener('DOMContentLoaded', function () {
+            // Get the launch button and add loading indicator when clicked
+            const launchBtn = document.querySelector('.btn-primary');
 
-        document.addEventListener('DOMContentLoaded', function() {
-            const appUrl = './index.html'; // This would point to your Flask app's entry point
-            const runAppBtn = document.createElement('a');
-            runAppBtn.href = appUrl;
-            runAppBtn.className = 'btn btn-primary';
-            runAppBtn.textContent = 'Run AnimeWatchList';
-
-            // Add this button to the buttons container
-            document.querySelector('.buttons').prepend(runAppBtn);
-
-            runAppBtn.addEventListener('click', function(e) {
-                // If this was a real launcher, you might want to do some checks here
-                // before redirecting to the app
+            launchBtn.addEventListener('click', function (e) {
                 document.getElementById('loading').classList.remove('hidden');
                 document.getElementById('status').classList.remove('hidden');
             });

@@ -22,14 +22,14 @@
         {% if title == "Watched Anime" %}
         <!-- Option to move to Not Watched -->
         <div class="status-actions">
-            <a href="{{ url_for('change_status', anime_id=anime.id, status='not_watched') }}" class="status-change-btn not-watched">
+            <a href="{{ get_url_for('change_status', anime_id=anime.id, status='not_watched') }}" class="status-change-btn not-watched">
                 Mark as Not Watched
             </a>
         </div>
         {% elif title == "Not Watched Anime" %}
         <!-- Option to move to Watched -->
         <div class="status-actions">
-            <a href="{{ url_for('change_status', anime_id=anime.id, status='watched') }}" class="status-change-btn watched">
+            <a href="{{ get_url_for('change_status', anime_id=anime.id, status='watched') }}" class="status-change-btn watched">
                 Mark as Watched
             </a>
         </div>

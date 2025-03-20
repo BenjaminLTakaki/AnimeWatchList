@@ -4,16 +4,28 @@ import json
 import requests
 import time
 import random
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
 
-app = Flask(__name__)
+# Determine if running in production or locally
+is_production = os.environ.get('RENDER', False)
+
+# Configure Flask app
+app = Flask(
+    __name__,
+    static_url_path='/projects/animewatchlist/static' if is_production else '/static',
+    template_folder='templates'
+)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "anime_tracker_secret")
+
+# Set application root if in production
+if is_production:
+    app.config['APPLICATION_ROOT'] = '/projects/animewatchlist'
 
 # Global anime queue to serve one anime at a time
 anime_queue = []
 
 # Directory and file paths for status tracking
-DATA_DIR = "data"
+DATA_DIR = "projects/animewatchlist/data"
 os.makedirs(DATA_DIR, exist_ok=True)
 WATCHED_FILE = os.path.join(DATA_DIR, "watched.json")
 NOT_WATCHED_FILE = os.path.join(DATA_DIR, "not_watched.json")
@@ -276,6 +288,14 @@ def change_anime_status(anime_id, new_status):
             
     return False
 
+# Helper function to handle URLs in production vs development
+def get_url_for(*args, **kwargs):
+    """Generate URL considering the application root in production."""
+    url = url_for(*args, **kwargs)
+    if is_production and app.config.get('APPLICATION_ROOT'):
+        url = f"{app.config['APPLICATION_ROOT']}{url}"
+    return url
+
 @app.route("/change_status/<int:anime_id>/<status>")
 def change_status(anime_id, status):
     """
@@ -283,7 +303,7 @@ def change_status(anime_id, status):
     """
     if status not in ["watched", "not_watched"]:
         flash("Invalid status. Must be 'watched' or 'not_watched'.")
-        return redirect(request.referrer or url_for("index"))
+        return redirect(request.referrer or get_url_for("index"))
     
     success = change_anime_status(anime_id, status)
     
@@ -304,7 +324,7 @@ def change_status(anime_id, status):
         flash(f"Could not change anime status. Anime not found or already in that status.")
     
     # Redirect back to the referring page
-    return redirect(request.referrer or url_for("index"))
+    return redirect(request.referrer or get_url_for("index"))
 
 @app.route("/")
 def index():
@@ -314,7 +334,8 @@ def index():
     return render_template("index.html", 
                            anime=current_anime,
                            watched_count=watched_count, 
-                           not_watched_count=not_watched_count)
+                           not_watched_count=not_watched_count,
+                           get_url_for=get_url_for)
 
 @app.route("/mark", methods=["POST"])
 def mark():
@@ -330,11 +351,11 @@ def mark():
     
     if not status:
         flash("Error: No status provided")
-        return redirect(url_for("index"))
+        return redirect(get_url_for("index"))
         
     if not anime_json:
         flash("Error: No anime data provided")
-        return redirect(url_for("index"))
+        return redirect(get_url_for("index"))
     
     try:
         # Print the raw JSON string for debugging
@@ -345,7 +366,7 @@ def mark():
         # Validate required fields
         if "id" not in anime or "title" not in anime:
             flash("Error: Invalid anime data (missing required fields)")
-            return redirect(url_for("index"))
+            return redirect(get_url_for("index"))
             
         # Ensure all required fields with defaults
         anime.setdefault("episodes", "N/A")
@@ -367,32 +388,32 @@ def mark():
     except json.decoder.JSONDecodeError as e:
         flash(f"Error: Invalid anime data format: {e}")
         print(f"JSON decode error: {e}")
-        return redirect(url_for("index"))
+        return redirect(get_url_for("index"))
     except Exception as e:
         flash(f"Error marking anime: {e}")
         print(f"Unexpected error: {e}")
-        return redirect(url_for("index"))
+        return redirect(get_url_for("index"))
     
-    return redirect(url_for("index"))
+    return redirect(get_url_for("index"))
 
 @app.route("/fetch")
 def fetch():
     """Manually trigger a fetch for more anime."""
     fetch_more_anime()
     flash("Fetched additional anime!")
-    return redirect(url_for("index"))
+    return redirect(get_url_for("index"))
 
 @app.route("/watched")
 def watched():
     """Display the list of anime marked as watched."""
     watched_list = load_json_file(WATCHED_FILE)
-    return render_template("list.html", title="Watched Anime", anime_list=watched_list)
+    return render_template("list.html", title="Watched Anime", anime_list=watched_list, get_url_for=get_url_for)
 
 @app.route("/not_watched")
 def not_watched():
     """Display the list of anime marked as not watched."""
     not_watched_list = load_json_file(NOT_WATCHED_FILE)
-    return render_template("list.html", title="Not Watched Anime", anime_list=not_watched_list)
+    return render_template("list.html", title="Not Watched Anime", anime_list=not_watched_list, get_url_for=get_url_for)
 
 @app.route("/search", methods=["GET", "POST"])
 def search():
@@ -434,7 +455,7 @@ def search():
             except Exception as e:
                 flash(f"Error searching for anime: {e}")
     
-    return render_template("search.html", results=results, query=query)
+    return render_template("search.html", results=results, query=query, get_url_for=get_url_for)
 
 @app.route("/mark_search", methods=["POST"])
 def mark_search():
@@ -444,7 +465,7 @@ def mark_search():
     
     if not anime_id or not status:
         flash("Missing required parameters")
-        return redirect(request.referrer or url_for("search"))
+        return redirect(request.referrer or get_url_for("search"))
     
     # Always mark search results as not watched first
     if status == "watched":
@@ -455,7 +476,7 @@ def mark_search():
         change_anime_status(int(anime_id), status)
     
     flash(f"Anime marked as {status}!")
-    return redirect(request.referrer or url_for("search"))
+    return redirect(request.referrer or get_url_for("search"))
 
 @app.route("/direct_mark/<int:anime_id>/<status>")
 def direct_mark(anime_id, status):
@@ -465,7 +486,7 @@ def direct_mark(anime_id, status):
     """
     if status not in ["watched", "not_watched"]:
         flash("Invalid status. Must be 'watched' or 'not_watched'.")
-        return redirect(url_for("index"))
+        return redirect(get_url_for("index"))
     
     # Check if this anime is in our queue
     global anime_queue
@@ -490,7 +511,7 @@ def direct_mark(anime_id, status):
             }
         except Exception as e:
             flash(f"Error fetching anime details: {e}")
-            return redirect(url_for("index"))
+            return redirect(get_url_for("index"))
     
     # Mark the anime
     mark_anime(anime, status)
@@ -503,7 +524,12 @@ def direct_mark(anime_id, status):
     if not anime_queue:
         fetch_more_anime()
     
-    return redirect(url_for("index"))
+    return redirect(get_url_for("index"))
+
+# Add a route to serve the connector page
+@app.route("/connector")
+def connector():
+    return render_template("connector.html")
 
 if __name__ == "__main__":
     app.run(debug=True)
