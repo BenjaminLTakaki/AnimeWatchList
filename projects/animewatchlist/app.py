@@ -1,4 +1,3 @@
-# app.py
 import os
 import json
 import requests
@@ -20,6 +19,8 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "anime_tracker_secret")
 # Set application root if in production
 if is_production:
     app.config['APPLICATION_ROOT'] = '/projects/animewatchlist'
+    # Also add this to help with URL generation
+    app.config['PREFERRED_URL_SCHEME'] = 'https'
 
 # Global anime queue to serve one anime at a time
 anime_queue = []
