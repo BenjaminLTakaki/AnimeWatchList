@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Projects - Benjamin Takaki</title>
+    <link rel="stylesheet" href="../styles/styles.css" />
+    <link rel="stylesheet" href="projects.css" />
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" integrity="sha512-iBBXm8fW90+nuLcSKVB1DVXQ3R/4IWp/jBsjmLbzRv7ZvUc4VjZdE6Vmvv4v1T5GkZMc5Ny9GD0RrR1r99C1sw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="logo"><a href="../index.html">Benjamin Takaki</a></div>
+            <nav class="nav-menu">
+                <ul>
+                    <li><a href="../index.html#home">Home</a></li>
+                    <li><a href="../index.html#about">About</a></li>
+                    <li><a href="../index.html#projects">Projects</a></li>
+                    <li><a href="../index.html#contact">Contact</a></li>
+                </ul>
+            </nav>
+            <button class="nav-toggle" aria-label="Toggle navigation">
+                <span class="hamburger"></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Projects Showcase -->
+    <section class="projects-showcase">
+        <div class="container">
+            <h1>My Projects</h1>
+            <p class="lead">A collection of software and web development projects I've created.</p>
+            
+            <div class="projects-grid">
+                <!-- AnimeWatchList Project -->
+                <div class="project-card">
+                    <div class="project-image">
+                        <img src="animewatchlist/static/images/preview.jpg" alt="AnimeWatchList Preview" onerror="this.src='https://via.placeholder.com/300x200?text=AnimeWatchList'">
+                    </div>
+                    <div class="project-details">
+                        <h3>AnimeWatchList</h3>
+                        <p>An anime tracking application built with Python Flask that helps users manage their watched and to-watch anime lists.</p>
+                        <div class="project-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">Flask</span>
+                            <span class="tag">JavaScript</span>
+                            <span class="tag">API</span>
+                        </div>
+                        <div class="project-description">
+                            <p>AnimeWatchList allows users to:</p>
+                            <ul>
+                                <li>Discover popular anime from MyAnimeList</li>
+                                <li>Search for specific anime titles</li>
+                                <li>Mark anime as watched or not watched</li>
+                                <li>Maintain personal anime lists</li>
+                            </ul>
+                        </div>
+                        <div class="project-links">
+                            <a href="animewatchlist/" class="btn btn-primary">View Project</a>
+                            <a href="https://github.com/BenjaminLTakaki/AnimeWatchList" target="_blank" class="btn btn-secondary">GitHub Repo</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Placeholder for future projects -->
+                <div class="coming-soon">
+                    <h3>More Projects Coming Soon</h3>
+                    <p>I'm constantly working on new projects. Check back soon for updates!</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Back to Portfolio Button -->
+    <div class="back-to-portfolio">
+        <a href="../index.html" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Portfolio
+        </a>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; 2024 Benjamin Takaki. All rights reserved.</p>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="../script.js"></script>
+</body>
+</html>

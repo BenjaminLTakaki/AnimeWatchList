@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Benjamin Takaki - Portfolio</title>
+    <link rel="stylesheet" href="styles/styles.css" />
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" integrity="sha512-iBBXm8fW90+nuLcSKVB1DVXQ3R/4IWp/jBsjmLbzRv7ZvUc4VjZdE6Vmvv4v1T5GkZMc5Ny9GD0RrR1r99C1sw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+    <!-- Sidebar with Social Links -->
+    <aside class="sidebar" aria-label="Social media links">
+        <ul>
+            <li>
+                <a href="https://linkedin.com/in/benjamin-takaki-3a7aa3302" target="_blank" aria-label="LinkedIn">
+                    <img src="styles/LinkedinLogo.png" alt="LinkedIn" />
+                </a>
+            </li>
+            <li>
+                <a href="https://github.com/BenjaminLTakaki" target="_blank" aria-label="GitHub">
+                    <img src="styles/GithubLogo.png" alt="GitHub" />
+                </a>
+            </li>
+            <li>
+                <a href="mailto:bentakaki7@gmail.com" aria-label="Email">
+                    <img src="styles/GmailLogo.png" alt="Email" class="img1" />
+                </a>
+            </li>
+        </ul>
+    </aside>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="logo">Benjamin Takaki</div>
+            <nav class="nav-menu">
+                <ul>
+                    <li><a href="#home">Home</a></li>
+                    <li><a href="#about">About</a></li>
+                    <li><a href="#projects">Projects</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                </ul>
+            </nav>
+            <button class="nav-toggle" aria-label="Toggle navigation">
+                <span class="hamburger"></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero" id="home">
+        <div class="container hero-content">
+            <h1>Hello! I'm <span class="highlight">Benjamin Takaki</span></h1>
+            <p>I am an ICT student passionate about programming and leveraging technology to solve real-world challenges.</p>
+            <div class="cta-buttons">
+                <a href="resume.pdf" target="_blank" class="btn btn-primary">Get Resume</a>
+                <a href="#about" class="btn btn-secondary">Learn More</a>
+            </div>
+        </div>
+        <div class="hero-image">
+            <img src="your-photo.jpg" alt="Portrait of Benjamin Takaki" />
+        </div>
+    </section>
+
+    <!-- About Me Section -->
+    <section id="about" class="about">
+        <div class="container">
+            <h2>About Me</h2>
+            <p>
+                I am a first-year student at Fontys University of Applied Sciences, pursuing an ICT degree with a focus on programming and innovative technology.
+                My educational journey, which includes graduating from the Lycée Français International de Tokyo and excelling in the American Section of the International Option of the French Baccalaureate, has honed my analytical thinking and problem-solving skills.
+            </p>
+            <p>
+                In my studies, I have worked on Python projects such as labyrinth solvers, image pixelators, and a Space Invaders clone.
+                I am interested in software development and how ICT can tackle real-world problems. International experiences and roles as a camp counselor and waiter have helped me develop strong interpersonal and cross-cultural communication skills.
+            </p>
+            <p>
+                Fluent in English, French, and conversant in Japanese, I thrive in diverse environments. I am excited to continue growing my technical expertise and contributing to meaningful, innovative projects.
+            </p>
+        </div>
+    </section>
+
+    <!-- Projects Section -->
+    <section id="projects" class="projects">
+        <div class="container">
+            <h2>My Projects</h2>
+            <div class="project-list">
+                <!-- AnimeWatchList Project -->
+                <div class="project-card">
+                    <div class="project-image">
+                        <img src="projects/animewatchlist/static/images/preview.jpg" alt="AnimeWatchList Preview" onerror="this.src='https://via.placeholder.com/300x200?text=AnimeWatchList'">
+                    </div>
+                    <div class="project-details">
+                        <h3>AnimeWatchList</h3>
+                        <p>A web application for tracking anime you've watched and want to watch. Built with Python Flask, this app allows users to discover, search, and categorize anime series.</p>
+                        <div class="project-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">Flask</span>
+                            <span class="tag">JavaScript</span>
+                            <span class="tag">API</span>
+                        </div>
+                        <div class="project-links">
+                            <a href="projects/animewatchlist/" class="btn btn-primary">View Project</a>
+                            <a href="https://github.com/BenjaminLTakaki/AnimeWatchList" target="_blank" class="btn btn-secondary">GitHub Repo</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GitHub Repositories Section -->
+                <div id="github-repos" class="repo-grid"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact">
+        <div class="container">
+            <h2>Contact Me</h2>
+            <p>If you'd like to get in touch, feel free to send me a message!</p>
+            <form id="contact-form" class="contact-form">
+                <input type="text" name="name" placeholder="Your Name" required aria-label="Your Name" />
+                <input type="email" name="email" placeholder="Your Email" required aria-label="Your Email" />
+                <textarea name="message" placeholder="Your Message" required aria-label="Your Message"></textarea>
+                <button type="submit" class="btn btn-primary">Send Message</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Back to Top Button -->
+    <button class="back-to-top" aria-label="Back to top">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; 2024 Benjamin Takaki. All rights reserved.</p>
+    </footer>
+
+    <!-- Scripts -->
+    <!-- EmailJS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

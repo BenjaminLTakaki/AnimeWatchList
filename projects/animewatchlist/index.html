@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnimeWatchList - Benjamin Takaki</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #0f1418;
+            color: #ffffff;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 800px;
+            padding: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: #4C9CFF;
+        }
+
+        p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+            color: #c0c9d6;
+        }
+
+        .buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.8rem 1.5rem;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background-color: #4C9CFF;
+            color: white;
+        }
+
+        .btn-secondary {
+            border: 2px solid #4C9CFF;
+            color: #4C9CFF;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .loader {
+            margin-top: 2rem;
+            border: 5px solid rgba(76, 156, 255, 0.2);
+            border-radius: 50%;
+            border-top: 5px solid #4C9CFF;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .info {
+            margin-top: 2rem;
+            padding: 1rem;
+            border-radius: 8px;
+            background-color: rgba(76, 156, 255, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AnimeWatchList Project</h1>
+        <p>This is a Flask web application for tracking anime you've watched and want to watch. The app allows you to discover, search, and organize anime series.</p>
+
+        <div class="info">
+            <p>To run this project locally:</p>
+            <ol style="text-align: left;">
+                <li>Make sure you have Python and Flask installed</li>
+                <li>Navigate to the project directory in your terminal</li>
+                <li>Run <code>pip install -r requirements.txt</code> to install dependencies</li>
+                <li>Start the app with <code>python app.py</code></li>
+                <li>Open your browser to <code>http://localhost:5000</code></li>
+            </ol>
+        </div>
+
+        <div class="buttons">
+            <a href="https://github.com/BenjaminLTakaki/AnimeWatchList" target="_blank" class="btn btn-primary">View on GitHub</a>
+            <a href="../index.html" class="btn btn-secondary">Back to Portfolio</a>
+        </div>
+
+        <div id="loading" class="loader hidden"></div>
+        <p id="status" class="hidden">Starting AnimeWatchList application...</p>
+    </div>
+
+    <script>
+        // This script would handle any needed logic for launching the app
+        // In a real deployment environment, you would modify this based on how
+        // your application is hosted and accessed
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const appUrl = './index.html'; // This would point to your Flask app's entry point
+            const runAppBtn = document.createElement('a');
+            runAppBtn.href = appUrl;
+            runAppBtn.className = 'btn btn-primary';
+            runAppBtn.textContent = 'Run AnimeWatchList';
+
+            // Add this button to the buttons container
+            document.querySelector('.buttons').prepend(runAppBtn);
+
+            runAppBtn.addEventListener('click', function(e) {
+                // If this was a real launcher, you might want to do some checks here
+                // before redirecting to the app
+                document.getElementById('loading').classList.remove('hidden');
+                document.getElementById('status').classList.remove('hidden');
+            });
+        });
+    </script>
+</body>
+</html>
