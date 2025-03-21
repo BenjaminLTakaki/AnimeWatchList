@@ -776,3 +776,112 @@ section h2::after {
 .btn-secondary:hover {
     background: rgba(76, 156, 255, 0.1);
 }
+/* GitHub Section Styling */
+.github-section {
+    margin-top: 40px;
+    width: 100%;
+}
+
+.github-heading {
+    font-size: 1.8rem;
+    color: var(--accent-primary);
+    margin-bottom: 25px;
+    text-align: center;
+    position: relative;
+}
+
+    .github-heading::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80px;
+        height: 3px;
+        background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+        border-radius: 2px;
+    }
+
+.repo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.repo-card {
+    background: var(--background-secondary);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    border: 1px solid transparent;
+    transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+    .repo-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+        border-color: var(--accent-primary);
+    }
+
+    .repo-card h4 {
+        font-size: 1.4rem;
+        margin: 0 0 15px 0;
+        color: var(--accent-primary);
+    }
+
+    .repo-card p {
+        color: var(--text-secondary);
+        margin: 0 0 15px 0;
+        flex-grow: 1;
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+
+.repo-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.language {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.lang-color {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.repo-links {
+    margin-top: auto;
+}
+
+    .repo-links .btn {
+        width: 100%;
+        text-align: center;
+        font-size: 0.9rem;
+    }
+
+.loading {
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 20px;
+}
+
+/* Media queries to ensure responsive layout */
+@media (max-width: 768px) {
+    .repo-grid {
+        grid-template-columns: 1fr;
+    }
+}
