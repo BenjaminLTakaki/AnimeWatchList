@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Benjamin Takaki - Portfolio</title>
     <link rel="stylesheet" href="styles/styles.css" />
+    <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" integrity="sha512-iBBXm8fW90+nuLcSKVB1DVXQ3R/4IWp/jBsjmLbzRv7ZvUc4VjZdE6Vmvv4v1T5GkZMc5Ny9GD0RrR1r99C1sw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 </head>
 <body>
@@ -100,7 +101,7 @@
                             <span class="tag">API</span>
                         </div>
                         <div class="project-links">
-                            <a href="/animewatchlist" class="btn btn-primary">
+                            <a href="/animewatchlist" class="btn btn-primary" onclick="showLoading(event)">
                                 <i class="fas fa-external-link-alt"></i> View Project
                             </a>
                             <a href="https://github.com/BenjaminLTakaki/AnimeWatchList" target="_blank" class="btn btn-secondary">
@@ -110,13 +111,24 @@
                     </div>
                 </div>
 
-                <!-- GitHub Repositories Section -->
-                <div id="github-section" class="github-section">
+                <script>
+                    // Add this function to your existing JavaScript
+                    function showLoading(event) {
+                        // Create a loading overlay
+                        const loadingOverlay = document.createElement('div');
+                        loadingOverlay.className = 'loading-overlay';
+                        loadingOverlay.innerHTML = `
+                        <div class="loading-spinner"></div>
+                        <p>Loading AnimeWatchList...</p>
+                    `;
+                        document.body.appendChild(loadingOverlay);
+                    }
+                </script>
+
+                <!-- GitHub Repositories Section - Displaying top 3 repos -->
+                <div id="github-projects" class="github-section">
                     <h3 class="github-heading">From My GitHub</h3>
-                    <div id="github-repos" class="repo-grid">
-                        <!-- GitHub repos will be loaded here via JavaScript -->
-                        <div class="loading">Loading projects...</div>
-                    </div>
+                    <div id="github-repos" class="repo-grid"></div>
                 </div>
             </div>
         </div>
@@ -146,6 +158,7 @@
         <p>&copy; 2024 Benjamin Takaki. All rights reserved.</p>
     </footer>
 
+    <!-- Scripts -->
     <!-- EmailJS SDK -->
     <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
     <script src="script.js"></script>
