@@ -2,6 +2,7 @@ import os
 import json
 import requests
 import time
+import random
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
 
 # Determine if running in production or locally
@@ -15,40 +16,38 @@ app = Flask(
 )
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "anime_tracker_secret")
 
-# Set application root for production
-if is_production:
-    app.config['APPLICATION_ROOT'] = '/animewatchlist'
-    # Also add this to help with URL generation
-    app.config['PREFERRED_URL_SCHEME'] = 'https'
-
 # Helper function to handle URLs in production vs development
 def get_url_for(*args, **kwargs):
     """Generate URL considering the application root in production."""
     url = url_for(*args, **kwargs)
-    if is_production and app.config.get('APPLICATION_ROOT'):
-        url = f"{app.config['APPLICATION_ROOT']}{url}"
+    if is_production:
+        url = f"/animewatchlist{url}"
     return url
+
+# Set application root if in production
+if is_production:
+    app.config['APPLICATION_ROOT'] = '/projects/animewatchlist'
+    # Also add this to help with URL generation
+    app.config['PREFERRED_URL_SCHEME'] = 'https'
 
 # Global anime queue to serve one anime at a time
 anime_queue = []
 
 # Directory and file paths for status tracking
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+DATA_DIR = "projects/animewatchlist/data"
 os.makedirs(DATA_DIR, exist_ok=True)
 WATCHED_FILE = os.path.join(DATA_DIR, "watched.json")
 NOT_WATCHED_FILE = os.path.join(DATA_DIR, "not_watched.json")
-PAGE_TRACKER_FILE = os.path.join(DATA_DIR, "page_tracker.json")
 
 # Jikan API base URL (no authentication needed)
 JIKAN_API_BASE = "https://api.jikan.moe/v4"
 
 def ensure_status_files():
     """Ensure that status JSON files exist and are properly initialized."""
-    for file in [WATCHED_FILE, NOT_WATCHED_FILE, PAGE_TRACKER_FILE]:
+    for file in [WATCHED_FILE, NOT_WATCHED_FILE]:
         if not os.path.exists(file) or os.path.getsize(file) == 0:
-            default_content = [] if file != PAGE_TRACKER_FILE else {"current_page": 1}
             with open(file, "w", encoding="utf-8") as f:
-                json.dump(default_content, f, indent=2)
+                json.dump([], f, indent=2)
 
 ensure_status_files()
 
@@ -59,12 +58,11 @@ def load_json_file(filepath):
             return json.load(f)
     except json.decoder.JSONDecodeError:
         # If the file content is invalid, reinitialize it
-        default_content = [] if filepath != PAGE_TRACKER_FILE else {"current_page": 1}
         with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(default_content, f, indent=2)
-        return default_content
+            json.dump([], f, indent=2)
+        return []
     except Exception:
-        return [] if filepath != PAGE_TRACKER_FILE else {"current_page": 1}
+        return []
 
 def save_json_file(filepath, data):
     """Save JSON data to a file."""
@@ -78,9 +76,16 @@ def fetch_more_anime():
     global anime_queue
     print("Fetching popular anime...")
     
+    # File to store the current page
+    PAGE_TRACKER_FILE = os.path.join(DATA_DIR, "page_tracker.json")
+    
     # Load the current page from file for persistence
     try:
-        current_page = load_json_file(PAGE_TRACKER_FILE).get('current_page', 1)
+        if os.path.exists(PAGE_TRACKER_FILE):
+            with open(PAGE_TRACKER_FILE, 'r') as f:
+                current_page = json.load(f).get('current_page', 1)
+        else:
+            current_page = 1
     except Exception:
         current_page = 1
     
@@ -110,7 +115,8 @@ def fetch_more_anime():
         current_page += 1
         
         # Save the updated page number to file
-        save_json_file(PAGE_TRACKER_FILE, {'current_page': current_page})
+        with open(PAGE_TRACKER_FILE, 'w') as f:
+            json.dump({'current_page': current_page}, f)
         
         # Load existing anime IDs to avoid duplicates
         watched_list = load_json_file(WATCHED_FILE)
@@ -183,6 +189,13 @@ def get_status_counts():
 def change_anime_status(anime_id, new_status):
     """
     Change an anime's status from watched to not watched or vice versa.
+    
+    Args:
+        anime_id: The ID of the anime to change
+        new_status: The new status ('watched' or 'not_watched')
+    
+    Returns:
+        bool: True if successful, False otherwise
     """
     if new_status not in ["watched", "not_watched"]:
         print(f"Invalid status: {new_status}")
@@ -193,15 +206,29 @@ def change_anime_status(anime_id, new_status):
     not_watched_list = load_json_file(NOT_WATCHED_FILE)
     
     # Check if anime exists in watched list
-    anime_in_watched = next((anime for anime in watched_list if anime["id"] == anime_id), None)
+    anime_in_watched = None
+    for anime in watched_list:
+        if anime["id"] == anime_id:
+            anime_in_watched = anime
+            break
     
     # Check if anime exists in not watched list
-    anime_in_not_watched = next((anime for anime in not_watched_list if anime["id"] == anime_id), None)
+    anime_in_not_watched = None
+    for anime in not_watched_list:
+        if anime["id"] == anime_id:
+            anime_in_not_watched = anime
+            break
+    
+    print(f"Anime ID: {anime_id}")
+    print(f"New status: {new_status}")
+    print(f"Found in watched list: {anime_in_watched is not None}")
+    print(f"Found in not watched list: {anime_in_not_watched is not None}")
     
     # Handle moving to watched
     if new_status == "watched":
         # If already in watched list, do nothing
         if anime_in_watched:
+            print("Anime already in watched list")
             return True
         
         # If in not watched list, move it
@@ -213,12 +240,14 @@ def change_anime_status(anime_id, new_status):
             # Add to watched list
             watched_list.append(anime_in_not_watched)
             save_json_file(WATCHED_FILE, watched_list)
+            print("Moved anime from not watched to watched")
             return True
     
     # Handle moving to not watched
     elif new_status == "not_watched":
         # If already in not watched list, do nothing
         if anime_in_not_watched:
+            print("Anime already in not watched list")
             return True
         
         # If in watched list, move it
@@ -230,6 +259,7 @@ def change_anime_status(anime_id, new_status):
             # Add to not watched list
             not_watched_list.append(anime_in_watched)
             save_json_file(NOT_WATCHED_FILE, not_watched_list)
+            print("Moved anime from watched to not watched")
             return True
     
     # If we couldn't find the anime in either list, try to fetch it from API
@@ -254,9 +284,11 @@ def change_anime_status(anime_id, new_status):
             if new_status == "watched":
                 watched_list.append(anime)
                 save_json_file(WATCHED_FILE, watched_list)
+                print("Added new anime to watched list")
             else:
                 not_watched_list.append(anime)
                 save_json_file(NOT_WATCHED_FILE, not_watched_list)
+                print("Added new anime to not watched list")
                 
             return True
         except Exception as e:
@@ -264,6 +296,14 @@ def change_anime_status(anime_id, new_status):
             return False
             
     return False
+
+# Helper function to handle URLs in production vs development
+def get_url_for(*args, **kwargs):
+    """Generate URL considering the application root in production."""
+    url = url_for(*args, **kwargs)
+    if is_production and app.config.get('APPLICATION_ROOT'):
+        url = f"{app.config['APPLICATION_ROOT']}{url}"
+    return url
 
 @app.route("/change_status/<int:anime_id>/<status>")
 def change_status(anime_id, status):
@@ -312,6 +352,9 @@ def mark():
     Mark the current anime as watched or not watched.
     Remove it from the queue and then redirect back to the home page.
     """
+    # Debug information
+    print("Form data received:", request.form)
+    
     status = request.form.get("status")  # expected: "watched" or "not_watched"
     anime_json = request.form.get("anime")
     
@@ -324,7 +367,10 @@ def mark():
         return redirect(get_url_for("index"))
     
     try:
+        # Print the raw JSON string for debugging
+        print("Raw anime JSON:", anime_json)
         anime = json.loads(anime_json)
+        print("Parsed anime data:", anime)
         
         # Validate required fields
         if "id" not in anime or "title" not in anime:
@@ -350,9 +396,11 @@ def mark():
             
     except json.decoder.JSONDecodeError as e:
         flash(f"Error: Invalid anime data format: {e}")
+        print(f"JSON decode error: {e}")
         return redirect(get_url_for("index"))
     except Exception as e:
         flash(f"Error marking anime: {e}")
+        print(f"Unexpected error: {e}")
         return redirect(get_url_for("index"))
     
     return redirect(get_url_for("index"))
@@ -428,15 +476,22 @@ def mark_search():
         flash("Missing required parameters")
         return redirect(request.referrer or get_url_for("search"))
     
-    change_anime_status(int(anime_id), status)
-    flash(f"Anime marked as {status}!")
+    # Always mark search results as not watched first
+    if status == "watched":
+        change_anime_status(int(anime_id), "not_watched")
+        # Then if needed, mark as watched
+        change_anime_status(int(anime_id), "watched")
+    else:
+        change_anime_status(int(anime_id), status)
     
+    flash(f"Anime marked as {status}!")
     return redirect(request.referrer or get_url_for("search"))
 
 @app.route("/direct_mark/<int:anime_id>/<status>")
 def direct_mark(anime_id, status):
     """
     Alternative method to mark anime by ID directly.
+    This provides a fallback if the form submission isn't working.
     """
     if status not in ["watched", "not_watched"]:
         flash("Invalid status. Must be 'watched' or 'not_watched'.")
@@ -479,6 +534,11 @@ def direct_mark(anime_id, status):
         fetch_more_anime()
     
     return redirect(get_url_for("index"))
+
+# Add a route to serve the connector page
+@app.route("/connector")
+def connector():
+    return render_template("connector.html")
 
 if __name__ == "__main__":
     app.run(debug=True)
