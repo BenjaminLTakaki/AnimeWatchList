@@ -5,11 +5,11 @@ async function fetchAndDisplayRepos() {
 
     if (!reposContainer) return;
 
-    // Clear existing content
+    // Clear existing content and show loading state
     reposContainer.innerHTML = '<div class="loading">Loading projects...</div>';
 
     try {
-        const response = await fetch(`https://api.github.com/users/${githubUsername}/repos?sort=updated&per_page=6`);
+        const response = await fetch(`https://api.github.com/users/${githubUsername}/repos?sort=updated&per_page=8`);
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -20,10 +20,11 @@ async function fetchAndDisplayRepos() {
         // Remove loading indicator
         reposContainer.innerHTML = '';
 
-        // Filter out repos that are already featured
+        // Filter out repos that are already featured or are forks
         const filteredRepos = repos.filter(repo =>
             repo.name.toLowerCase() !== 'animewatchlist' &&
-            repo.name.toLowerCase() !== 'portfoliowebsite'
+            repo.name.toLowerCase() !== 'portfoliowebsite' &&
+            !repo.fork
         );
 
         if (filteredRepos.length === 0) {
@@ -32,7 +33,7 @@ async function fetchAndDisplayRepos() {
         }
 
         // Display each repository
-        filteredRepos.forEach(repo => {
+        filteredRepos.slice(0, 4).forEach(repo => {
             const repoCard = document.createElement('div');
             repoCard.className = 'repo';
 
@@ -61,19 +62,19 @@ async function fetchAndDisplayRepos() {
                     <span class="repo-language">
                         ${repo.language ?
                     `<span class="repo-language-color" style="background-color: ${languageColor}"></span>
-                            ${repo.language}` :
+                        ${repo.language}` :
                     'N/A'}
                     </span>
                     <span class="repo-date">Created: ${formattedDate}</span>
                 </div>
                 <div class="project-links">
-                    <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="btn-secondary">
+                    <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
                         <i class="fab fa-github"></i> View Code
                     </a>
                     ${hasDemo ?
-                    `<a href="${demoUrl}" target="_blank" rel="noopener noreferrer" class="btn-primary">
-                            <i class="fas fa-external-link-alt"></i> Live Demo
-                        </a>` :
+                    `<a href="${demoUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+                        <i class="fas fa-external-link-alt"></i> Live Demo
+                    </a>` :
                     ''}
                 </div>
             `;
