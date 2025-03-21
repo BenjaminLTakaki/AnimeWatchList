@@ -6,6 +6,8 @@
     <title>Projects - Benjamin Takaki</title>
     <link rel="stylesheet" href="../styles/styles.css" />
     <link rel="stylesheet" href="projects.css" />
+    <!-- Add the fixed CSS file -->
+    <link rel="stylesheet" href="fixed-projects.css" />
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" integrity="sha512-iBBXm8fW90+nuLcSKVB1DVXQ3R/4IWp/jBsjmLbzRv7ZvUc4VjZdE6Vmvv4v1T5GkZMc5Ny9GD0RrR1r99C1sw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 </head>
@@ -42,7 +44,7 @@
                     </div>
                     <div class="project-details">
                         <h3>AnimeWatchList</h3>
-                        <p>An anime tracking application built with Python Flask that helps users manage their watched and to-watch anime lists.</p>
+                        <p>A web application for tracking anime you've watched and want to watch. Built with Python Flask, this app allows users to discover, search, and categorize anime series.</p>
                         <div class="project-tags">
                             <span class="tag">Python</span>
                             <span class="tag">Flask</span>
@@ -59,30 +61,32 @@
                             </ul>
                         </div>
                         <div class="project-links">
-                            <a href="/animewatchlist" class="btn btn-primary"><i class="fas fa-external-link-alt"></i> View Project</a>
-                            <a href="https://github.com/BenjaminLTakaki/AnimeWatchList" target="_blank" class="btn btn-secondary"><i class="fab fa-github"></i> GitHub Repo</a>
+                            <a href="/animewatchlist" class="btn-primary"><i class="fas fa-external-link-alt"></i> View Project</a>
+                            <a href="https://github.com/BenjaminLTakaki/AnimeWatchList" target="_blank" class="btn-secondary"><i class="fab fa-github"></i> GitHub Repo</a>
                         </div>
                     </div>
                 </div>
-                
-                <!-- GitHub Repositories Section -->
-                <div class="github-section">
-                    <h3 class="github-heading">My GitHub Projects</h3>
-                    <div id="github-repos" class="repo-grid"></div>
+            </div>
+            
+            <!-- GitHub Projects Section -->
+            <div class="github-projects-section">
+                <h2>My GitHub Projects</h2>
+                <div id="github-repos" class="repo-grid">
+                    <!-- GitHub repositories will be loaded here via JavaScript -->
                 </div>
-                
-                <!-- Placeholder for future projects -->
-                <div class="coming-soon">
-                    <h3>More Projects Coming Soon</h3>
-                    <p>I'm constantly working on new projects. Check back soon for updates!</p>
-                </div>
+            </div>
+            
+            <!-- Placeholder for future projects -->
+            <div class="coming-soon">
+                <h3>More Projects Coming Soon</h3>
+                <p>I'm constantly working on new projects. Check back soon for updates!</p>
             </div>
         </div>
     </section>
 
     <!-- Back to Portfolio Button -->
     <div class="back-to-portfolio">
-        <a href="../index.html" class="btn btn-secondary">
+        <a href="../index.html" class="btn-secondary">
             <i class="fas fa-arrow-left"></i> Back to Portfolio
         </a>
     </div>
@@ -93,8 +97,15 @@
     </footer>
 
     <!-- Scripts -->
+    <!-- Three.js for background -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- GitHub repos script -->
+    <script src="github-repos.js"></script>
+    <!-- Three.js background script -->
+    <script src="three-background.js"></script>
     <!-- EmailJS SDK -->
     <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+    <!-- Main script -->
     <script src="../script.js"></script>
 </body>
 </html>
