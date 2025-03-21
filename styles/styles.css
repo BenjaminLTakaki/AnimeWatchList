@@ -549,7 +549,7 @@ section h2::after {
     }
 
     .project-card {
-        flex-direction: row;
+        flex-direction: column;
         max-height: 300px;
     }
 
