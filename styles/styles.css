@@ -182,14 +182,14 @@ body {
 /* Hero Section */
 .hero {
     display: flex;
-    justify-content: center; 
+    justify-content: flex-start; /* Align content to the left */
     align-items: center;
     min-height: 100vh;
     padding: 0 5%;
     position: relative;
     overflow: hidden;
-    margin-top: 70px; 
-    text-align: center; /* Center-align text */
+    margin-top: 70px;
+    text-align: left; /* Left-align text */
 }
 
     .hero::before {
@@ -204,8 +204,9 @@ body {
     }
 
 .hero-content {
-    max-width: 800px; /* Increased width */
+    max-width: 600px;
     z-index: 1;
+    margin-left: 10%; /* Add some margin from the left edge */
 }
 
 .hero h1 {
@@ -214,23 +215,17 @@ body {
     margin-bottom: 20px;
 }
 
-.hero-name {
-    font-size: 4rem; /* Larger font for the name */
+.highlight {
     background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin-bottom: 30px;
-    display: block;
 }
 
 .hero p {
     font-size: 1.2rem;
     color: var(--text-secondary);
     margin-bottom: 30px;
-    max-width: 650px;
-    margin-left: auto;
-    margin-right: auto;
 }
 
 .cta-buttons {
@@ -238,7 +233,12 @@ body {
     flex-wrap: wrap;
     gap: 15px;
     margin-bottom: 20px;
-    justify-content: center; /* Center the buttons */
+    justify-content: flex-start; /* Align buttons to the left */
+}
+
+/* Remove the hero-image section if you want just text on the left */
+.hero-image {
+    display: none;
 }
 
 .btn {
