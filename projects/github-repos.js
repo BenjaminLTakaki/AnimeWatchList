@@ -1,18 +1,16 @@
-// Function to fetch and display GitHub repositories
+// Function to fetch and display GitHub repositories 
 async function fetchAndDisplayRepos() {
     const githubUsername = 'BenjaminLTakaki';
     const reposContainer = document.getElementById('github-repos');
 
     if (!reposContainer) return;
 
-    // Clear existing content and show loading state
-    reposContainer.innerHTML = '<div class="loading">Loading projects...</div>';
-
     try {
-        const response = await fetch(`https://api.github.com/users/${githubUsername}/repos?sort=updated&per_page=8`);
+        // Make request to GitHub API
+        const response = await fetch(`https://api.github.com/users/${githubUsername}/repos?sort=updated&per_page=10`);
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error(`GitHub API error: ${response.status}`);
         }
 
         const repos = await response.json();
@@ -20,36 +18,44 @@ async function fetchAndDisplayRepos() {
         // Remove loading indicator
         reposContainer.innerHTML = '';
 
-        // Filter out repos that are already featured or are forks
+        // Filter out repos that are forks or empty
         const filteredRepos = repos.filter(repo =>
-            repo.name.toLowerCase() !== 'animewatchlist' &&
-            repo.name.toLowerCase() !== 'portfoliowebsite' &&
-            !repo.fork
+            !repo.fork &&
+            repo.name.toLowerCase() !== 'benjaminltakaki' &&
+            repo.name.toLowerCase() !== 'portfoliowebsite'
         );
 
         if (filteredRepos.length === 0) {
-            reposContainer.innerHTML = '<p class="no-repos">No other repositories found</p>';
+            reposContainer.innerHTML = '<p class="no-repos">No repositories found.</p>';
             return;
         }
 
-        // Display each repository
-        filteredRepos.slice(0, 4).forEach(repo => {
+        // Sort repos by last updated date
+        filteredRepos.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+
+        // Display up to 6 repositories
+        filteredRepos.slice(0, 6).forEach(repo => {
             const repoCard = document.createElement('div');
             repoCard.className = 'repo';
 
-            // Format the date
+            // Format created date
             const createdDate = new Date(repo.created_at);
             const formattedDate = createdDate.toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'short'
             });
 
-            // Determine if the repo has a demo/homepage
+            // Determine if has a demo link
             const hasDemo = repo.homepage || (repo.has_pages && repo.name);
             const demoUrl = repo.homepage || (repo.has_pages ? `https://${githubUsername}.github.io/${repo.name}` : null);
 
             // Get language color
             const languageColor = getLanguageColor(repo.language);
+
+            // Limit description length
+            const description = repo.description
+                ? (repo.description.length > 100 ? repo.description.substring(0, 100) + '...' : repo.description)
+                : 'No description available.';
 
             repoCard.innerHTML = `
                 <h3>
@@ -57,24 +63,24 @@ async function fetchAndDisplayRepos() {
                         ${repo.name}
                     </a>
                 </h3>
-                <p>${repo.description || 'No description available.'}</p>
+                <p>${description}</p>
                 <div class="repo-meta">
                     <span class="repo-language">
                         ${repo.language ?
                     `<span class="repo-language-color" style="background-color: ${languageColor}"></span>
-                        ${repo.language}` :
+                            ${repo.language}` :
                     'N/A'}
                     </span>
                     <span class="repo-date">Created: ${formattedDate}</span>
                 </div>
                 <div class="project-links">
-                    <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+                    <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="btn-secondary">
                         <i class="fab fa-github"></i> View Code
                     </a>
                     ${hasDemo ?
-                    `<a href="${demoUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
-                        <i class="fas fa-external-link-alt"></i> Live Demo
-                    </a>` :
+                    `<a href="${demoUrl}" target="_blank" rel="noopener noreferrer" class="btn-primary">
+                            <i class="fas fa-external-link-alt"></i> Live Demo
+                        </a>` :
                     ''}
                 </div>
             `;
@@ -86,7 +92,8 @@ async function fetchAndDisplayRepos() {
         console.error('Error fetching GitHub repositories:', error);
         reposContainer.innerHTML = `
             <div class="error-message">
-                <p>Unable to load GitHub repositories. Please try again later.</p>
+                <p><i class="fas fa-exclamation-triangle"></i> Unable to load GitHub repositories. Please try again later.</p>
+                <p class="error-details">${error.message}</p>
             </div>
         `;
     }

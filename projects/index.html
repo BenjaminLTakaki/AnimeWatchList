@@ -34,7 +34,9 @@
             <h1>My Projects</h1>
             <p class="lead">A collection of software and web development projects I've created.</p>
             
-            <div class="projects-grid">
+            <div class="featured-projects">
+                <h2>Featured Projects</h2>
+                
                 <!-- AnimeWatchList Project -->
                 <div class="project-card">
                     <div class="project-image">
@@ -68,16 +70,14 @@
             
             <!-- GitHub Projects Section -->
             <div class="github-projects-section">
-                <h2>My GitHub Projects</h2>
+                <h2>GitHub Projects</h2>
                 <div id="github-repos" class="repo-grid">
                     <!-- GitHub repositories will be loaded here via JavaScript -->
+                    <div class="loading-container">
+                        <div class="loading-spinner"></div>
+                        <p>Loading GitHub projects...</p>
+                    </div>
                 </div>
-            </div>
-            
-            <!-- Placeholder for future projects -->
-            <div class="coming-soon">
-                <h3>More Projects Coming Soon</h3>
-                <p>I'm constantly working on new projects. Check back soon for updates!</p>
             </div>
         </div>
     </section>
