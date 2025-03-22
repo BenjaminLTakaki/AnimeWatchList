@@ -20,7 +20,7 @@ anime_app.config['PREFERRED_URL_SCHEME'] = 'https'
 
 # Set static URL path for the anime app
 anime_app.static_url_path = '/animewatchlist/static'
-anime_app.static_folder = 'projects/animewatchlist/static'
+anime_app.static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'projects/animewatchlist/static')
 
 # Set up routes for the main application to serve static files
 @main_app.route('/')
@@ -44,13 +44,6 @@ def anime_redirect():
 def anime_static(filename):
     return send_from_directory('projects/animewatchlist/static', filename)
 
-# Also serve static files from the app itself
-anime_app.add_url_rule(
-    '/static/<path:filename>',
-    endpoint='static',
-    view_func=lambda filename: send_from_directory('static', filename)
-)
-
 # Custom middleware to handle the mounting properly
 class PathFixMiddleware:
     def __init__(self, app, script_name):
@@ -71,6 +64,19 @@ patched_anime_app = PathFixMiddleware(anime_app, '/animewatchlist')
 application = DispatcherMiddleware(main_app, {
     '/animewatchlist': patched_anime_app
 })
+
+# Add a debug route to main app to check configuration
+@main_app.route('/debug_config')
+def debug_config():
+    config_info = {
+        "main_app_static_folder": main_app.static_folder,
+        "anime_app_static_folder": anime_app.static_folder,
+        "anime_app_static_url_path": anime_app.static_url_path,
+        "anime_app_application_root": anime_app.config.get('APPLICATION_ROOT', 'Not set'),
+        "current_directory": os.path.dirname(os.path.abspath(__file__)),
+        "static_files_exist": os.path.exists('projects/animewatchlist/static/style.css')
+    }
+    return f"<pre>{str(config_info)}</pre>"
 
 if __name__ == "__main__":
     from werkzeug.serving import run_simple
