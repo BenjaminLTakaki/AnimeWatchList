@@ -18,6 +18,10 @@ from app import app as anime_app
 anime_app.config['APPLICATION_ROOT'] = '/animewatchlist'
 anime_app.config['PREFERRED_URL_SCHEME'] = 'https'
 
+# Set static URL path for the anime app
+anime_app.static_url_path = '/animewatchlist/static'
+anime_app.static_folder = 'projects/animewatchlist/static'
+
 # Set up routes for the main application to serve static files
 @main_app.route('/')
 def index():
