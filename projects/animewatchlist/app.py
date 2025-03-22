@@ -16,6 +16,15 @@ app = Flask(
 )
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "anime_tracker_secret")
 
+
+if is_production:
+    app.config['APPLICATION_ROOT'] = '/animewatchlist'
+    app.config['PREFERRED_URL_SCHEME'] = 'https'
+    app.static_url_path = '/animewatchlist/static'
+else:
+    app.static_url_path = '/static'
+
+
 # Helper function to handle URLs in production vs development
 def get_url_for(*args, **kwargs):
     """Generate URL considering the application root in production."""
@@ -306,6 +315,13 @@ def get_url_for(*args, **kwargs):
         if not url.startswith('/animewatchlist'):
             url = f"/animewatchlist{url}"
     return url
+
+def get_static_url(filename):
+    """Generate URL for static files considering the environment."""
+    if is_production:
+        return f"/animewatchlist/static/{filename}"
+    else:
+        return url_for('static', filename=filename)
 
 @app.route("/change_status/<int:anime_id>/<status>")
 def change_status(anime_id, status):
