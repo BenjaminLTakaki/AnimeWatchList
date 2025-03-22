@@ -316,13 +316,6 @@ def get_url_for(*args, **kwargs):
             url = f"/animewatchlist{url}"
     return url
 
-def get_static_url(filename):
-    """Generate URL for static files considering the environment."""
-    if is_production:
-        return f"/animewatchlist/static/{filename}"
-    else:
-        return url_for('static', filename=filename)
-
 @app.route("/change_status/<int:anime_id>/<status>")
 def change_status(anime_id, status):
     """

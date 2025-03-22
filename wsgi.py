@@ -44,6 +44,13 @@ def anime_redirect():
 def anime_static(filename):
     return send_from_directory('projects/animewatchlist/static', filename)
 
+# Also serve static files from the app itself
+anime_app.add_url_rule(
+    '/static/<path:filename>',
+    endpoint='static',
+    view_func=lambda filename: send_from_directory('static', filename)
+)
+
 # Custom middleware to handle the mounting properly
 class PathFixMiddleware:
     def __init__(self, app, script_name):
