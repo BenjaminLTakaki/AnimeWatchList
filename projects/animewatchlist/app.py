@@ -301,8 +301,10 @@ def change_anime_status(anime_id, new_status):
 def get_url_for(*args, **kwargs):
     """Generate URL considering the application root in production."""
     url = url_for(*args, **kwargs)
-    if is_production and app.config.get('APPLICATION_ROOT'):
-        url = f"{app.config['APPLICATION_ROOT']}{url}"
+    if is_production:
+        # Make sure the application root is properly prepended
+        if not url.startswith('/animewatchlist'):
+            url = f"/animewatchlist{url}"
     return url
 
 @app.route("/change_status/<int:anime_id>/<status>")
