@@ -18,7 +18,7 @@ from app import app as anime_app
 anime_app.config['APPLICATION_ROOT'] = '/animewatchlist'
 anime_app.config['PREFERRED_URL_SCHEME'] = 'https'
 
-# Set static URL path for the anime app
+# Set static URL path for the anime app - do this only once
 anime_app.static_url_path = '/animewatchlist/static'
 anime_app.static_folder = 'projects/animewatchlist/static'
 
@@ -44,12 +44,7 @@ def anime_redirect():
 def anime_static(filename):
     return send_from_directory('projects/animewatchlist/static', filename)
 
-# Fix for the static files in the AnimeWatchList app
-@main_app.route('/animewatchlist/static/<path:filename>')
-def anime_static(filename):
-    return send_from_directory('projects/animewatchlist/static', filename)
-
-# Add specific route for the CSS file
+# Add specific route for CSS file with a UNIQUE name
 @main_app.route('/animewatchlist/static/style.css')
 def anime_css():
     return send_from_directory('projects/animewatchlist/static', 'style.css', mimetype='text/css')
@@ -75,14 +70,17 @@ application = DispatcherMiddleware(main_app, {
     '/animewatchlist': patched_anime_app
 })
 
+# Add additional middleware to properly handle static files
 class StaticURLProcessor:
     def __init__(self, app):
         self.app = app
-    
+       
     def __call__(self, environ, start_response):
         if environ['PATH_INFO'].startswith('/animewatchlist/static/'):
             environ['PATH_INFO'] = environ['PATH_INFO'].replace('/animewatchlist', '', 1)
         return self.app(environ, start_response)
+
+# Apply the StaticURLProcessor middleware
 application = StaticURLProcessor(application)
 
 # Add a debug route to main app to check configuration
