@@ -5,6 +5,11 @@ import time
 import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_login import login_required, current_user
+from dotenv import load_dotenv
+from sqlalchemy import inspect
+
+# Load environment variables
+load_dotenv()
 
 # Configure Flask app
 is_production = os.environ.get('RENDER', False)
@@ -22,7 +27,7 @@ if is_production:
 else:
     app.static_url_path = '/static'
 
-# Helper function to handle URLs in production vs development
+# Define helper function for URL generation
 def get_url_for(*args, **kwargs):
     url = url_for(*args, **kwargs)
     if is_production and not url.startswith('/animewatchlist'):
@@ -36,9 +41,16 @@ def inject_template_vars():
         'current_year': datetime.datetime.now().year
     }
 
-# Import and initialize auth system AFTER app is created
-from auth import init_auth, User
+# Import and initialize auth system
+from auth import init_auth
 db = init_auth(app, get_url_for, lambda user_id: (0, 0))  # Temporary function, will be replaced
+
+# Create tables explicitly
+with app.app_context():
+    db.create_all()  # Create user tables
+
+# Now that the database is initialized, we can import the User model
+from auth import User
 
 # Import and initialize user data AFTER db is initialized
 from user_data import init_user_data, get_user_anime_list, get_status_counts
@@ -52,6 +64,10 @@ Anime, UserAnimeList = init_user_data(db)
 import auth
 auth.get_status_counts = get_status_counts
 
+# Create all tables again to ensure all models are registered
+with app.app_context():
+    db.create_all()
+
 # Global anime queue to serve one anime at a time
 anime_queue = []
 
@@ -60,6 +76,27 @@ os.makedirs('data', exist_ok=True)
 
 # Jikan API base URL
 JIKAN_API_BASE = "https://api.jikan.moe/v4"
+
+# Debug route to manually create tables if needed
+@app.route("/debug/create_tables")
+def create_tables():
+    """Manual route to create database tables."""
+    try:
+        with app.app_context():
+            # Create auth tables
+            db.create_all()
+            
+            # Create user data tables explicitly if needed
+            inspector = inspect(db.engine)
+            if 'anime' not in inspector.get_table_names():
+                db.Anime.__table__.create(db.engine)
+            if 'user_anime_list' not in inspector.get_table_names():
+                db.UserAnimeList.__table__.create(db.engine)
+                
+        flash("Database tables created successfully!")
+    except Exception as e:
+        flash(f"Error creating tables: {e}")
+    return redirect(url_for('index'))
 
 def fetch_more_anime():
     """
@@ -172,7 +209,11 @@ def index():
     not_watched_count = 0
     
     if current_user.is_authenticated:
-        watched_count, not_watched_count = get_status_counts(current_user.id)
+        try:
+            watched_count, not_watched_count = get_status_counts(current_user.id)
+        except Exception as e:
+            print(f"Error getting status counts: {e}")
+            flash("There was an issue accessing your anime lists. Try visiting the debug page.")
     
     return render_template("index.html", 
                            anime=current_anime,
@@ -321,7 +362,7 @@ def change_status(anime_id, status):
         flash(f"Could not change anime status. Anime not found or already in that status.")
     
     # Redirect back to the referring page
-    if 'search' in request.referrer and search_query:
+    if request.referrer and 'search' in request.referrer and search_query:
         return redirect(url_for('search', query=search_query))
     return redirect(request.referrer or get_url_for("index"))
 

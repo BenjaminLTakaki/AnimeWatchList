@@ -2,12 +2,17 @@ import os
 import sys
 import datetime
 from flask import Flask, send_from_directory, redirect, request
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Create a main application to serve both static files and the AnimeWatchList app
 main_app = Flask(__name__, static_folder='.')
 
 # Set production flag for the anime app
-os.environ['RENDER'] = 'true'
+if os.environ.get('RENDER', False):
+    os.environ['RENDER'] = 'true'
 
 # Set the Python path to include the animewatchlist directory
 animewatchlist_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'projects/animewatchlist')

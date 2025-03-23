@@ -1,10 +1,3 @@
-# Add these to requirements.txt
-# Flask-Login==0.6.2
-# Flask-SQLAlchemy==3.0.3
-# Flask-WTF==1.1.1
-# Werkzeug==2.2.3
-# email_validator==2.0.0
-
 import os
 import datetime
 from flask import Flask, redirect, url_for, flash, render_template, request
@@ -15,10 +8,12 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
 
+__all__ = ['init_auth', 'User', 'db']
+
 # Initialize SQLAlchemy
 db = SQLAlchemy()
 
-# Define User model
+# Define User model - Make it globally available
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
@@ -31,7 +26,7 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-# Registration form
+# Registration form - Make it globally available
 class RegistrationForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=4, max=25)])
     email = StringField('Email', validators=[DataRequired(), Email()])
@@ -49,14 +44,16 @@ class RegistrationForm(FlaskForm):
         if user:
             raise ValidationError('That email is taken. Please choose a different one.')
 
-# Login form
+# Login form - Make it globally available
 class LoginForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
     remember = BooleanField('Remember Me')
     submit = SubmitField('Login')
 
-# Store auth routes
+# Initialize globals that will be set by init_auth
+get_url_for = None
+get_status_counts = None
 auth_routes = {}
 
 def init_auth(app, get_url_for_func, get_status_counts_func):
@@ -69,11 +66,22 @@ def init_auth(app, get_url_for_func, get_status_counts_func):
         get_status_counts_func: Function to get status counts (imported from user_data)
     """
     # Configure database
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:////var/data/users.db')
+    database_uri = os.environ.get('DATABASE_URL', 'postgresql://postgres:password@localhost/animewatchlist')
+    
+    # Fix for Render PostgreSQL URLs
+    if database_uri.startswith('postgres://'):
+        database_uri = database_uri.replace('postgres://', 'postgresql://', 1)
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Initialize database with app
     db.init_app(app)
+    
+    # Store the functions as globals accessible within this module
+    global get_url_for, get_status_counts
+    get_url_for = get_url_for_func
+    get_status_counts = get_status_counts_func
     
     # Initialize LoginManager
     login_manager = LoginManager()
@@ -88,11 +96,6 @@ def init_auth(app, get_url_for_func, get_status_counts_func):
     # Create database tables
     with app.app_context():
         db.create_all()
-    
-    # Store the functions as globals accessible within this module
-    global get_url_for, get_status_counts
-    get_url_for = get_url_for_func
-    get_status_counts = get_status_counts_func
     
     # Register routes
     app.add_url_rule('/register', view_func=register, methods=['GET', 'POST'])
@@ -157,7 +160,3 @@ def profile():
                           watched_count=watched_count, 
                           not_watched_count=not_watched_count, 
                           get_url_for=get_url_for)
-
-# Initialize globals that will be set by init_auth
-get_url_for = None
-get_status_counts = None

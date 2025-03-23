@@ -125,11 +125,12 @@ def get_anime_status_for_user(user_id, mal_id):
 
 def init_user_data(database):
     """Initialize models with the database from auth.py"""
-    global db, Anime, UserAnimeList
+    global db
     db = database
     
     # Now define real models that use the db instance
     class Anime(db.Model):
+        __tablename__ = 'anime'  # Explicitly set table name
         id = db.Column(db.Integer, primary_key=True)
         mal_id = db.Column(db.Integer, nullable=False)
         title = db.Column(db.String(255), nullable=False)
@@ -149,6 +150,7 @@ def init_user_data(database):
             }
 
     class UserAnimeList(db.Model):
+        __tablename__ = 'user_anime_list'  # Explicitly set table name
         id = db.Column(db.Integer, primary_key=True)
         user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
         anime_id = db.Column(db.Integer, db.ForeignKey('anime.id'), nullable=False)
@@ -167,4 +169,5 @@ def init_user_data(database):
     db.Anime = Anime
     db.UserAnimeList = UserAnimeList
     
+    # We'll let the calling code handle creating tables within the app context
     return Anime, UserAnimeList
