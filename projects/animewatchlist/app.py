@@ -27,9 +27,8 @@ else:
 
 # Helper function to handle URLs in production vs development
 def get_url_for(*args, **kwargs):
-    """Generate URL considering the application root in production."""
     url = url_for(*args, **kwargs)
-    if is_production:
+    if is_production and not url.startswith('/animewatchlist'):
         url = f"/animewatchlist{url}"
     return url
 
