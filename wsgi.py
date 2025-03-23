@@ -1,8 +1,6 @@
 import os
 import sys
-from flask import Flask, send_from_directory, redirect
-from werkzeug.middleware.dispatcher import DispatcherMiddleware
-from werkzeug.wrappers import Response
+from flask import Flask, send_from_directory, redirect, request
 
 # Create a main application to serve both static files and the AnimeWatchList app
 main_app = Flask(__name__, static_folder='.')
@@ -14,13 +12,12 @@ os.environ['RENDER'] = 'true'
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'projects/animewatchlist'))
 from app import app as anime_app
 
-# Configure anime_app to know it's mounted at /animewatchlist
+# Configure anime_app
 anime_app.config['APPLICATION_ROOT'] = '/animewatchlist'
 anime_app.config['PREFERRED_URL_SCHEME'] = 'https'
 
-# Set static URL path for the anime app - do this only once
-anime_app.static_url_path = '/animewatchlist/static'
-anime_app.static_folder = 'projects/animewatchlist/static'
+# Define static folders explicitly
+ANIME_APP_STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'projects/animewatchlist/static')
 
 # Set up routes for the main application to serve static files
 @main_app.route('/')
@@ -39,62 +36,111 @@ def serve_static(path):
 def anime_redirect():
     return redirect('/animewatchlist/')
 
-# Fix for the static files in the AnimeWatchList app
+# CRITICAL: Handle anime app's static files from the main app
 @main_app.route('/animewatchlist/static/<path:filename>')
 def anime_static(filename):
-    return send_from_directory('projects/animewatchlist/static', filename)
+    print(f"Serving static file: {filename} from {ANIME_APP_STATIC_DIR}")
+    if os.path.exists(os.path.join(ANIME_APP_STATIC_DIR, filename)):
+        return send_from_directory(ANIME_APP_STATIC_DIR, filename)
+    else:
+        print(f"Static file not found: {filename}")
+        # Fallback: check if the file exists in the root static folder
+        if os.path.exists(os.path.join('static', filename)):
+            return send_from_directory('static', filename)
+        return f"Static file {filename} not found", 404
 
-# Add specific route for CSS file with a UNIQUE name
-@main_app.route('/animewatchlist/static/style.css')
-def anime_css():
-    return send_from_directory('projects/animewatchlist/static', 'style.css', mimetype='text/css')
-
-# Custom middleware to handle the mounting properly
-class PathFixMiddleware:
-    def __init__(self, app, script_name):
-        self.app = app
-        self.script_name = script_name
-
-    def __call__(self, environ, start_response):
-        script_name = environ.get('SCRIPT_NAME', '')
-        if script_name == self.script_name:
-            environ['SCRIPT_NAME'] = self.script_name
-            environ['PATH_INFO'] = environ['PATH_INFO'].replace(self.script_name, '', 1)
-        return self.app(environ, start_response)
-
-# Apply the PathFixMiddleware to anime_app
-patched_anime_app = PathFixMiddleware(anime_app, '/animewatchlist')
-
-# Mount the anime_app at the /animewatchlist prefix
-application = DispatcherMiddleware(main_app, {
-    '/animewatchlist': patched_anime_app
-})
-
-# Add additional middleware to properly handle static files
-class StaticURLProcessor:
+# Class to handle routing to the anime app
+class AnimeAppDispatcher:
     def __init__(self, app):
         self.app = app
-       
+        
     def __call__(self, environ, start_response):
-        if environ['PATH_INFO'].startswith('/animewatchlist/static/'):
-            environ['PATH_INFO'] = environ['PATH_INFO'].replace('/animewatchlist', '', 1)
-        return self.app(environ, start_response)
+        # Handle requests to the anime app
+        path_info = environ.get('PATH_INFO', '')
+        
+        # Special handling for static files
+        if path_info.startswith('/animewatchlist/static/'):
+            # Rewrite the request to use our special static file handler
+            environ['PATH_INFO'] = path_info
+            return main_app(environ, start_response)
+            
+        # For all other /animewatchlist paths, route to the anime app
+        if path_info.startswith('/animewatchlist'):
+            script_name = '/animewatchlist'
+            environ['SCRIPT_NAME'] = script_name
+            environ['PATH_INFO'] = path_info[len(script_name):]
+            return anime_app(environ, start_response)
+            
+        # Everything else goes to the main app
+        return main_app(environ, start_response)
 
-# Apply the StaticURLProcessor middleware
-application = StaticURLProcessor(application)
+# Set up the WSGI application with our custom dispatcher
+application = AnimeAppDispatcher(main_app)
 
-# Add a debug route to main app to check configuration
-@main_app.route('/debug_config')
-def debug_config():
-    config_info = {
-        "main_app_static_folder": main_app.static_folder,
-        "anime_app_static_folder": anime_app.static_folder,
-        "anime_app_static_url_path": anime_app.static_url_path,
-        "anime_app_application_root": anime_app.config.get('APPLICATION_ROOT', 'Not set'),
-        "current_directory": os.path.dirname(os.path.abspath(__file__)),
-        "static_files_exist": os.path.exists('projects/animewatchlist/static/style.css')
-    }
-    return f"<pre>{str(config_info)}</pre>"
+# Create CSS files in required locations if they don't exist
+def ensure_static_files_exist():
+    """Make sure required static files exist in the appropriate directories."""
+    # Define source and destination directories
+    css_source = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'projects/animewatchlist/static/style.css')
+    js_source = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'projects/animewatchlist/static/script.js')
+    
+    # Create directories if they don't exist
+    os.makedirs(ANIME_APP_STATIC_DIR, exist_ok=True)
+    
+    # Create style.css if it doesn't exist
+    if not os.path.exists(css_source):
+        print(f"Creating missing CSS file at {css_source}")
+        with open(css_source, 'w') as f:
+            # Copy content from existing CSS file
+            try:
+                with open('projects/animewatchlist/static/style.css', 'r') as source:
+                    f.write(source.read())
+            except:
+                # Fallback: write basic CSS
+                f.write("""/* static/style.css */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+}
+
+header {
+    background: #2E51A2; /* MAL blue */
+    color: white;
+    padding: 1em;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.8em;
+}
+
+/* Rest of your existing CSS or new CSS */
+""")
+    
+    # Create script.js if it doesn't exist
+    if not os.path.exists(js_source):
+        print(f"Creating missing JS file at {js_source}")
+        with open(js_source, 'w') as f:
+            # Copy content from existing JS file or write basic JS
+            try:
+                with open('projects/animewatchlist/static/script.js', 'r') as source:
+                    f.write(source.read())
+            except:
+                # Fallback: write basic JS
+                f.write("""// static/script.js
+document.addEventListener("DOMContentLoaded", function () {
+    console.log("Anime Tracker loaded.");
+});
+""")
+
+# Run this function to ensure static files exist
+ensure_static_files_exist()
 
 if __name__ == "__main__":
     from werkzeug.serving import run_simple

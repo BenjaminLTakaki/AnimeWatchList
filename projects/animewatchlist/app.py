@@ -308,6 +308,16 @@ def change_anime_status(anime_id, new_status):
 # Helper function to handle URLs in production vs development
 def get_url_for(*args, **kwargs):
     """Generate URL considering the application root in production."""
+    # Special case for static files
+    if args and args[0] == 'static':
+        if is_production:
+            # Make sure we have the correct path for static files
+            return f"/animewatchlist/static/{kwargs.get('filename', '')}"
+        else:
+            # In development
+            return f"/static/{kwargs.get('filename', '')}"
+    
+    # For other routes
     url = url_for(*args, **kwargs)
     if is_production:
         # Make sure the application root is properly prepended
