@@ -3,21 +3,48 @@
 {% block title %}Login - Anime Tracker{% endblock %}
 
 {% block content %}
-<div class="login-container">
-    <h2>Login to MyAnimeList</h2>
-    <p>To track your anime and sync with MyAnimeList, you need to login with your MAL account.</p>
+<div class="auth-container">
+    <h2>Login to Anime Tracker</h2>
 
-    <div class="login-button">
-        <a href="{{ auth_url }}" class="mal-login-btn">Login with MyAnimeList</a>
-    </div>
+    <form method="POST" action="{{ get_url_for('login') }}" class="auth-form">
+        {{ form.hidden_tag() }}
 
-    <div class="login-info">
-        <h3>Why login?</h3>
-        <ul>
-            <li>Mark anime as watched or not watched on MyAnimeList</li>
-            <li>Sync your existing MAL lists with this app</li>
-            <li>Keep your anime tracking consistent across devices</li>
-        </ul>
-    </div>
+        <div class="form-group">
+            {{ form.email.label(class="form-label") }}
+            {{ form.email(class="form-control") }}
+            {% if form.email.errors %}
+            <div class="invalid-feedback">
+                {% for error in form.email.errors %}
+                <span>{{ error }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            {{ form.password.label(class="form-label") }}
+            {{ form.password(class="form-control") }}
+            {% if form.password.errors %}
+            <div class="invalid-feedback">
+                {% for error in form.password.errors %}
+                <span>{{ error }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="form-check">
+            {{ form.remember(class="form-check-input") }}
+            {{ form.remember.label(class="form-check-label") }}
+        </div>
+
+        <div class="form-action">
+            {{ form.submit(class="btn btn-primary") }}
+        </div>
+
+        <div class="auth-links">
+            <p>Need an account? <a href="{{ get_url_for('register') }}">Sign Up Now</a></p>
+        </div>
+    </form>
 </div>
 {% endblock %}

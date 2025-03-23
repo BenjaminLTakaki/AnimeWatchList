@@ -1,5 +1,6 @@
 import os
 import sys
+import datetime
 from flask import Flask, send_from_directory, redirect, request
 
 # Create a main application to serve both static files and the AnimeWatchList app
@@ -8,9 +9,22 @@ main_app = Flask(__name__, static_folder='.')
 # Set production flag for the anime app
 os.environ['RENDER'] = 'true'
 
+# Set the Python path to include the animewatchlist directory
+animewatchlist_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'projects/animewatchlist')
+sys.path.insert(0, animewatchlist_path)
+
+# Define the path to ensure it exists before import
+os.makedirs(os.path.join(animewatchlist_path, 'data'), exist_ok=True)
+
 # Import the AnimeWatchList app
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'projects/animewatchlist'))
-from app import app as anime_app
+from projects.animewatchlist.app import app as anime_app
+
+# Create a standard context processor to inject variables into all templates
+@anime_app.context_processor
+def inject_template_vars():
+    return {
+        'current_year': datetime.datetime.now().year
+    }
 
 # Configure anime_app
 anime_app.config['APPLICATION_ROOT'] = '/animewatchlist'

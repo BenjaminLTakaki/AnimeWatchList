@@ -3,7 +3,16 @@
 {% block title %}Home - Anime Tracker{% endblock %}
 
 {% block content %}
-  {% if anime %}
+{% if not current_user.is_authenticated %}
+<div class="welcome-message">
+    <h2>Welcome to Anime Tracker!</h2>
+    <p>Log in or register to track anime you've watched and discover new series.</p>
+    <div class="auth-buttons">
+        <a href="{{ get_url_for('login') }}" class="btn btn-primary">Login</a>
+        <a href="{{ get_url_for('register') }}" class="btn btn-secondary">Register</a>
+    </div>
+</div>
+{% elif anime %}
 <div class="anime-card">
     <h2>
         <a href="https://myanimelist.net/anime/{{ anime.id }}" target="_blank" class="anime-title-link">
@@ -26,7 +35,7 @@
 <div class="status-counts">
     <p>Watched: {{ watched_count }} | Not Watched: {{ not_watched_count }}</p>
 </div>
-  {% else %}
+{% else %}
 <div class="no-anime">
     <h2>No more anime available</h2>
     <p>Try fetching more anime or search for specific titles.</p>
@@ -35,5 +44,5 @@
         <a href="{{ get_url_for('search') }}" class="btn-search">Search Anime</a>
     </div>
 </div>
-  {% endif %}
+{% endif %}
 {% endblock %}

@@ -28,6 +28,7 @@
             <p><strong>Episodes:</strong> {{ anime.episodes }}</p>
             <p><strong>Score:</strong> {{ anime.score }}</p>
 
+            {% if current_user.is_authenticated %}
             {% if anime.status == "watched" %}
             <div class="status-badge watched">Watched</div>
             <div class="status-actions">
@@ -48,6 +49,11 @@
                 <button type="submit" name="status" value="watched" class="btn-watched">Watched</button>
                 <button type="submit" name="status" value="not_watched" class="btn-not-watched">Not Watched</button>
             </form>
+            {% endif %}
+            {% else %}
+            <div class="auth-required">
+                <a href="{{ get_url_for('login') }}" class="login-to-mark">Login to track this anime</a>
+            </div>
             {% endif %}
         </div>
         {% endfor %}
