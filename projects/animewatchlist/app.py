@@ -545,10 +545,5 @@ def direct_mark(anime_id, status):
     
     return redirect(get_url_for("index"))
 
-# Add a route to serve the connector page
-@app.route("/connector")
-def connector():
-    return render_template("connector.html")
-
 if __name__ == "__main__":
     app.run(debug=True)

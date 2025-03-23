@@ -44,6 +44,16 @@ def anime_redirect():
 def anime_static(filename):
     return send_from_directory('projects/animewatchlist/static', filename)
 
+# Fix for the static files in the AnimeWatchList app
+@main_app.route('/animewatchlist/static/<path:filename>')
+def anime_static(filename):
+    return send_from_directory('projects/animewatchlist/static', filename)
+
+# Add specific route for the CSS file
+@main_app.route('/animewatchlist/static/style.css')
+def anime_css():
+    return send_from_directory('projects/animewatchlist/static', 'style.css', mimetype='text/css')
+
 # Custom middleware to handle the mounting properly
 class PathFixMiddleware:
     def __init__(self, app, script_name):
@@ -64,6 +74,16 @@ patched_anime_app = PathFixMiddleware(anime_app, '/animewatchlist')
 application = DispatcherMiddleware(main_app, {
     '/animewatchlist': patched_anime_app
 })
+
+class StaticURLProcessor:
+    def __init__(self, app):
+        self.app = app
+    
+    def __call__(self, environ, start_response):
+        if environ['PATH_INFO'].startswith('/animewatchlist/static/'):
+            environ['PATH_INFO'] = environ['PATH_INFO'].replace('/animewatchlist', '', 1)
+        return self.app(environ, start_response)
+application = StaticURLProcessor(application)
 
 # Add a debug route to main app to check configuration
 @main_app.route('/debug_config')
