@@ -1,0 +1,398 @@
+{
+    "categories": [
+      {
+        "name": "Bedrijfskunde & Management",
+        "courses": [
+          {
+            "name": "Lean",
+            "description": "Learn about Lean methodologies to optimize processes and reduce waste in your organization."
+          },
+          {
+            "name": "Logistiek & Supply Chain Management",
+            "description": "Master the essentials of logistics and supply chain management for improved operational efficiency."
+          },
+          {
+            "name": "Ondernemingsraad",
+            "description": "Learn about the works council and employee representation in Dutch organizations."
+          },
+          {
+            "name": "Starten met Officemanagement",
+            "description": "Getting started with office management techniques for improved workplace efficiency."
+          },
+          {
+            "name": "Verandermanagement",
+            "description": "Learn strategies and techniques for effectively managing organizational change."
+          },
+          {
+            "name": "Business Analyse",
+            "description": "Develop skills in business analysis to identify opportunities and solve complex business problems."
+          },
+          {
+            "name": "Continu innoveren in jouw organisatie",
+            "description": "Learn how to foster continuous innovation in your organization."
+          }
+        ]
+      },
+      {
+        "name": "Communicatie & Presentatie",
+        "courses": [
+          {
+            "name": "Actief Luisteren in het Kort",
+            "description": "Improve your active listening skills for better communication outcomes."
+          },
+          {
+            "name": "De invloed van media",
+            "description": "Understand the influence of media on communication and public perception."
+          },
+          {
+            "name": "Digitale toegankelijkheid",
+            "description": "Learn how to make digital communications accessible to all audiences."
+          },
+          {
+            "name": "Effectief communiceren",
+            "description": "Master effective communication techniques for professional environments."
+          },
+          {
+            "name": "Effectieve Gesprekken Voeren",
+            "description": "Learn how to conduct effective conversations in various professional contexts."
+          },
+          {
+            "name": "Goed presenteren voor een groep",
+            "description": "Develop skills for delivering impactful presentations to groups."
+          },
+          {
+            "name": "Hoe word ik een toponderhandelaar?",
+            "description": "Learn techniques to become a skilled negotiator in professional settings."
+          }
+        ]
+      },
+      {
+        "name": "Financieel",
+        "courses": [
+          {
+            "name": "Balanslezen en Analyse",
+            "description": "Learn how to read and analyze balance sheets for financial decision-making."
+          },
+          {
+            "name": "Basis Boekhouding",
+            "description": "Learn the fundamentals of bookkeeping and accounting principles."
+          },
+          {
+            "name": "Finance for non-financials",
+            "description": "Financial concepts and principles explained for professionals without a finance background."
+          },
+          {
+            "name": "Financieel Management",
+            "description": "Learn essential financial management skills for business success."
+          },
+          {
+            "name": "Hoe Werkt Btw",
+            "description": "Understanding VAT (BTW) regulations and applications in business."
+          }
+        ]
+      },
+      {
+        "name": "Gezondheid & Vitaliteit",
+        "courses": [
+          {
+            "name": "Gezond achter je bureau",
+            "description": "Learn how to maintain health while working at a desk environment."
+          },
+          {
+            "name": "Gezond Thuiswerken",
+            "description": "Techniques for healthy remote working practices."
+          },
+          {
+            "name": "Mentaal sterk in je werk",
+            "description": "Develop mental resilience and strength for professional challenges."
+          },
+          {
+            "name": "Vitaal Werken",
+            "description": "Learn how to work with vitality and maintain energy throughout the workday."
+          },
+          {
+            "name": "Omgaan met stress",
+            "description": "Effective techniques for managing workplace stress."
+          }
+        ]
+      },
+      {
+        "name": "IT",
+        "courses": [
+          {
+            "name": "Adobe Illustrator",
+            "description": "Learn to create vector graphics and illustrations using Adobe Illustrator."
+          },
+          {
+            "name": "Adobe InDesign",
+            "description": "Master page design and layout for print and digital publishing with Adobe InDesign."
+          },
+          {
+            "name": "Big Data",
+            "description": "Understanding big data concepts and applications in business."
+          },
+          {
+            "name": "Digitale veiligheid",
+            "description": "Learn essential digital security practices to protect your information."
+          },
+          {
+            "name": "E-commerce",
+            "description": "Master the fundamentals of electronic commerce and online business."
+          },
+          {
+            "name": "Effectief online vergaderen",
+            "description": "Skills for effective online meetings and remote collaboration."
+          },
+          {
+            "name": "Introductie in Power BI",
+            "description": "Learn the basics of data visualization and reporting with Microsoft Power BI."
+          },
+          {
+            "name": "Machine Learning",
+            "description": "Introduction to machine learning concepts and applications."
+          },
+          {
+            "name": "Microsoft Excel Basis",
+            "description": "Learn fundamental Excel skills for data management and analysis."
+          },
+          {
+            "name": "Microsoft Excel Advanced: Formules en Functies",
+            "description": "Advanced Excel formulas and functions for complex data analysis."
+          },
+          {
+            "name": "Programmeren in Python",
+            "description": "Learn Python programming for data analysis and automation."
+          },
+          {
+            "name": "Programmeren met HTML en CSS",
+            "description": "Build websites using HTML and CSS programming."
+          },
+          {
+            "name": "Programmeren met JavaScript",
+            "description": "Learn JavaScript programming for interactive web development."
+          },
+          {
+            "name": "Data Science",
+            "description": "Introduction to data science concepts, tools, and methodologies."
+          }
+        ]
+      },
+      {
+        "name": "Juridisch",
+        "courses": [
+          {
+            "name": "Algemene Verordening Gegevensbescherming (AVG)",
+            "description": "Understanding the General Data Protection Regulation (GDPR) and compliance requirements."
+          },
+          {
+            "name": "Compliance",
+            "description": "Learn about regulatory compliance in business operations."
+          },
+          {
+            "name": "Juridische Basiskennis",
+            "description": "Fundamental legal knowledge for non-legal professionals."
+          }
+        ]
+      },
+      {
+        "name": "Leidinggeven",
+        "courses": [
+          {
+            "name": "Beoordelings- en functioneringsgesprekken",
+            "description": "Learn how to conduct effective performance reviews and evaluation conversations."
+          },
+          {
+            "name": "Effectief leidinggeven",
+            "description": "Develop effective leadership skills for managing teams and individuals."
+          },
+          {
+            "name": "Het Nieuwe Werken",
+            "description": "Modern working practices and management approaches for today's workplace."
+          },
+          {
+            "name": "Leercultuur Ontwikkelen in je Organisatie",
+            "description": "Creating and fostering a learning culture in your organization."
+          },
+          {
+            "name": "Basis Leidinggeven",
+            "description": "The fundamentals of leadership and people management."
+          }
+        ]
+      },
+      {
+        "name": "Persoonlijke Effectiviteit",
+        "courses": [
+          {
+            "name": "Assertief en Effectief Organiseren",
+            "description": "Learn assertive and effective organizational skills for improved productivity."
+          },
+          {
+            "name": "Mindfulness",
+            "description": "Applying mindfulness techniques for improved focus and well-being at work."
+          },
+          {
+            "name": "Persoonlijke Effectiviteit",
+            "description": "Develop personal effectiveness skills for professional success."
+          },
+          {
+            "name": "Plannen en Organiseren",
+            "description": "Master planning and organizing techniques for better time management."
+          },
+          {
+            "name": "Prioriteiten en Doelen Stellen",
+            "description": "Learn how to set priorities and goals for improved productivity."
+          },
+          {
+            "name": "Stressmanagement",
+            "description": "Techniques for effectively managing stress in professional environments."
+          },
+          {
+            "name": "Timemanagement",
+            "description": "Time management strategies for optimal productivity and work-life balance."
+          }
+        ]
+      },
+      {
+        "name": "Project- & Procesmanagement",
+        "courses": [
+          {
+            "name": "Agile Projectmanagement",
+            "description": "Learn Agile project management methodologies for flexible and iterative development."
+          },
+          {
+            "name": "Lean Six Sigma",
+            "description": "Process improvement methodology combining Lean and Six Sigma approaches."
+          },
+          {
+            "name": "Projectmanagement",
+            "description": "Essential project management skills and methodologies."
+          },
+          {
+            "name": "Projectmatig Werken",
+            "description": "Learn to work in a project-based manner for better outcomes."
+          },
+          {
+            "name": "Scrum",
+            "description": "Master the Scrum framework for agile project delivery."
+          }
+        ]
+      },
+      {
+        "name": "Sales & Adviseren",
+        "courses": [
+          {
+            "name": "Accountmanagement",
+            "description": "Develop skills in managing client accounts and relationships."
+          },
+          {
+            "name": "De Vertrouwde Adviseur",
+            "description": "Becoming a trusted advisor to clients and stakeholders."
+          },
+          {
+            "name": "Effectief Beïnvloeden",
+            "description": "Learn techniques for effective influence in professional contexts."
+          },
+          {
+            "name": "Onderhandelen",
+            "description": "Develop negotiation skills for successful business outcomes."
+          },
+          {
+            "name": "Presenteren",
+            "description": "Master presentation skills for effective communication."
+          },
+          {
+            "name": "Professioneel Verkopen",
+            "description": "Professional selling techniques for business success."
+          }
+        ]
+      },
+      {
+        "name": "Samenwerken & Teamontwikkeling",
+        "courses": [
+          {
+            "name": "Assertiviteit",
+            "description": "Develop assertiveness skills for effective workplace interactions."
+          },
+          {
+            "name": "De teamrollen van Belbin",
+            "description": "Understanding team roles based on Belbin's team role theory."
+          },
+          {
+            "name": "Effectief Vergaderen",
+            "description": "Techniques for conducting efficient and productive meetings."
+          },
+          {
+            "name": "Feedback Geven en Ontvangen",
+            "description": "Learn how to give and receive constructive feedback in the workplace."
+          },
+          {
+            "name": "Werken in teams",
+            "description": "Developing skills for effective teamwork and collaboration."
+          }
+        ]
+      },
+      {
+        "name": "Schriftelijke Communicatie",
+        "courses": [
+          {
+            "name": "Zakelijk schrijven",
+            "description": "Develop effective business writing skills for professional communications."
+          },
+          {
+            "name": "Klantgericht Schrijven",
+            "description": "Learn customer-oriented writing techniques for effective communication."
+          },
+          {
+            "name": "Zakelijke Correspondentie",
+            "description": "Mastering business correspondence for professional communication."
+          }
+        ]
+      },
+      {
+        "name": "Talen",
+        "courses": [
+          {
+            "name": "Business English",
+            "description": "Improve your English language skills for professional business contexts."
+          },
+          {
+            "name": "Duits voor Beginners",
+            "description": "Learn basic German language skills for beginners."
+          },
+          {
+            "name": "Engels voor Beginners",
+            "description": "Basic English language skills for beginners."
+          },
+          {
+            "name": "Frans voor Beginners",
+            "description": "Learn basic French language skills for beginners."
+          },
+          {
+            "name": "Zakelijk Engels",
+            "description": "Professional English language skills for business contexts."
+          }
+        ]
+      },
+      {
+        "name": "Werk, Carrière & Ontwikkeling",
+        "courses": [
+          {
+            "name": "Duurzaam Werken",
+            "description": "Sustainable working practices for long-term career success."
+          },
+          {
+            "name": "Effectief (online) thuiswerken",
+            "description": "Strategies for effective remote working and home office productivity."
+          },
+          {
+            "name": "Sollicitatiegesprekken Voeren",
+            "description": "Preparation and techniques for successful job interviews."
+          },
+          {
+            "name": "Personal Branding",
+            "description": "Develop your personal brand for career advancement."
+          }
+        ]
+      }
+    ]
+  }

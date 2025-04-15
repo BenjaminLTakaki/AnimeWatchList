@@ -51,7 +51,7 @@
     <!-- Hero Section -->
     <section class="hero" id="home">
         <div class="container hero-content">
-            <h1>Hello! I’m <span class="highlight">Benjamin Takaki</span></h1>
+            <h1>Hello! I'm <span class="highlight">Benjamin Takaki</span></h1>
             <p>I am an ICT student passionate about programming and leveraging technology to solve real-world challenges.</p>
             <div class="cta-buttons">
                 <a href="resume.pdf" target="_blank" class="btn btn-primary">Get Resume</a>
@@ -86,6 +86,31 @@
         <div class="container">
             <h2>My Projects</h2>
             <div class="project-list">
+                <!-- Course Recommendation Project -->
+                <div class="project-card">
+                    <div class="project-image">
+                        <img src="projects/skillstown/static/images/preview.jpg" alt="SkillsTown Course Recommender Preview" onerror="this.src='https://via.placeholder.com/300x200?text=SkillsTownRecommender'">
+                    </div>
+                    <div class="project-details">
+                        <h3>SkillsTown Course Recommender</h3>
+                        <p>A web application that analyzes your CV to recommend relevant courses from SkillsTown's catalog. Built with Python Flask and NLP technology to extract skills and provide personalized course suggestions.</p>
+                        <div class="project-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">Flask</span>
+                            <span class="tag">NLP</span>
+                            <span class="tag">spaCy</span>
+                        </div>
+                        <div class="project-links">
+                            <a href="/skillstown" class="btn btn-primary" onclick="showLoading(event)">
+                                <i class="fas fa-external-link-alt"></i> View Project
+                            </a>
+                            <a href="https://github.com/BenjaminLTakaki/SkillsTownRecommender" target="_blank" class="btn btn-secondary">
+                                <i class="fab fa-github"></i> View on GitHub
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- AnimeWatchList Project -->
                 <div class="project-card">
                     <div class="project-image">
@@ -119,7 +144,7 @@
                         loadingOverlay.className = 'loading-overlay';
                         loadingOverlay.innerHTML = `
                                                         <div class="loading-spinner"></div>
-                                                        <p>Loading AnimeWatchList...</p>
+                                                        <p>Loading project...</p>
                                                     `;
                         document.body.appendChild(loadingOverlay);
                     }

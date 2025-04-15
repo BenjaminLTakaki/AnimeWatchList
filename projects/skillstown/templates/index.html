@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}SkillsTown Course Recommender - Upload Your CV{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container text-center">
+        <h1>Discover Your Perfect SkillsTown Courses</h1>
+        <p>Upload your CV and let our AI analyze your skills to recommend the best courses for your professional development.</p>
+    </div>
+</section>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-upload me-2"></i>Upload Your CV
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ get_url_for('upload_file') }}" enctype="multipart/form-data" id="upload-form">
+                        <div class="mb-4" id="upload-container">
+                            <div class="upload-area" id="dropzone" onclick="document.getElementById('file').click();">
+                                <i class="fas fa-file-upload upload-icon"></i>
+                                <h4>Drag & Drop or Click to Upload</h4>
+                                <p class="text-muted">Accepted formats: PDF, DOCX, TXT</p>
+                                <div id="file-name" class="mt-3"></div>
+                            </div>
+                            <input type="file" name="file" id="file" accept=".pdf,.docx,.txt" style="display: none;" onchange="updateFileName()">
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
+                                <i class="fas fa-search me-2"></i>Analyze CV & Recommend Courses
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <i class="fas fa-info-circle me-2"></i>How It Works
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 text-center mb-3">
+                            <div class="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 80px; height: 80px; background-color: var(--light-blue);">
+                                <i class="fas fa-upload fa-2x" style="color: var(--skillstown-blue);"></i>
+                            </div>
+                            <h5>Upload</h5>
+                            <p class="text-muted">Upload your CV in PDF, DOCX, or TXT format</p>
+                        </div>
+                        <div class="col-md-4 text-center mb-3">
+                            <div class="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 80px; height: 80px; background-color: var(--light-blue);">
+                                <i class="fas fa-cogs fa-2x" style="color: var(--skillstown-blue);"></i>
+                            </div>
+                            <h5>Analyze</h5>
+                            <p class="text-muted">Our AI analyzes your skills and experience</p>
+                        </div>
+                        <div class="col-md-4 text-center mb-3">
+                            <div class="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 80px; height: 80px; background-color: var(--light-blue);">
+                                <i class="fas fa-list-check fa-2x" style="color: var(--skillstown-blue);"></i>
+                            </div>
+                            <h5>Recommend</h5>
+                            <p class="text-muted">Get personalized course recommendations</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // File upload handling
+    function updateFileName() {
+        const fileInput = document.getElementById('file');
+        const fileNameContainer = document.getElementById('file-name');
+        
+        if (fileInput.files.length > 0) {
+            const fileName = fileInput.files[0].name;
+            fileNameContainer.innerHTML = `<div class="alert alert-success">
+                <i class="fas fa-check-circle me-2"></i>Selected file: <strong>${fileName}</strong>
+            </div>`;
+            document.getElementById('submit-btn').removeAttribute('disabled');
+        } else {
+            fileNameContainer.innerHTML = '';
+        }
+    }
+    
+    // Drag and drop functionality
+    const dropzone = document.getElementById('dropzone');
+    
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('bg-light');
+    });
+    
+    dropzone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('bg-light');
+    });
+    
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('bg-light');
+        
+        const files = e.dataTransfer.files;
+        const fileInput = document.getElementById('file');
+        
+        if (files.length > 0) {
+            // Check file extension
+            const fileName = files[0].name;
+            const fileExt = fileName.split('.').pop().toLowerCase();
+            
+            if (['pdf', 'docx', 'txt'].includes(fileExt)) {
+                fileInput.files = files;
+                updateFileName();
+            } else {
+                document.getElementById('file-name').innerHTML = `<div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>Invalid file format. Please upload PDF, DOCX, or TXT files.
+                </div>`;
+            }
+        }
+    });
+    
+    // Form validation
+    document.getElementById('upload-form').addEventListener('submit', function(event) {
+        const fileInput = document.getElementById('file');
+        if (fileInput.files.length === 0) {
+            event.preventDefault();
+            document.getElementById('file-name').innerHTML = `<div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle me-2"></i>Please select a file to upload.
+            </div>`;
+        } else {
+            // Show loading state
+            document.getElementById('submit-btn').innerHTML = `
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Analyzing CV...
+            `;
+            document.getElementById('submit-btn').disabled = true;
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}About - SkillsTown Course Recommender{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container text-center">
+        <h1>About SkillsTown CV Analyzer</h1>
+        <p>Learn more about how our tool works to recommend the best courses for your professional development</p>
+    </div>
+</section>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-info-circle me-2"></i>About This Tool
+                </div>
+                <div class="card-body">
+                    <h4>What is the SkillsTown CV Analyzer?</h4>
+                    <p>
+                        The SkillsTown CV Analyzer is an AI-powered tool designed to help professionals find the most relevant courses for their career development. By analyzing your CV, the tool identifies your current skills and suggests SkillsTown courses that can help you enhance your expertise or develop new competencies.
+                    </p>
+                    
+                    <h4 class="mt-4">How It Works</h4>
+                    <p>
+                        Our tool uses natural language processing (NLP) to analyze your CV and extract relevant skills and experience. It then matches these skills against SkillsTown's extensive course catalog to recommend courses that align with your professional profile and potential career growth areas.
+                    </p>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-4 text-center mb-3">
+                            <div class="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 80px; height: 80px; background-color: var(--light-blue);">
+                                <i class="fas fa-upload fa-2x" style="color: var(--skillstown-blue);"></i>
+                            </div>
+                            <h5>CV Upload</h5>
+                            <p class="text-muted">Upload your CV in PDF, DOCX, or TXT format</p>
+                        </div>
+                        <div class="col-md-4 text-center mb-3">
+                            <div class="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 80px; height: 80px; background-color: var(--light-blue);">
+                                <i class="fas fa-brain fa-2x" style="color: var(--skillstown-blue);"></i>
+                            </div>
+                            <h5>AI Analysis</h5>
+                            <p class="text-muted">Our AI extracts your skills, experience, and professional profile</p>
+                        </div>
+                        <div class="col-md-4 text-center mb-3">
+                            <div class="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 80px; height: 80px; background-color: var(--light-blue);">
+                                <i class="fas fa-graduation-cap fa-2x" style="color: var(--skillstown-blue);"></i>
+                            </div>
+                            <h5>Course Matching</h5>
+                            <p class="text-muted">Get personalized course recommendations from SkillsTown's catalog</p>
+                        </div>
+                    </div>
+                    
+                    <h4 class="mt-4">Privacy & Data Security</h4>
+                    <p>
+                        We take your privacy seriously. Your CV is only processed temporarily for analysis purposes and is not stored permanently. The data extracted from your CV is used solely to generate course recommendations and is not shared with third parties.
+                    </p>
+                    
+                    <h4 class="mt-4">About SkillsTown</h4>
+                    <p>
+                        SkillsTown is the online training provider for professionals. Through on-demand learning, SkillsTown enables companies, organizations, and their employees to adapt to the continuously changing world around them.
+                    </p>
+                    <p>
+                        With hundreds of online training courses offered in various learning formats, SkillsTown responds to new and personalized ways of learning in every life stage of organizations and employees - increasing knowledge and skills, stimulating adaptability, and contributing to attractive employership.
+                    </p>
+                    
+                    <div class="text-center mt-4">
+                        <a href="{{ get_url_for('index') }}" class="btn btn-primary">
+                            <i class="fas fa-arrow-right me-2"></i>Try the CV Analyzer
+                        </a>
+                        <a href="https://www.skillstown.nl" class="btn btn-outline-primary ms-2" target="_blank">
+                            <i class="fas fa-external-link-alt me-2"></i>Visit SkillsTown
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
