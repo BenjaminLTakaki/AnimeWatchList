@@ -28,8 +28,21 @@ from projects.skillstown.app import app as skillstown_app
 animewatchlist_path = os.path.join(project_root, 'projects/animewatchlist')
 sys.path.insert(0, animewatchlist_path)
 
-# Import the AnimeWatchList app
-from projects.animewatchlist.app import app as animewatchlist_app
+# Import the AnimeWatchList app with error handling
+try:
+    from projects.animewatchlist.app import app as animewatchlist_app
+    print("AnimeWatchList app imported successfully")
+    has_animewatchlist_app = True
+except Exception as e:
+    print(f"Could not import AnimeWatchList app: {e}")
+    print("Creating a stub AnimeWatchList app")
+    animewatchlist_app = Flask("animewatchlist_stub")
+    
+    @animewatchlist_app.route('/')
+    def animewatchlist_index():
+        return "AnimeWatchList is currently unavailable. Database connection issues. Please check your PostgreSQL setup."
+    
+    has_animewatchlist_app = True  # Keep as True so routing still works
 
 # Spotify Cover Generator app setup
 spotify_path = os.path.join(project_root, 'projects/spotify-cover-generator')

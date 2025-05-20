@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Music Cover Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Spotify Music Cover Generator</h1>
+        <p>Create AI-generated album art based on your playlist or album's genres</p>
+        
+        {% if error %}
+            <p class="error">{{ error }}</p>
+        {% endif %}
+        
+        <form method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="playlist_url">Spotify Playlist or Album URL:</label>
+                <input type="text" id="playlist_url" name="playlist_url" placeholder="https://open.spotify.com/playlist/... or https://open.spotify.com/album/..." required>
+                <small>Paste the full URL of a Spotify playlist or album</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="mood">Additional Prompt Words:</label>
+                <input type="text" id="mood" name="mood" placeholder="e.g., retro, neon, minimalist, cinematic">
+                <small>Add extra words to customize the image generation (optional)</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="negative_prompt">Custom Negative Prompt:</label>
+                <textarea id="negative_prompt" name="negative_prompt" rows="4" placeholder="Enter things you want to avoid in the generated image"></textarea>
+                <small>Leave empty to use the default negative prompt</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="lora_name">LoRA Style (Optional):</label>
+                <select id="lora_name" name="lora_name">
+                    <option value="none">None (Default Stable Diffusion)</option>
+                    {% for lora in loras %}
+                    <option value="{{ lora.name }}">{{ lora.name }}</option>
+                    {% endfor %}
+                </select>
+                <small>Apply a custom LoRA for specialized art styles</small>
+            </div>
+            
+            <div class="form-group preset-options">
+                <label>Preset styles:</label>
+                <div class="preset-buttons">
+                    <button type="button" class="preset-btn" data-preset="minimalist">Minimalist</button>
+                    <button type="button" class="preset-btn" data-preset="high-contrast">High Contrast</button>
+                    <button type="button" class="preset-btn" data-preset="retro">Retro</button>
+                    <button type="button" class="preset-btn" data-preset="bold-colors">Bold Colors</button>
+                </div>
+            </div>
+            
+            <button type="submit" class="submit-btn">Generate Cover</button>
+        </form>
+        
+        <div class="lora-upload">
+            <h3>Upload LoRA</h3>
+            
+            <form id="lora-upload-form" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="lora_file">LoRA File (.safetensors, .ckpt, .pt):</label>
+                    <input type="file" id="lora_file" name="file" accept=".safetensors,.ckpt,.pt">
+                </div>
+                <button type="submit" class="upload-btn">Upload LoRA</button>
+            </form>
+            
+            <div id="upload-status"></div>
+        </div>
+        
+        <div class="info-section">
+            <h3>How it works</h3>
+            <p>This tool analyzes your Spotify playlist or album to extract genres from the artists. It then uses AI to generate a unique album cover that matches your music's genres and style, with a detailed genre analysis chart.</p>
+            
+            <h4>Features</h4>
+            <ul>
+                <li><strong>Gemini AI Titles</strong> - Using Google's Gemini 2.5 Flash Preview API for creative album titles</li>
+                <li><strong>Custom Prompts</strong> - Add additional words to customize the image generation</li>
+                <li><strong>Custom Negative Prompts</strong> - Control what you don't want in your generated images</li>
+                <li><strong>LoRA Support</strong> - Add LoRAs via file upload for custom styles</li>
+                <li><strong>Stable Diffusion API</strong> - Faster image generation using cloud-based Stable Diffusion</li>
+            </ul>
+            
+            <h4>Tips for Using LoRAs</h4>
+            <p>LoRAs (Low-Rank Adaptations) are specialized models that can dramatically change the visual style of generated images:</p>
+            <ul>
+                <li>Upload LoRA files directly (.safetensors, .ckpt, or .pt format)</li>
+                <li>Use the dropdown to select previously uploaded LoRAs</li>
+                <li>Different LoRAs can produce vastly different visual styles</li>
+            </ul>
+            
+            <h4>About Negative Prompts</h4>
+            <p>Negative prompts tell the AI what you don't want in the image. The default negative prompt helps avoid common issues like extra fingers or distorted faces. You can customize this to further refine your results.</p>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "loras": [
+    {
+      "name": "Asia moment",
+      "source_type": "link",
+      "path": "",
+      "url": "https://civitai.com/models/12597/moxin",
+      "trigger_words": [],
+      "strength": 1.0
+    }
+  ]
+}

@@ -1,0 +1,305 @@
+import random
+import string
+import json
+import datetime
+import re
+import urllib.parse
+from pathlib import Path
+import os
+import requests
+from flask import current_app
+from config import DATA_DIR, LORA_DIR, COVERS_DIR
+
+def generate_random_string(size=10):
+    """Generate a random string of letters and digits."""
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=size))
+
+def save_generation_data(data, output_path=None):
+    """Save generation data to database and return ID."""
+    try:
+        # Import here to avoid circular imports
+        from app import GenerationResultDB, db, app
+        
+        with app.app_context():
+            # Create a new generation result record
+            new_result = GenerationResultDB(
+                title=data.get("title", "New Album"),
+                output_path=data.get("output_path", ""),
+                item_name=data.get("item_name", ""),
+                genres=data.get("genres", []),
+                all_genres=data.get("all_genres", []),
+                style_elements=data.get("style_elements", []),
+                mood=data.get("mood", ""),
+                energy_level=data.get("energy_level", ""),
+                spotify_url=data.get("spotify_url", ""),
+                lora_name=data.get("lora_name", ""),
+                lora_type=data.get("lora_type", ""),
+                lora_url=data.get("lora_url", "")
+            )
+            
+            db.session.add(new_result)
+            db.session.commit()
+            
+            # Return the ID as a string
+            return str(new_result.id)
+    except Exception as e:
+        print(f"Error saving data to database: {e}")
+        
+        # Fall back to saving to a JSON file if database fails
+        try:
+            # Create a unique filename based on timestamp
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_name = "".join(c for c in data.get("item_name", "") if c.isalnum() or c in [' ', '-', '_']).strip()
+            safe_name = safe_name.replace(' ', '_')
+            json_filename = f"{timestamp}_{safe_name}.json"
+            
+            with open(DATA_DIR / json_filename, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            
+            print(f"Data saved to file {DATA_DIR / json_filename} (database failed)")
+            
+            return str(DATA_DIR / json_filename)
+        except Exception as file_error:
+            print(f"Error saving data to file: {file_error}")
+            return None
+
+def get_available_loras():
+    """Get list of available LoRAs from database and file system."""
+    loras = []
+    
+    try:
+        # First, get local LoRAs from the file system
+        local_loras = []
+        for ext in [".safetensors", ".ckpt", ".pt"]:
+            local_loras.extend(list(LORA_DIR.glob(f"*{ext}")))
+        
+        # Import here to avoid circular imports
+        from app import LoraModelDB, db, app
+        from models import LoraModel
+        
+        # Convert file system LoRAs to LoraModel objects
+        local_lora_names = []
+        for lora in local_loras:
+            local_lora_names.append(lora.stem)
+            loras.append(LoraModel(
+                name=lora.stem,
+                source_type="local",
+                path=str(lora),
+                url="",
+                trigger_words=[],
+                strength=0.7
+            ))
+        
+        # Get LoRAs from database (primarily link-type LoRAs)
+        with app.app_context():
+            db_loras = LoraModelDB.query.all()
+            for db_lora in db_loras:
+                # Skip if we already have this from the file system
+                if db_lora.source_type == "local" and db_lora.name in local_lora_names:
+                    continue
+                
+                loras.append(LoraModel(
+                    name=db_lora.name,
+                    source_type=db_lora.source_type,
+                    path=db_lora.path,
+                    url=db_lora.url,
+                    trigger_words=db_lora.trigger_words or [],
+                    strength=db_lora.strength
+                ))
+        
+        # Sort by name
+        loras.sort(key=lambda x: x.name)
+        return loras
+    except Exception as e:
+        print(f"Error getting LoRAs: {e}")
+        # If database fails, try to get just file system LoRAs
+        try:
+            from models import LoraModel
+            local_loras = []
+            for ext in [".safetensors", ".ckpt", ".pt"]:
+                local_loras.extend(list(LORA_DIR.glob(f"*{ext}")))
+            
+            return [LoraModel(
+                name=lora.stem,
+                source_type="local",
+                path=str(lora),
+                url="",
+                trigger_words=[],
+                strength=0.7
+            ) for lora in local_loras]
+        except Exception as inner_e:
+            print(f"Error getting local LoRAs: {inner_e}")
+            return []
+
+def add_lora_link(name, url, trigger_words=None, strength=0.7):
+    """Add a LoRA via link to the database."""
+    try:
+        # Make sure name is valid and unique
+        name = name.strip()
+        if not name:
+            return False, "LoRA name cannot be empty"
+        
+        # Validate URL format
+        if not is_valid_lora_url(url):
+            return False, "Invalid LoRA URL format"
+        
+        # Import here to avoid circular imports
+        from app import LoraModelDB, db, app
+        
+        with app.app_context():
+            # Check if LoRA with this name already exists
+            existing = LoraModelDB.query.filter_by(name=name).first()
+            if existing:
+                return False, f"LoRA with name '{name}' already exists"
+            
+            # Create new LoRA in database
+            new_lora = LoraModelDB(
+                name=name,
+                source_type="link",
+                path="",
+                url=url,
+                trigger_words=trigger_words or [],
+                strength=float(strength)
+            )
+            
+            db.session.add(new_lora)
+            db.session.commit()
+        
+        return True, f"LoRA '{name}' added successfully"
+    except Exception as e:
+        print(f"Error adding LoRA link: {e}")
+        return False, f"Error adding LoRA link: {str(e)}"
+
+def is_valid_lora_url(url):
+    """Validate if a URL is likely to be a valid LoRA URL."""
+    # Check basic URL format
+    try:
+        result = urllib.parse.urlparse(url)
+        if not all([result.scheme, result.netloc]):
+            return False
+        
+        # Common LoRA hosting sites
+        known_hosts = [
+            'civitai.com', 
+            'huggingface.co',
+            'cloudflare.com',
+            'discord.com',
+            'githubusercontent.com'
+        ]
+        
+        # Check if host is a common LoRA hosting site
+        host_match = any(host in result.netloc for host in known_hosts)
+        
+        # Check file extension for direct file links
+        path = result.path.lower()
+        ext_match = path.endswith(('.safetensors', '.ckpt', '.pt', '.bin'))
+        
+        # If it's a known host or has a valid extension, consider it valid
+        return host_match or ext_match
+    except:
+        return False
+
+def create_image_filename(title):
+    """Create a safe filename for the image."""
+    safe_title = "".join(c for c in title if c.isalnum() or c in [' ', '-', '_']).strip()
+    safe_title = safe_title.replace(' ', '_')
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    return f"{timestamp}_{safe_title}.png"
+
+def extract_lora_id_from_civitai(url):
+    """Extract the LoRA ID from a Civitai URL."""
+    # Example: https://civitai.com/models/12345/my-lora
+    try:
+        match = re.search(r'/models/(\d+)', url)
+        if match:
+            return match.group(1)
+        return None
+    except:
+        return None
+
+def get_lora_details_from_civitai(lora_id):
+    """Get LoRA details from Civitai API."""
+    try:
+        response = requests.get(f"https://civitai.com/api/v1/models/{lora_id}")
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Extract relevant information
+            name = data.get("name", "")
+            description = data.get("description", "")
+            
+            # Get trigger words and download URL from the latest version
+            trigger_words = []
+            download_url = ""
+            
+            if "modelVersions" in data and len(data["modelVersions"]) > 0:
+                latest_version = data["modelVersions"][0]
+                
+                # Get trigger words
+                if "trainedWords" in latest_version:
+                    trigger_words = latest_version["trainedWords"]
+                
+                # Get download URL - requires authentication, so we'll use the base URL
+                download_url = url
+            
+            return {
+                "name": name,
+                "description": description,
+                "trigger_words": trigger_words,
+                "download_url": download_url
+            }
+        
+        return None
+    except Exception as e:
+        print(f"Error fetching Civitai LoRA details: {e}")
+        return None
+
+def get_generation_by_id(generation_id):
+    """Get a generation result by ID from the database."""
+    try:
+        # Import here to avoid circular imports
+        from app import GenerationResultDB, db, app
+        
+        with app.app_context():
+            result = GenerationResultDB.query.get(generation_id)
+            if result:
+                return {
+                    "id": result.id,
+                    "title": result.title,
+                    "output_path": result.output_path,
+                    "item_name": result.item_name,
+                    "genres": result.genres,
+                    "all_genres": result.all_genres,
+                    "style_elements": result.style_elements,
+                    "mood": result.mood,
+                    "energy_level": result.energy_level,
+                    "timestamp": result.timestamp.strftime("%Y-%m-%d %H:%M:%S") if result.timestamp else "",
+                    "spotify_url": result.spotify_url,
+                    "lora_name": result.lora_name,
+                    "lora_type": result.lora_type,
+                    "lora_url": result.lora_url
+                }
+            return None
+    except Exception as e:
+        print(f"Error getting generation by ID: {e}")
+        return None
+
+def list_recent_generations(limit=10):
+    """List recent generation results from the database."""
+    try:
+        # Import here to avoid circular imports
+        from app import GenerationResultDB, db, app
+        
+        with app.app_context():
+            results = GenerationResultDB.query.order_by(GenerationResultDB.timestamp.desc()).limit(limit).all()
+            return [{
+                "id": result.id,
+                "title": result.title,
+                "output_path": result.output_path,
+                "item_name": result.item_name,
+                "timestamp": result.timestamp.strftime("%Y-%m-%d %H:%M:%S") if result.timestamp else "",
+                "image_url": f"/spotifycovergenerator/generated_covers/{os.path.basename(result.output_path)}"
+            } for result in results]
+    except Exception as e:
+        print(f"Error listing recent generations: {e}")
+        return []
