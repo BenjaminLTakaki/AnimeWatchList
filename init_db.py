@@ -18,13 +18,26 @@ print("Initializing database...")
 
 try:
     # Import necessary modules
-    from projects.animewatchlist.auth import db, User    # Configure database
+    from projects.animewatchlist.auth import db, User
+    
+    # Configure database
     database_url = os.environ.get('DATABASE_URL')
     if database_url and database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     
-    # Database URL adjustment to ensure correct database name
+    # Database URL adjustment to ensure correct database name and remove old user reference
     if database_url:
+        # Extract the connection parts
+        if 'animewatchlist_db_user' in database_url:
+            # If the URL contains the old user, replace it with the correct connection string
+            print("Detected old database user configuration, updating...")
+            # Get just the host part of the connection string
+            parts = database_url.split('@')
+            if len(parts) > 1:
+                host_part = parts[1].split('/')[0]
+                # Reconstruct with the correct database name
+                database_url = f"postgresql://postgres:YourPassword@{host_part}/animewatchlist-db"
+        
         # If database name isn't already animewatchlist-db, modify it
         if '/animewatchlist-db' not in database_url:
             # Extract everything up to the last slash (if exists)
