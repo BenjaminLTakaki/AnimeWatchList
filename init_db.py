@@ -23,20 +23,12 @@ try:
     # Configure database
     database_url = os.environ.get('DATABASE_URL')
     
-    # If DATABASE_URL is not set, try alternative variables
+    # If DATABASE_URL is not set, log an error
     if not database_url:
-        # Try to build the connection string from individual components
-        db_host = os.environ.get('DB_HOST', 'dpg-d0me7lbuibrs73ekuqt0-a')
-        db_port = os.environ.get('DB_PORT', '5432')
-        db_name = os.environ.get('DB_NAME', 'animewatchlist_db')
-        db_user = os.environ.get('DB_USER', 'animewatchlist_db_user')
-        db_password = os.environ.get('DB_PASSWORD', 'zvKOo9pIfbHbcv0sBym8mtaUyUuX9dkP')  # Default password
-        
-        if db_password:
-            database_url = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
-        else:
-            # Fallback to a default for local development
-            database_url = 'postgresql://postgres:password@localhost/animewatchlist'
+        print("ERROR: DATABASE_URL environment variable is not set!")
+        print("Please set the DATABASE_URL environment variable with your PostgreSQL connection string.")
+        # Fallback to a development database for local use only
+        database_url = 'sqlite:///test.db'
     
     # Fix for Render PostgreSQL URLs
     if database_url and database_url.startswith('postgres://'):
@@ -52,20 +44,35 @@ try:
     # Create tables
     with app.app_context():
         print("Creating database tables...")
-        db.create_all()
-        print("Tables created successfully.")
-        
-        # Check if we have default user
-        admin_user = User.query.filter_by(username='admin').first()
-        if not admin_user:
-            print("Creating default admin user...")
-            admin = User(username='admin', email='admin@example.com')
-            admin.set_password('password123')
-            db.session.add(admin)
-            db.session.commit()
-            print("Default admin user created.")
+        try:
+            db.create_all()
+            print("Tables created successfully.")
+            
+            # Check if we have default user
+            admin_user = User.query.filter_by(username='admin').first()
+            if not admin_user:
+                print("Creating default admin user...")
+                admin = User(username='admin', email='admin@example.com')
+                admin.set_password('password123')
+                db.session.add(admin)
+                db.session.commit()
+                print("Default admin user created.")
+        except Exception as e:
+            print(f"Error creating tables: {e}")
     
     print("Database initialization complete!")
 except Exception as e:
     print(f"Error initializing database: {e}")
     print("Please ensure PostgreSQL is running and configured correctly.")
+    
+    # Print environment variables for debugging (hide sensitive parts)
+    print("\nEnvironment Variables (for debugging):")
+    if 'DATABASE_URL' in os.environ:
+        parts = os.environ['DATABASE_URL'].split('@')
+        if len(parts) >= 2:
+            masked_url = f"...@{parts[1]}"
+            print(f"DATABASE_URL is set and contains hostname: {masked_url}")
+        else:
+            print("DATABASE_URL is set but in an unexpected format")
+    else:
+        print("DATABASE_URL is not set")

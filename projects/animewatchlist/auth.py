@@ -65,29 +65,21 @@ def init_auth(app, get_url_for_func, get_status_counts_func):
         get_url_for_func: Function to generate URLs (imported from main app)
         get_status_counts_func: Function to get status counts (imported from user_data)
     """
-    # Configure database
+    # Configure database - ONLY use environment variables
     database_uri = os.environ.get('DATABASE_URL')
     
-    # If DATABASE_URL is not set, try alternative variables
+    # If DATABASE_URL is not set, log an error
     if not database_uri:
-        # Try to build the connection string from individual components
-        db_host = os.environ.get('DB_HOST', 'dpg-d0me7lbuibrs73ekuqt0-a')
-        db_port = os.environ.get('DB_PORT', '5432')
-        db_name = os.environ.get('DB_NAME', 'animewatchlist_db')
-        db_user = os.environ.get('DB_USER', 'animewatchlist_db_user')
-        db_password = os.environ.get('DB_PASSWORD', 'zvKOo9pIfbHbcv0sBym8mtaUyUuX9dkP')  # Default password from screenshot
-        
-        if db_password:
-            database_uri = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
-        else:
-            # Fallback to a default for local development
-            database_uri = 'postgresql://postgres:password@localhost/animewatchlist'
+        print("ERROR: DATABASE_URL environment variable is not set!")
+        print("Please set the DATABASE_URL environment variable with your PostgreSQL connection string.")
+        # Fallback to a development database for local use only
+        database_uri = 'sqlite:///test.db'
     
     # Fix for Render PostgreSQL URLs
     if database_uri and database_uri.startswith('postgres://'):
         database_uri = database_uri.replace('postgres://', 'postgresql://', 1)
     
-    print(f"Using database URI: {database_uri}")  # Add for debugging
+    print(f"Using database URI: {database_uri}")  # Log the full URI for debugging
     
     app.config['SQLALCHEMY_DATABASE_URI'] = database_uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -112,7 +104,11 @@ def init_auth(app, get_url_for_func, get_status_counts_func):
     
     # Create database tables
     with app.app_context():
-        db.create_all()
+        try:
+            db.create_all()
+            print("Database tables created successfully!")
+        except Exception as e:
+            print(f"Error creating database tables: {e}")
     
     # Register routes
     app.add_url_rule('/register', view_func=register, methods=['GET', 'POST'])
