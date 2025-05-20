@@ -30,7 +30,7 @@ try:
         db_port = os.environ.get('DB_PORT', '5432')
         db_name = os.environ.get('DB_NAME', 'animewatchlist_db')
         db_user = os.environ.get('DB_USER', 'animewatchlist_db_user')
-        db_password = os.environ.get('DB_PASSWORD')  # Must be set in Render environment variables
+        db_password = os.environ.get('DB_PASSWORD', 'zvKOo9pIfbHbcv0sBym8mtaUyUuX9dkP')  # Default password
         
         if db_password:
             database_url = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
