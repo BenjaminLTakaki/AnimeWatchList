@@ -75,7 +75,7 @@ def init_auth(app, get_url_for_func, get_status_counts_func):
         db_port = os.environ.get('DB_PORT', '5432')
         db_name = os.environ.get('DB_NAME', 'animewatchlist_db')
         db_user = os.environ.get('DB_USER', 'animewatchlist_db_user')
-        db_password = os.environ.get('DB_PASSWORD')  # This must be set in Render environment variables
+        db_password = os.environ.get('DB_PASSWORD', 'zvKOo9pIfbHbcv0sBym8mtaUyUuX9dkP')  # Default password from screenshot
         
         if db_password:
             database_uri = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
@@ -86,6 +86,8 @@ def init_auth(app, get_url_for_func, get_status_counts_func):
     # Fix for Render PostgreSQL URLs
     if database_uri and database_uri.startswith('postgres://'):
         database_uri = database_uri.replace('postgres://', 'postgresql://', 1)
+    
+    print(f"Using database URI: {database_uri}")  # Add for debugging
     
     app.config['SQLALCHEMY_DATABASE_URI'] = database_uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
