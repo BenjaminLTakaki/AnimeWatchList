@@ -22,37 +22,28 @@ try:
     
     # Configure database
     database_url = os.environ.get('DATABASE_URL')
+    
+    # If DATABASE_URL is not set, try alternative variables
+    if not database_url:
+        # Try to build the connection string from individual components
+        db_host = os.environ.get('DB_HOST', 'dpg-d0me7lbuibrs73ekuqt0-a')
+        db_port = os.environ.get('DB_PORT', '5432')
+        db_name = os.environ.get('DB_NAME', 'animewatchlist_db')
+        db_user = os.environ.get('DB_USER', 'animewatchlist_db_user')
+        db_password = os.environ.get('DB_PASSWORD')  # Must be set in Render environment variables
+        
+        if db_password:
+            database_url = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
+        else:
+            # Fallback to a default for local development
+            database_url = 'postgresql://postgres:password@localhost/animewatchlist'
+    
+    # Fix for Render PostgreSQL URLs
     if database_url and database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     
-    # Database URL adjustment to ensure correct database name and remove old user reference
-    if database_url:
-        # Extract the connection parts
-        if 'animewatchlist_db_user' in database_url:
-            # If the URL contains the old user, replace it with the correct connection string
-            print("Detected old database user configuration, updating...")
-            # Get just the host part of the connection string
-            parts = database_url.split('@')
-            if len(parts) > 1:
-                host_part = parts[1].split('/')[0]
-                # Reconstruct with the correct database name
-                database_url = f"postgresql://postgres:YourPassword@{host_part}/animewatchlist-db"
-        
-        # If database name isn't already animewatchlist-db, modify it
-        if '/animewatchlist-db' not in database_url:
-            # Extract everything up to the last slash (if exists)
-            if '/' in database_url.split('://')[1]:
-                base_url = database_url.rsplit('/', 1)[0]
-                database_url = f"{base_url}/animewatchlist-db"
-            else:
-                database_url = f"{database_url}/animewatchlist-db"
-    else:
-        # Fallback/default connection string with proper database name
-        database_url = 'postgresql://postgres:YourPassword@localhost:5432/animewatchlist-db'
-    
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    
     print(f"Using database URL: {database_url}")
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Initialize database with app

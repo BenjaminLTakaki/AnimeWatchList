@@ -66,10 +66,25 @@ def init_auth(app, get_url_for_func, get_status_counts_func):
         get_status_counts_func: Function to get status counts (imported from user_data)
     """
     # Configure database
-    database_uri = os.environ.get('DATABASE_URL', 'postgresql://postgres:password@localhost/animewatchlist')
+    database_uri = os.environ.get('DATABASE_URL')
+    
+    # If DATABASE_URL is not set, try alternative variables
+    if not database_uri:
+        # Try to build the connection string from individual components
+        db_host = os.environ.get('DB_HOST', 'dpg-d0me7lbuibrs73ekuqt0-a')
+        db_port = os.environ.get('DB_PORT', '5432')
+        db_name = os.environ.get('DB_NAME', 'animewatchlist_db')
+        db_user = os.environ.get('DB_USER', 'animewatchlist_db_user')
+        db_password = os.environ.get('DB_PASSWORD')  # This must be set in Render environment variables
+        
+        if db_password:
+            database_uri = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
+        else:
+            # Fallback to a default for local development
+            database_uri = 'postgresql://postgres:password@localhost/animewatchlist'
     
     # Fix for Render PostgreSQL URLs
-    if database_uri.startswith('postgres://'):
+    if database_uri and database_uri.startswith('postgres://'):
         database_uri = database_uri.replace('postgres://', 'postgresql://', 1)
     
     app.config['SQLALCHEMY_DATABASE_URI'] = database_uri
@@ -88,6 +103,31 @@ def init_auth(app, get_url_for_func, get_status_counts_func):
     login_manager.init_app(app)
     login_manager.login_view = 'login'
     login_manager.login_message_category = 'info'
+    
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.query.get(int(user_id))
+    
+    # Create database tables
+    with app.app_context():
+        db.create_all()
+    
+    # Register routes
+    app.add_url_rule('/register', view_func=register, methods=['GET', 'POST'])
+    app.add_url_rule('/login', view_func=login, methods=['GET', 'POST'])
+    app.add_url_rule('/logout', view_func=logout)
+    app.add_url_rule('/profile', view_func=profile)
+    
+    # Store auth route functions in a global dict for access from outside
+    global auth_routes
+    auth_routes = {
+        'register': register,
+        'login': login,
+        'logout': logout,
+        'profile': profile
+    }
+    
+    return db
     
     @login_manager.user_loader
     def load_user(user_id):
