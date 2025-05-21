@@ -13,7 +13,7 @@ from generator import generate_cover
 from chart_generator import generate_genre_chart
 from models import PlaylistData, GenreAnalysis, LoraModel
 from utils import generate_random_string, get_available_loras
-from config import BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY
+from config import BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY, SPOTIFY_DB_URL
 from flask_sqlalchemy import SQLAlchemy
 from contextlib import contextmanager
 
@@ -70,8 +70,8 @@ def initialize_app():
     """Initialize the application's dependencies"""
     global initialized
     
-    # Configure database
-    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+    # Configure database using SPOTIFY_DB_URL from config
+    app.config['SQLALCHEMY_DATABASE_URI'] = SPOTIFY_DB_URL
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Initialize database

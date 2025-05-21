@@ -39,8 +39,8 @@ CIVITAI_API_ENABLED = os.getenv("CIVITAI_API_ENABLED", "True").lower() in ("true
 # Flask configuration
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY")
 
-# Database configuration - use existing PostgreSQL configuration
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:password@localhost/portfoliodb')
+# Database configuration - use SPOTIFY_DB_URL instead of DATABASE_URL
+SPOTIFY_DB_URL = os.getenv('SPOTIFY_DB_URL', 'postgresql://postgres:password@localhost/portfoliodb')
 
 # Default negative prompt for image generation
 DEFAULT_NEGATIVE_PROMPT = """

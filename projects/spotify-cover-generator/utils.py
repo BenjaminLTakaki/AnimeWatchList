@@ -8,7 +8,7 @@ from pathlib import Path
 import os
 import requests
 from flask import current_app
-from config import DATA_DIR, LORA_DIR, COVERS_DIR
+from config import DATA_DIR, LORA_DIR, COVERS_DIR, SPOTIFY_DB_URL
 
 def generate_random_string(size=10):
     """Generate a random string of letters and digits."""
@@ -240,7 +240,7 @@ def get_lora_details_from_civitai(lora_id):
                     trigger_words = latest_version["trainedWords"]
                 
                 # Get download URL - requires authentication, so we'll use the base URL
-                download_url = url
+                download_url = f"https://civitai.com/models/{lora_id}"
             
             return {
                 "name": name,
