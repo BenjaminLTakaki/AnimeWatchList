@@ -7,8 +7,7 @@ import urllib.parse
 from pathlib import Path
 import os
 import requests
-from flask import current_app
-from config import DATA_DIR, LORA_DIR, COVERS_DIR, SPOTIFY_DB_URL
+from config import DATA_DIR, LORA_DIR, COVERS_DIR
 
 def generate_random_string(size=10):
     """Generate a random string of letters and digits."""

@@ -8,17 +8,20 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 # Import app modules
-from spotify_client import initialize_spotify
-from generator import generate_cover
-from chart_generator import generate_genre_chart
-from models import PlaylistData, GenreAnalysis, LoraModel
-from utils import generate_random_string, get_available_loras
 from config import BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY, SPOTIFY_DB_URL
-from flask_sqlalchemy import SQLAlchemy
 from contextlib import contextmanager
 
-# Initialize SQLAlchemy
-db = SQLAlchemy()
+# Initialize Flask app first
+app = Flask(__name__, template_folder=str(BASE_DIR / "templates"), static_folder=str(BASE_DIR / "static"))
+app.secret_key = FLASK_SECRET_KEY or ''.join(random.choices('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=24))
+
+# Configure database
+app.config['SQLALCHEMY_DATABASE_URI'] = SPOTIFY_DB_URL
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize SQLAlchemy - we do this only once
+from flask_sqlalchemy import SQLAlchemy
+db = SQLAlchemy(app)
 
 # Define database models for the app
 class LoraModelDB(db.Model):
@@ -33,6 +36,8 @@ class LoraModelDB(db.Model):
     
     def to_lora_model(self):
         """Convert DB model to LoraModel object"""
+        # Import here to avoid circular imports
+        from models import LoraModel
         return LoraModel(
             name=self.name,
             source_type=self.source_type,
@@ -59,10 +64,6 @@ class GenerationResultDB(db.Model):
     lora_type = db.Column(db.String(20))
     lora_url = db.Column(db.String(500))
 
-# Initialize Flask app
-app = Flask(__name__, template_folder=str(BASE_DIR / "templates"), static_folder=str(BASE_DIR / "static"))
-app.secret_key = FLASK_SECRET_KEY or generate_random_string(24)
-
 # Global initialization flag
 initialized = False
 
@@ -70,16 +71,19 @@ def initialize_app():
     """Initialize the application's dependencies"""
     global initialized
     
-    # Configure database using SPOTIFY_DB_URL from config
-    app.config['SQLALCHEMY_DATABASE_URI'] = SPOTIFY_DB_URL
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    
-    # Initialize database
-    db.init_app(app)
-    
     # Create tables if they don't exist
-    with app.app_context():
-        db.create_all()
+    try:
+        with app.app_context():
+            db.create_all()
+    except Exception as e:
+        print(f"Error creating database tables: {e}")
+        return False
+    
+    # Now import modules that might need the database to be configured first
+    # Import here to avoid circular imports with db
+    from spotify_client import initialize_spotify
+    from models import PlaylistData, GenreAnalysis, LoraModel
+    from utils import generate_random_string, get_available_loras
     
     # Initialize Spotify client
     spotify_initialized = initialize_spotify()
@@ -111,6 +115,9 @@ def calculate_genre_percentages(genres_list):
     if not genres_list:
         return []
     
+    # Import here to avoid circular imports
+    from models import GenreAnalysis
+    
     # Use GenreAnalysis to calculate percentages
     genre_analysis = GenreAnalysis.from_genre_list(genres_list)
     return genre_analysis.get_percentages(max_genres=5)
@@ -127,6 +134,16 @@ def index():
             print("Application initialized successfully")
         else:
             print("Failed to initialize application")
+            return render_template(
+                "index.html", 
+                error="Failed to initialize application. Check server logs for details.",
+                loras=[]
+            )
+    
+    # Import here to avoid circular imports
+    from utils import get_available_loras
+    from generator import generate_cover
+    from chart_generator import generate_genre_chart
     
     # Get available LoRAs
     loras = get_available_loras()
@@ -215,6 +232,7 @@ def status():
     """API endpoint to check system status"""
     # Check if Spotify is initialized
     from spotify_client import sp
+    from utils import get_available_loras
     
     return jsonify({
         "initialized": initialized,
@@ -233,6 +251,10 @@ def api_generate():
         spotify_url = data.get("spotify_url")
         user_mood = data.get("mood", "")
         negative_prompt = data.get("negative_prompt", "")
+        
+        # Import here to avoid circular imports
+        from utils import get_available_loras
+        from generator import generate_cover
         
         # Handle LoRA - simplified to only use name
         lora_name = data.get("lora_name", "")
@@ -278,6 +300,10 @@ def api_regenerate():
         if not data or "playlist_url" not in data:
             return jsonify({"error": "Missing playlist_url in request"}), 400
             
+        # Import here to avoid circular imports
+        from utils import get_available_loras
+        from generator import generate_cover
+        
         spotify_url = data.get("playlist_url")
         user_mood = data.get("mood", "")
         negative_prompt = data.get("negative_prompt", "")
@@ -321,6 +347,7 @@ def api_regenerate():
 @app.route("/api/loras", methods=["GET"])
 def api_loras():
     """API endpoint to get available LoRAs"""
+    from utils import get_available_loras
     loras = get_available_loras()
     return jsonify({
         "loras": [lora.to_dict() for lora in loras]
@@ -330,6 +357,9 @@ def api_loras():
 def api_upload_lora():
     """API endpoint to upload a new LoRA file"""
     try:
+        from utils import get_available_loras
+        from config import LORA_DIR
+        
         if 'file' not in request.files:
             return jsonify({"error": "No file part"}), 400
             
@@ -346,7 +376,6 @@ def api_upload_lora():
             return jsonify({"error": f"File must be one of: {', '.join(allowed_extensions)}"}), 400
             
         # Save the file
-        from config import LORA_DIR
         filename = os.path.basename(file.filename)
         file.save(os.path.join(LORA_DIR, filename))
         
@@ -368,6 +397,11 @@ if __name__ == "__main__":
             print(f"Starting Spotify Cover Generator in CLI mode")
             
             initialize_app()
+            
+            # Import here to avoid circular imports
+            from models import LoraModel
+            from generator import generate_cover
+            from utils import get_available_loras
             
             spotify_url = sys.argv[2]
             mood = sys.argv[3] if len(sys.argv) >= 4 else None
