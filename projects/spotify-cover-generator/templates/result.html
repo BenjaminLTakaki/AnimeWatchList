@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Generated Album Cover</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
@@ -73,7 +76,8 @@
             padding: 10px;
             border-radius: 4px;
             font-family: monospace;
-            white-space: pre-wrap;            max-height: 150px;
+            white-space: pre-wrap;            
+            max-height: 150px;
             overflow-y: auto;
         }
         
@@ -185,7 +189,8 @@
         .genre-percentage-bar[data-percentage="100"] { width: 100%; }
     </style>
 </head>
-<body>    <div class="container result-container">
+<body>
+    <div class="container result-container">
         <h1 class="album-title">
             {{ title }}
             {% if lora_name %}
@@ -198,7 +203,18 @@
         <div class="result-layout">
             <!-- Album cover on the left -->
             <div class="cover-display">
-                <img src="{{ url_for('serve_image', filename=image_file) }}" alt="Album Cover" class="album-cover">
+            {% set placeholder_url = url_for('static', filename='images/image-placeholder.png') %}
+
+            {% if image_data_base64 %}
+                <img src="data:image/png;base64,{{ image_data_base64 }}" alt="Album Cover" class="album-cover">
+            {% else %}
+                <img 
+                    src="{{ url_for('serve_image', filename=image_file) }}" 
+                    alt="Album Cover" 
+                    class="album-cover" 
+                    onerror="this.src='{{ placeholder_url }}'; this.onerror=null;"
+                >
+            {% endif %}
             </div>
             
             <!-- Genre visualization on the right -->
@@ -244,7 +260,8 @@
                 <!-- Genre percentages visualization -->
                 {% if genre_percentages %}
                 <div class="genre-percentages-container">
-                    <h4>Top 5 Genres</h4>                    {% for genre in genre_percentages %}
+                    <h4>Top 5 Genres</h4>
+                    {% for genre in genre_percentages %}
                     <div class="genre-percentage-item">
                         <div class="genre-percentage-label">{{ genre.name }}</div>
                         <div class="genre-percentage">
@@ -293,6 +310,117 @@
             <p class="note">Cover generated on {{ timestamp|default('today') }}</p>
         </div>
     </div>
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        // JavaScript for handling image download and title copying
+        document.addEventListener('DOMContentLoaded', function() {
+            // Copy title button
+            const copyTitleButton = document.getElementById('copy-title');
+            if (copyTitleButton) {
+                copyTitleButton.addEventListener('click', function() {
+                    const title = document.querySelector('.album-title').textContent.trim();
+                    
+                    navigator.clipboard.writeText(title)
+                        .then(function() {
+                            // Show success message
+                            copyTitleButton.textContent = 'Title Copied!';
+                            
+                            // Reset button text after a delay
+                            setTimeout(function() {
+                                copyTitleButton.textContent = 'Copy Title';
+                            }, 2000);
+                        })
+                        .catch(err => {
+                            console.error('Failed to copy title: ', err);
+                        });
+                });
+            }
+            
+            // Copy/Download cover button
+            const downloadCoverButton = document.getElementById('copy-cover');
+            if (downloadCoverButton) {
+                downloadCoverButton.addEventListener('click', function() {
+                    // Try to download the base64 image if it exists
+                    const albumCover = document.querySelector('.album-cover');
+                    if (albumCover && albumCover.src.startsWith('data:image/png;base64,')) {
+                        // Create a temporary link to download the image
+                        const a = document.createElement('a');
+                        a.href = albumCover.src;
+                        a.download = 'album_cover_' + new Date().getTime() + '.png';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        
+                        // Show success message
+                        this.textContent = 'Cover Downloaded!';
+                        
+                        // Reset button text after a delay
+                        setTimeout(() => {
+                            this.textContent = 'Download Cover';
+                        }, 2000);
+                    } else {
+                        // Fall back to server-side image if available
+                        const imagePath = this.getAttribute('data-image-path');
+                        if (imagePath) {
+                            const imageUrl = '/generated_covers/' + imagePath;
+                            
+                            // Create a temporary link to download the image
+                            const a = document.createElement('a');
+                            a.href = imageUrl;
+                            a.download = imagePath;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            
+                            // Show success message
+                            this.textContent = 'Cover Downloaded!';
+                            
+                            // Reset button text after a delay
+                            setTimeout(() => {
+                                this.textContent = 'Download Cover';
+                            }, 2000);
+                        }
+                    }
+                });
+            }
+            
+            // Regenerate button (ajax functionality)
+            const regenerateButton = document.getElementById('regenerate-cover');
+            if (regenerateButton) {
+                regenerateButton.addEventListener('click', function() {
+                    const playlist_url = this.getAttribute('data-playlist-url');
+                    const mood = this.getAttribute('data-mood') || '';
+                    const negative_prompt = this.getAttribute('data-negative-prompt') || '';
+                    const lora_name = this.getAttribute('data-lora-name') || '';
+                    
+                    // Show loading state
+                    this.disabled = true;
+                    this.innerHTML = 'Regenerating... <span class="spinner"></span>';
+                    
+                    // Submit form to regenerate
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = window.location.pathname;
+                    
+                    // Add hidden fields
+                    const addHidden = (name, value) => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = name;
+                        input.value = value;
+                        form.appendChild(input);
+                    };
+                    
+                    addHidden('playlist_url', playlist_url);
+                    addHidden('mood', mood);
+                    addHidden('negative_prompt', negative_prompt);
+                    addHidden('lora_name', lora_name);
+                    
+                    // Submit the form
+                    document.body.appendChild(form);
+                    form.submit();
+                });
+            }
+        });
+    </script>
 </body>
 </html>

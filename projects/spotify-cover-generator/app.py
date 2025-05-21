@@ -78,6 +78,9 @@ def initialize_app():
     except Exception as e:
         print(f"Error creating database tables: {e}")
         return False
+        
+    # Make sure necessary directories exist
+    os.makedirs(COVERS_DIR, exist_ok=True)
     
     # Now import modules that might need the database to be configured first
     # Import here to avoid circular imports with db
@@ -121,6 +124,52 @@ def calculate_genre_percentages(genres_list):
     # Use GenreAnalysis to calculate percentages
     genre_analysis = GenreAnalysis.from_genre_list(genres_list)
     return genre_analysis.get_percentages(max_genres=5)
+
+# Create a placeholder image once at startup
+def create_static_placeholder():
+    """Create a static placeholder image if it doesn't exist"""
+    from PIL import Image, ImageDraw, ImageFont
+    
+    placeholder_path = os.path.join(app.static_folder, "images", "image-placeholder.png")
+    if not os.path.exists(placeholder_path):
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(placeholder_path), exist_ok=True)
+        
+        # Create a simple placeholder image
+        image = Image.new('RGB', (512, 512), color='#1E1E1E')
+        draw = ImageDraw.Draw(image)
+        
+        # Draw a border
+        border_width = 5
+        border_color = "#333333"
+        draw.rectangle(
+            [(border_width//2, border_width//2), (512-border_width//2, 512-border_width//2)],
+            outline=border_color,
+            width=border_width
+        )
+        
+        # Try to use a font
+        try:
+            font = ImageFont.truetype("arial.ttf", 28)
+            small_font = ImageFont.truetype("arial.ttf", 16)
+        except:
+            # Use default if truetype not available
+            font = ImageFont.load_default()
+            small_font = font
+            
+        # Draw text
+        text = "Image Not Found"
+        draw.text((100, 240), text, fill="#1DB954", font=font)
+        draw.text((90, 280), "Click Generate Again", fill="#FFFFFF", font=small_font)
+        
+        # Save the image
+        image.save(placeholder_path)
+        print(f"Created placeholder image at {placeholder_path}")
+    
+    return placeholder_path
+
+# Create placeholder on startup
+create_static_placeholder()
 
 # Routes
 @app.route("/", methods=["GET", "POST"])
@@ -193,10 +242,18 @@ def index():
             # Calculate genre percentages for visualization
             genre_percentages = calculate_genre_percentages(result.get("all_genres", []))
             
+            # Log the base64 data length to see if it was generated
+            if "image_data_base64" in result:
+                base64_length = len(result["image_data_base64"])
+                print(f"Base64 image data generated, length: {base64_length}")
+            else:
+                print("No base64 image data in result")
+            
             # Data for display
             display_data = {
                 "title": result["title"],
                 "image_file": img_filename,
+                "image_data_base64": result.get("image_data_base64", ""),
                 "genres": ", ".join(result.get("genres", [])),
                 "mood": result.get("mood", ""),
                 "playlist_name": result.get("item_name", "Your Music"),
@@ -225,7 +282,23 @@ def index():
 @app.route("/generated_covers/<path:filename>")
 def serve_image(filename):
     """Serve generated images"""
-    return send_from_directory(COVERS_DIR, filename)
+    try:
+        print(f"Attempting to serve image: {filename} from {COVERS_DIR}")
+        
+        # Create an absolute path to the file
+        file_path = os.path.join(COVERS_DIR, filename)
+        
+        # Check if file exists
+        if os.path.exists(file_path):
+            return send_from_directory(COVERS_DIR, filename)
+        else:
+            print(f"Image file not found: {file_path}")
+            # Return a placeholder image
+            return send_from_directory(os.path.join(app.static_folder, "images"), "image-placeholder.png")
+    except Exception as e:
+        print(f"Error serving image {filename}: {e}")
+        # Return a placeholder in case of error
+        return send_from_directory(os.path.join(app.static_folder, "images"), "image-placeholder.png")
 
 @app.route("/status")
 def status():
@@ -275,12 +348,13 @@ def api_generate():
         if "error" in result:
             return jsonify({"error": result["error"]}), 400
             
-        # Return result data
+        # Return result data, including base64 data for direct use
         return jsonify({
             "success": True,
             "title": result["title"],
             "image_path": result["output_path"],
             "image_url": f"/generated_covers/{os.path.basename(result['output_path'])}",
+            "image_data_base64": result.get("image_data_base64", ""),
             "data_file": result.get("data_file"),
             "genres": result.get("genres", []),
             "mood": result.get("mood", ""),
@@ -336,6 +410,7 @@ def api_regenerate():
             "title": result["title"],
             "image_path": result["output_path"],
             "image_url": f"/generated_covers/{os.path.basename(result['output_path'])}",
+            "image_data_base64": result.get("image_data_base64", ""),
             "data_file": result.get("data_file", ""),
             "lora_name": result.get("lora_name", ""),
             "lora_type": result.get("lora_type", "")

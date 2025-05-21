@@ -2,7 +2,7 @@ import requests
 import json
 import os
 import base64
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import io
 import time
 import random
@@ -91,7 +91,7 @@ def generate_cover_image(prompt, lora=None, output_path=None, negative_prompt=No
     # Check if we have API key
     if not STABILITY_API_KEY:
         print("ERROR: Missing Stability API key. Please set STABILITY_API_KEY in your .env file.")
-        return False
+        return create_placeholder_image(output_path)
     
     print(f"Generating with prompt: {prompt}")
     
@@ -170,7 +170,7 @@ def generate_cover_image(prompt, lora=None, output_path=None, negative_prompt=No
                 if response.status_code != 200:
                     print(f"Backup API error: {response.status_code}")
                     print(f"Response: {response.text}")
-                    return False
+                    return create_placeholder_image(output_path)
                 
                 response_data = response.json()
                 
@@ -184,18 +184,19 @@ def generate_cover_image(prompt, lora=None, output_path=None, negative_prompt=No
                     
                     # Save image if output path is specified
                     if output_path:
+                        # Make sure directory exists
+                        os.makedirs(os.path.dirname(str(output_path)), exist_ok=True)
                         image.save(output_path)
                         print(f"Image saved to {output_path} (using backup API)")
-                        return True
                     
                     return image
                 else:
                     print("No image data found in backup API response")
-                    return False
+                    return create_placeholder_image(output_path)
             
             except Exception as e:
                 print(f"Error with backup API: {e}")
-                return False
+                return create_placeholder_image(output_path)
             
         # Extract image data from main API response
         if "image" in response_data:
@@ -207,45 +208,50 @@ def generate_cover_image(prompt, lora=None, output_path=None, negative_prompt=No
             
             # Save image if output path is specified
             if output_path:
+                # Make sure directory exists
+                os.makedirs(os.path.dirname(str(output_path)), exist_ok=True)
                 image.save(output_path)
                 print(f"Image saved to {output_path}")
-                return True
-                
+            
             return image
         else:
             print("No image data found in the response.")
             print(f"Response structure: {json.dumps(list(response_data.keys()), indent=2)}")
-            return False
+            return create_placeholder_image(output_path)
             
     except Exception as e:
         print(f"Error generating image: {e}")
-        if output_path:
-            return False
-        # Return a placeholder image
-        placeholder = Image.new('RGB', (512, 512), color='#3A506B')
+        return create_placeholder_image(output_path)
+
+def create_placeholder_image(output_path=None):
+    """Create a placeholder image when generation fails"""
+    try:
+        # Create a placeholder image
+        width, height = 512, 512
+        image = Image.new('RGB', (width, height), color='#3A506B')
         
+        # Add text to the placeholder image
+        draw = ImageDraw.Draw(image)
+        
+        # Try to load a font, use default if not available
         try:
-            # Try to add text to the placeholder image
-            from PIL import ImageDraw, ImageFont
-            draw = ImageDraw.Draw(placeholder)
-            
-            # Try to load a font, use default if not available
-            try:
-                font = ImageFont.truetype("arial.ttf", 20)
-            except:
-                font = ImageFont.load_default()
-            
-            # Draw error message
-            error_message = f"API Error: {str(e)[:50]}..."
-            draw.text((20, 240), error_message, fill="white", font=font)
-            draw.text((20, 270), "Using placeholder image", fill="white", font=font)
-            
-            if output_path:
-                placeholder.save(output_path)
-                print(f"Placeholder image saved to {output_path}")
-                return True
-                
-        except Exception as draw_error:
-            print(f"Error creating placeholder image: {draw_error}")
-            
-        return placeholder
+            font = ImageFont.truetype("arial.ttf", 20)
+        except:
+            font = ImageFont.load_default()
+        
+        # Draw message
+        draw.text((20, 240), "Image Generation Failed", fill="white", font=font)
+        draw.text((20, 270), "Using placeholder image", fill="white", font=font)
+        
+        # Save if output path is specified
+        if output_path:
+            # Make sure directory exists
+            os.makedirs(os.path.dirname(str(output_path)), exist_ok=True)
+            image.save(output_path)
+            print(f"Placeholder image saved to {output_path}")
+        
+        return image
+    except Exception as draw_error:
+        print(f"Error creating placeholder image: {draw_error}")
+        # Return a minimal image if even the placeholder creation fails
+        return Image.new('RGB', (512, 512), color='#FF0000')

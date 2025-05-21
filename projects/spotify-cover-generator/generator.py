@@ -1,6 +1,9 @@
 import os
 import datetime
+import base64
+import io
 from pathlib import Path
+from PIL import Image
 
 from spotify_client import extract_playlist_data
 from image_generator import create_prompt_from_data, generate_cover_image
@@ -44,6 +47,9 @@ def generate_cover(url, user_mood=None, lora_input=None, output_path=None, negat
         img_filename = create_image_filename(title)
         output_path = COVERS_DIR / img_filename
     
+    # Make sure the output directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
     # Process LoRA input - simplified to only handle local LoRAs
     lora = None
     lora_name = ""
@@ -82,10 +88,26 @@ def generate_cover(url, user_mood=None, lora_input=None, output_path=None, negat
                 lora_type = lora_input.get('source_type', 'local')
     
     # Generate cover image with the custom negative prompt if provided
-    success = generate_cover_image(image_prompt, lora, output_path, negative_prompt)
+    image_result = generate_cover_image(image_prompt, lora, output_path, negative_prompt)
     
-    if not success:
+    if image_result is None or (isinstance(image_result, bool) and not image_result):
         return {"error": "Failed to generate cover image"}
+    
+    # Check if image_result is a PIL Image or a boolean success value
+    if hasattr(image_result, 'mode'):  # It's a PIL Image
+        image = image_result
+    else:
+        # It's a success boolean, so load image from file
+        try:
+            image = Image.open(output_path)
+        except Exception as e:
+            print(f"Error opening generated image: {e}")
+            return {"error": f"Failed to process generated image: {str(e)}"}
+    
+    # Convert image to base64 for embedding in HTML
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    img_base64 = base64.b64encode(buffered.getvalue()).decode()
     
     # Current timestamp
     timestamp = str(datetime.datetime.now())
@@ -104,6 +126,9 @@ def generate_cover(url, user_mood=None, lora_input=None, output_path=None, negat
     
     # Convert to dict for saving
     result_dict = result.to_dict()
+    
+    # Add the base64 data to the result dict
+    result_dict["image_data_base64"] = img_base64
     
     # Save data to JSON file
     data_file = save_generation_data(result_dict)
