@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}CV Assessment & Skill Analysis - SkillsTown{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container text-center">
+        <h1>CV Assessment & Skill Analysis</h1>
+        <p>Upload your CV for a personalized skill analysis and course recommendations</p>
+    </div>
+</section>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0"><i class="fas fa-file-upload me-2"></i>Upload Your CV</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info d-flex align-items-center">
+                        <i class="fas fa-info-circle me-3 fa-2x"></i>
+                        <div>
+                            <strong>Why analyze your CV?</strong>
+                            <p class="mb-0">Our AI-powered tool analyzes your CV to identify your skills, assess your strengths, and suggest personalized course recommendations to help advance your career.</p>
+                        </div>
+                    </div>
+                    
+                    <form method="POST" action="{{ get_url_for('upload_file') }}" enctype="multipart/form-data" id="upload-form">
+                        <div class="mb-4" id="upload-container">
+                            <div class="upload-area" id="dropzone" onclick="document.getElementById('file').click();">
+                                <i class="fas fa-file-upload upload-icon"></i>
+                                <h4>Drag & Drop or Click to Upload</h4>
+                                <p class="text-muted">Accepted formats: PDF, DOCX, TXT</p>
+                                <p class="text-muted small">Your CV is only used for analysis and is not stored permanently</p>
+                                <div id="file-name" class="mt-3"></div>
+                            </div>
+                            <input type="file" name="file" id="file" accept=".pdf,.docx,.txt" style="display: none;" onchange="updateFileName()">
+                        </div>
+                        
+                        {% if not current_user.is_authenticated %}
+                            <div class="alert alert-warning d-flex align-items-center mb-4">
+                                <i class="fas fa-exclamation-circle me-3 fa-2x"></i>
+                                <div>
+                                    <strong>Note:</strong> To save your course recommendations, please <a href="{{ get_url_for('login_redirect') }}" class="alert-link">log in</a> before uploading your CV.
+                                </div>
+                            </div>
+                        {% endif %}
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
+                                <i class="fas fa-search me-2"></i>Analyze CV & Recommend Courses
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-header bg-secondary text-white">
+                    <h3 class="mb-0"><i class="fas fa-question-circle me-2"></i>How It Works</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 text-center mb-3">
+                            <div class="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 80px; height: 80px; background-color: var(--light-blue);">
+                                <i class="fas fa-upload fa-2x" style="color: var(--skillstown-blue);"></i>
+                            </div>
+                            <h5>Upload CV</h5>
+                            <p class="text-muted">Upload your CV or resume in PDF, DOCX, or TXT format</p>
+                        </div>
+                        <div class="col-md-4 text-center mb-3">
+                            <div class="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 80px; height: 80px; background-color: var(--light-blue);">
+                                <i class="fas fa-robot fa-2x" style="color: var(--skillstown-blue);"></i>
+                            </div>
+                            <h5>AI Analysis</h5>
+                            <p class="text-muted">Our AI analyzes your skills, experience, and capabilities</p>
+                        </div>
+                        <div class="col-md-4 text-center mb-3">
+                            <div class="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 80px; height: 80px; background-color: var(--light-blue);">
+                                <i class="fas fa-graduation-cap fa-2x" style="color: var(--skillstown-blue);"></i>
+                            </div>
+                            <h5>Get Recommendations</h5>
+                            <p class="text-muted">Receive personalized course recommendations and skill insights</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <h5>Data Privacy</h5>
+                        <p class="mb-0">Your CV is processed securely for analysis purposes only. The content is not stored permanently, and we do not share your data with third parties. The analysis is used solely to generate skill assessments and course recommendations.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // File upload handling
+    function updateFileName() {
+        const fileInput = document.getElementById('file');
+        const fileNameContainer = document.getElementById('file-name');
+        
+        if (fileInput.files.length > 0) {
+            const fileName = fileInput.files[0].name;
+            fileNameContainer.innerHTML = `<div class="alert alert-success">
+                <i class="fas fa-check-circle me-2"></i>Selected file: <strong>${fileName}</strong>
+            </div>`;
+            document.getElementById('submit-btn').removeAttribute('disabled');
+        } else {
+            fileNameContainer.innerHTML = '';
+        }
+    }
+    
+    // Drag and drop functionality
+    const dropzone = document.getElementById('dropzone');
+    
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('bg-light');
+    });
+    
+    dropzone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('bg-light');
+    });
+    
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('bg-light');
+        
+        const files = e.dataTransfer.files;
+        const fileInput = document.getElementById('file');
+        
+        if (files.length > 0) {
+            // Check file extension
+            const fileName = files[0].name;
+            const fileExt = fileName.split('.').pop().toLowerCase();
+            
+            if (['pdf', 'docx', 'txt'].includes(fileExt)) {
+                fileInput.files = files;
+                updateFileName();
+            } else {
+                document.getElementById('file-name').innerHTML = `<div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>Invalid file format. Please upload PDF, DOCX, or TXT files.
+                </div>`;
+            }
+        }
+    });
+    
+    // Form validation
+    document.getElementById('upload-form').addEventListener('submit', function(event) {
+        const fileInput = document.getElementById('file');
+        if (fileInput.files.length === 0) {
+            event.preventDefault();
+            document.getElementById('file-name').innerHTML = `<div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle me-2"></i>Please select a file to upload.
+            </div>`;
+        } else {
+            // Show loading state
+            document.getElementById('submit-btn').innerHTML = `
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Analyzing CV...
+            `;
+            document.getElementById('submit-btn').disabled = true;
+        }
+    });
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-area {
+        border: 2px dashed var(--skillstown-blue);
+        border-radius: 10px;
+        padding: 40px 20px;
+        text-align: center;
+        background-color: #f8f9fa;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+    
+    .upload-area:hover {
+        background-color: var(--light-blue);
+    }
+    
+    .upload-icon {
+        font-size: 4rem;
+        color: var(--skillstown-blue);
+        margin-bottom: 15px;
+    }
+</style>
+{% endblock %}
