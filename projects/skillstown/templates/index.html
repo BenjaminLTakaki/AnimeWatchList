@@ -25,9 +25,6 @@
         <div class="popular-categories mt-4">
             <p class="text-muted mb-2">Popular categories:</p>
             <div class="category-tags">
-                <a href="{{ get_url_for('search') }}?query=Python" class="category-tag">Python</a>
-                <a href="{{ get_url_for('search') }}?query=Management" class="category-tag">Management</a>
-                <a href="{{ get_url_for('search') }}?query=Communication" class="category-tag">Communication</a>
                 <a href="{{ get_url_for('search') }}?query=Leadership" class="category-tag">Leadership</a>
                 <a href="{{ get_url_for('search') }}?query=Excel" class="category-tag">Excel</a>
                 <a href="{{ get_url_for('search') }}?query=Project" class="category-tag">Project Management</a>
@@ -146,11 +143,11 @@
                         </h4>
                     </div>
                     <div class="card-body">
-                        <p>Track your professional development journey with your enrolled courses.</p>
+                        <p>Track your professional development journey with your saved courses.</p>
                         <div class="d-grid">
-                            <a href="{{ get_url_for('enrolled_courses') }}" class="btn btn-success">
-                                <i class="fas fa-graduation-cap me-2"></i>
-                                Your Enrolled Courses ({{ enrolled_courses_count }})
+                            <a href="{{ get_url_for('saved_courses') }}" class="btn btn-success">
+                                <i class="fas fa-bookmark me-2"></i>
+                                Your Saved Courses ({{ saved_courses_count }})
                             </a>
                         </div>
                     </div>
@@ -164,7 +161,7 @@
                         </h4>
                     </div>
                     <div class="card-body">
-                        <p>Sign in to track your learning progress and enroll in courses.</p>
+                        <p>Sign in to track your learning progress and save courses.</p>
                         <div class="d-grid">
                             <a href="{{ get_url_for('login_redirect') }}" class="btn btn-primary">
                                 <i class="fas fa-sign-in-alt me-2"></i>
@@ -228,7 +225,7 @@
                         </li>
                         <li>
                             <i class="fas fa-check-circle text-success me-2"></i>
-                            <strong>Enroll & Track</strong> your course progress
+                            <strong>Save & Track</strong> your course progress
                         </li>
                         <li>
                             <i class="fas fa-check-circle text-success me-2"></i>
@@ -365,4 +362,7 @@
         margin-bottom: 12px;
     }
 </style>
-{% endblock %}
+{% endblock %}_url_for('search') }}?query=Python" class="category-tag">Python</a>
+                <a href="{{ get_url_for('search') }}?query=Management" class="category-tag">Management</a>
+                <a href="{{ get_url_for('search') }}?query=Communication" class="category-tag">Communication</a>
+                <a href="{{ get
