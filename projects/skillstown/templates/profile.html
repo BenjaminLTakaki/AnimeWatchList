@@ -26,8 +26,8 @@
                             <div class="row">
                                 <div class="col-md-4">
                                     <div class="stat-box text-center">
-                                        <div class="stat-number text-primary">{{ saved_courses_count }}</div>
-                                        <div class="stat-label">Saved Courses</div>
+                                        <div class="stat-number text-primary">{{ enrolled_courses_count }}</div>
+                                        <div class="stat-label">Enrolled Courses</div>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
@@ -83,8 +83,8 @@
                         <a href="{{ get_url_for('assessment') }}" class="btn btn-outline-info">
                             <i class="fas fa-file-alt me-2"></i>Upload CV for Analysis
                         </a>
-                        <a href="{{ get_url_for('saved_courses') }}" class="btn btn-outline-success">
-                            <i class="fas fa-bookmark me-2"></i>View Saved Courses
+                        <a href="{{ get_url_for('enrolled_courses') }}" class="btn btn-outline-success">
+                            <i class="fas fa-graduation-cap me-2"></i>View Enrolled Courses
                         </a>
                     </div>
                 </div>
@@ -100,21 +100,21 @@
                     </h4>
                 </div>
                 <div class="card-body">
-                    {% if saved_courses_count > 0 %}
+                    {% if enrolled_courses_count > 0 %}
                         <div class="progress-item mb-3">
                             <div class="d-flex justify-content-between">
                                 <span>Course Completion Rate</span>
                                 <span>{{ completion_percentage }}%</span>
                             </div>
                             <div class="progress mt-1">
-                                <div class="progress-bar bg-success" role="progressbar" style="--bar-width: {{ completion_percentage }}%"></div>
+                                <div class="progress-bar bg-success" role="progressbar" style="--width: {{ completion_percentage }}%"></div>
                             </div>
                         </div>
                         
                         <div class="learning-stats">
                             <div class="stat-row">
-                                <i class="fas fa-bookmark text-primary me-2"></i>
-                                <span>{{ saved_courses_count }} courses saved</span>
+                                <i class="fas fa-graduation-cap text-primary me-2"></i>
+                                <span>{{ enrolled_courses_count }} courses enrolled</span>
                             </div>
                             <div class="stat-row">
                                 <i class="fas fa-play-circle text-warning me-2"></i>
@@ -129,7 +129,7 @@
                         <div class="text-center py-4">
                             <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
                             <h5>Start Your Learning Journey</h5>
-                            <p class="text-muted">Save your first course to see your progress here!</p>
+                            <p class="text-muted">Enroll in your first course to see your progress here!</p>
                             <a href="{{ get_url_for('search') }}" class="btn btn-primary">
                                 <i class="fas fa-search me-2"></i>Find Courses
                             </a>
@@ -195,7 +195,7 @@
                         <div class="text-center py-4">
                             <i class="fas fa-history fa-3x text-muted mb-3"></i>
                             <h5>No Recent Activity</h5>
-                            <p class="text-muted">Your course activity will appear here once you start saving and learning!</p>
+                            <p class="text-muted">Your course activity will appear here once you start enrolling and learning!</p>
                         </div>
                     {% endif %}
                 </div>

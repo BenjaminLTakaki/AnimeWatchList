@@ -146,11 +146,11 @@
                         </h4>
                     </div>
                     <div class="card-body">
-                        <p>Track your professional development journey with your saved courses.</p>
+                        <p>Track your professional development journey with your enrolled courses.</p>
                         <div class="d-grid">
-                            <a href="{{ get_url_for('saved_courses') }}" class="btn btn-success">
-                                <i class="fas fa-bookmark me-2"></i>
-                                Your Saved Courses ({{ saved_courses_count }})
+                            <a href="{{ get_url_for('enrolled_courses') }}" class="btn btn-success">
+                                <i class="fas fa-graduation-cap me-2"></i>
+                                Your Enrolled Courses ({{ enrolled_courses_count }})
                             </a>
                         </div>
                     </div>
@@ -164,7 +164,7 @@
                         </h4>
                     </div>
                     <div class="card-body">
-                        <p>Sign in to track your learning progress and save courses for later.</p>
+                        <p>Sign in to track your learning progress and enroll in courses.</p>
                         <div class="d-grid">
                             <a href="{{ get_url_for('login_redirect') }}" class="btn btn-primary">
                                 <i class="fas fa-sign-in-alt me-2"></i>
@@ -228,7 +228,7 @@
                         </li>
                         <li>
                             <i class="fas fa-check-circle text-success me-2"></i>
-                            <strong>Save & Track</strong> your course progress
+                            <strong>Enroll & Track</strong> your course progress
                         </li>
                         <li>
                             <i class="fas fa-check-circle text-success me-2"></i>

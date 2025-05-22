@@ -41,9 +41,9 @@
                                         <div class="course-header">
                                             <span class="category-badge">{{ course.category }}</span>
                                             {% if current_user.is_authenticated %}
-                                                <button type="button" class="btn-save-course" 
-                                                        onclick="saveCourse('{{ course.category }}', '{{ course.course }}')">
-                                                    <i class="far fa-bookmark"></i>
+                                                <button type="button" class="btn-enroll-course" 
+                                                        onclick="enrollInCourse('{{ course.category }}', '{{ course.course }}')">
+                                                    <i class="fas fa-graduation-cap"></i>
                                                 </button>
                                             {% endif %}
                                         </div>
@@ -231,8 +231,8 @@
 
 {% block extra_js %}
 <script>
-    function saveCourse(category, courseName) {
-        fetch('{{ get_url_for("save_course_route") }}', {
+    function enrollInCourse(category, courseName) {
+        fetch('{{ get_url_for("enroll_course_route") }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -242,9 +242,10 @@
         .then(response => response.json())
         .then(data => {
             if(data.success) {
-                // Change the bookmark icon to filled
-                event.target.classList.remove('far');
+                // Change the icon to show enrolled
+                event.target.classList.remove('fas');
                 event.target.classList.add('fas');
+                event.target.style.color = '#28a745';
                 
                 // Show a notification
                 const toast = document.createElement('div');
@@ -326,7 +327,7 @@
         font-weight: 500;
     }
     
-    .btn-save-course {
+    .btn-enroll-course {
         background: none;
         border: none;
         color: #aaa;
@@ -335,7 +336,7 @@
         transition: color 0.3s;
     }
     
-    .btn-save-course:hover {
+    .btn-enroll-course:hover {
         color: var(--skillstown-blue);
     }
     
@@ -464,4 +465,4 @@
         transition: opacity 0.3s;
     }
 </style>
-{% endblock %}  
+{% endblock %}

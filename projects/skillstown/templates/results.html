@@ -55,9 +55,7 @@
                                                 </div>
                                                 <div class="skill-bar">
                                                     {% set level_percentage = 100 if skill_info.level == "expert" else 75 if skill_info.level == "advanced" else 50 if skill_info.level == "intermediate" else 25 %}
-                                                    <div class="skill-progress level-{{ skill_info.level }}" 
-                                                    style="--bar-width: {{ level_percentage }}%;">
-                                                </div>
+                                                    <div class="skill-progress level-{{ skill_info.level }}" style="--width: {{ level_percentage }}%;"></div>
                                                 </div>
                                             </div>
                                         {% endfor %}
@@ -79,7 +77,7 @@
                                                 </div>
                                                 <div class="skill-bar">
                                                     {% set level_percentage = 100 if skill_info.level == "expert" else 75 if skill_info.level == "advanced" else 50 if skill_info.level == "intermediate" else 25 %}
-                                                    <div class="skill-progress level-{{ skill_info.level }}" style="--bar-width: {{ level_percentage }}%;">
+                                                    <div class="skill-progress level-{{ skill_info.level }}" style="--width: {{ level_percentage }}%;"></div>
                                                 </div>
                                             </div>
                                         {% endfor %}
@@ -101,7 +99,7 @@
                                                 </div>
                                                 <div class="skill-bar">
                                                     {% set level_percentage = 100 if domain_info.level == "expert" else 75 if domain_info.level == "advanced" else 50 if domain_info.level == "intermediate" else 25 %}
-                                                    <div class="skill-progress level-{{ domain_info.level }}" style="--bar-width: {{ level_percentage }}%;"></div>
+                                                    <div class="skill-progress level-{{ domain_info.level }}" style="--width: {{ level_percentage }}%;"></div>
                                                 </div>
                                             </div>
                                         {% endfor %}
@@ -222,9 +220,9 @@
                                                 <div class="recommendation-header">
                                                     <span class="category-badge">{{ recommendation.category }}</span>
                                                     {% if current_user.is_authenticated %}
-                                                        <button type="button" class="btn-save-course" 
-                                                                onclick="saveCourse('{{ recommendation.category }}', '{{ recommendation.course }}')">
-                                                            <i class="far fa-bookmark"></i>
+                                                        <button type="button" class="btn-enroll-course" 
+                                                                onclick="enrollInCourse('{{ recommendation.category }}', '{{ recommendation.course }}')">
+                                                            <i class="fas fa-graduation-cap"></i>
                                                         </button>
                                                     {% endif %}
                                                 </div>
@@ -284,9 +282,9 @@
                                                             <span class="mini-category-badge">{{ course.category }}</span>
                                                             <h6>{{ course.course }}</h6>
                                                             {% if current_user.is_authenticated %}
-                                                                <button type="button" class="btn-save-mini" 
-                                                                        onclick="saveCourse('{{ course.category }}', '{{ course.course }}')">
-                                                                    <i class="far fa-bookmark"></i>
+                                                                <button type="button" class="btn-enroll-mini" 
+                                                                        onclick="enrollInCourse('{{ course.category }}', '{{ course.course }}')">
+                                                                    <i class="fas fa-graduation-cap"></i>
                                                                 </button>
                                                             {% endif %}
                                                         </div>
@@ -320,9 +318,9 @@
                                                             <div class="course-item-header">
                                                                 <h6>{{ course.course }}</h6>
                                                                 {% if current_user.is_authenticated %}
-                                                                    <button type="button" class="btn-save-mini" 
-                                                                            onclick="saveCourse('{{ course.category }}', '{{ course.course }}')">
-                                                                        <i class="far fa-bookmark"></i>
+                                                                    <button type="button" class="btn-enroll-mini" 
+                                                                            onclick="enrollInCourse('{{ course.category }}', '{{ course.course }}')">
+                                                                        <i class="fas fa-graduation-cap"></i>
                                                                     </button>
                                                                 {% endif %}
                                                             </div>
@@ -373,8 +371,8 @@
 
 {% block extra_js %}
 <script>
-    function saveCourse(category, courseName) {
-        fetch('{{ get_url_for("save_course_route") }}', {
+    function enrollInCourse(category, courseName) {
+        fetch('{{ get_url_for("enroll_course_route") }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -384,9 +382,8 @@
         .then(response => response.json())
         .then(data => {
             if(data.success) {
-                // Change the bookmark icon to filled
-                event.target.classList.remove('far');
-                event.target.classList.add('fas');
+                // Change the icon to show enrolled
+                event.target.style.color = '#28a745';
                 
                 // Show a notification
                 const toast = document.createElement('div');
@@ -577,7 +574,7 @@
         font-weight: 500;
     }
     
-    .btn-save-course, .btn-save-mini {
+    .btn-enroll-course, .btn-enroll-mini {
         background: none;
         border: none;
         color: #aaa;
@@ -586,7 +583,7 @@
         transition: color 0.3s;
     }
     
-    .btn-save-course:hover, .btn-save-mini:hover {
+    .btn-enroll-course:hover, .btn-enroll-mini:hover {
         color: var(--skillstown-blue);
     }
     

@@ -82,18 +82,18 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Custom DB model for saving user courses
+# Custom DB model for enrolling in user courses
 class UserCourse(db.Model):
     __tablename__ = 'user_courses'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     category = db.Column(db.String(100), nullable=False)
     course_name = db.Column(db.String(255), nullable=False)
-    status = db.Column(db.String(50), default='saved') # saved, in_progress, completed
+    status = db.Column(db.String(50), default='enrolled') # enrolled, in_progress, completed
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     
     # Define relationship
-    user = db.relationship('User', backref='saved_courses')
+    user = db.relationship('User', backref='enrolled_courses')
     
     __table_args__ = (
         db.UniqueConstraint('user_id', 'course_name', name='user_course_unique'),
@@ -109,9 +109,14 @@ def get_url_for(*args, **kwargs):
 # Add context processor to inject variables into all templates
 @app.context_processor
 def inject_template_vars():
+    enrolled_courses_count = 0
+    if current_user.is_authenticated:
+        enrolled_courses_count = UserCourse.query.filter_by(user_id=current_user.id).count()
+    
     return {
         'get_url_for': get_url_for,
-        'is_authenticated': lambda: current_user.is_authenticated
+        'is_authenticated': lambda: current_user.is_authenticated,
+        'enrolled_courses_count': enrolled_courses_count
     }
 
 # Load course catalog from JSON file
@@ -398,8 +403,8 @@ def search_courses(query, course_catalog):
     
     return results
 
-# Get saved courses for a user
-def get_saved_courses(user_id):
+# Get enrolled courses for a user
+def get_enrolled_courses(user_id):
     user_courses = UserCourse.query.filter_by(user_id=user_id).all()
     return [
         {
@@ -412,9 +417,9 @@ def get_saved_courses(user_id):
         for course in user_courses
     ]
 
-# Save a course for a user
-def save_course(user_id, category, course_name, status="saved"):
-    # Check if already saved
+# Enroll in a course for a user
+def enroll_in_course(user_id, category, course_name, status="enrolled"):
+    # Check if already enrolled
     existing = UserCourse.query.filter_by(
         user_id=user_id, 
         course_name=course_name
@@ -425,9 +430,9 @@ def save_course(user_id, category, course_name, status="saved"):
         if existing.status != status:
             existing.status = status
             db.session.commit()
-        return False  # Not a new save
+        return False  # Not a new enrollment
     
-    # Create new saved course
+    # Create new enrollment
     user_course = UserCourse(
         user_id=user_id,
         category=category,
@@ -437,10 +442,10 @@ def save_course(user_id, category, course_name, status="saved"):
     
     db.session.add(user_course)
     db.session.commit()
-    return True  # New save
+    return True  # New enrollment
 
-# Remove a saved course
-def remove_saved_course(user_id, course_id):
+# Remove an enrolled course
+def remove_enrolled_course(user_id, course_id):
     course = UserCourse.query.filter_by(id=course_id, user_id=user_id).first()
     if course:
         db.session.delete(course)
@@ -490,12 +495,12 @@ except ImportError:
 # Routes
 @app.route('/')
 def index():
-    # If user is authenticated, get saved courses count
-    saved_courses_count = 0
+    # If user is authenticated, get enrolled courses count
+    enrolled_courses_count = 0
     if current_user.is_authenticated:
-        saved_courses_count = UserCourse.query.filter_by(user_id=current_user.id).count()
+        enrolled_courses_count = UserCourse.query.filter_by(user_id=current_user.id).count()
     
-    return render_template('index.html', saved_courses_count=saved_courses_count)
+    return render_template('index.html', enrolled_courses_count=enrolled_courses_count)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -554,13 +559,13 @@ def logout():
 @login_required
 def profile():
     # Get user's course statistics
-    saved_courses_count = UserCourse.query.filter_by(user_id=current_user.id).count()
+    enrolled_courses_count = UserCourse.query.filter_by(user_id=current_user.id).count()
     in_progress_count = UserCourse.query.filter_by(user_id=current_user.id, status='in_progress').count()
     completed_count = UserCourse.query.filter_by(user_id=current_user.id, status='completed').count()
     
     # Calculate completion percentage
-    if saved_courses_count > 0:
-        completion_percentage = round((completed_count / saved_courses_count) * 100)
+    if enrolled_courses_count > 0:
+        completion_percentage = round((completed_count / enrolled_courses_count) * 100)
     else:
         completion_percentage = 0
     
@@ -583,7 +588,7 @@ def profile():
     member_since = "January 2025"  # Placeholder - you might want to add a created_at field to User model
     
     return render_template('profile.html',
-                         saved_courses_count=saved_courses_count,
+                         enrolled_courses_count=enrolled_courses_count,
                          in_progress_count=in_progress_count,
                          completed_count=completed_count,
                          completion_percentage=completion_percentage,
@@ -670,41 +675,41 @@ def search():
 def about():
     return render_template('about.html')
 
-@app.route('/saved-courses')
+@app.route('/enrolled-courses')
 @login_required
-def saved_courses():
-    courses = get_saved_courses(current_user.id)
-    return render_template('saved_courses.html', courses=courses)
+def enrolled_courses():
+    courses = get_enrolled_courses(current_user.id)
+    return render_template('enrolled_courses.html', courses=courses)
 
-@app.route('/save-course', methods=['POST'])
+@app.route('/enroll-course', methods=['POST'])
 @login_required
-def save_course_route():
+def enroll_course_route():
     category = request.form.get('category')
     course_name = request.form.get('course')
     
     if not category or not course_name:
         return jsonify({'success': False, 'message': 'Missing required information'})
     
-    result = save_course(current_user.id, category, course_name)
+    result = enroll_in_course(current_user.id, category, course_name)
     
     if result:
-        message = f"Course '{course_name}' has been saved!"
+        message = f"Successfully enrolled in '{course_name}'!"
     else:
-        message = f"Course '{course_name}' was already in your saved courses."
+        message = f"You are already enrolled in '{course_name}'."
     
     return jsonify({'success': True, 'message': message})
 
 @app.route('/remove-course/<int:course_id>', methods=['POST'])
 @login_required
 def remove_course(course_id):
-    result = remove_saved_course(current_user.id, course_id)
+    result = remove_enrolled_course(current_user.id, course_id)
     
     if result:
-        flash("Course has been removed from your saved courses.")
+        flash("Course has been removed from your enrolled courses.")
     else:
         flash("Course not found or not associated with your account.")
     
-    return redirect(url_for('saved_courses'))
+    return redirect(url_for('enrolled_courses'))
 
 @app.route('/update-course-status/<int:course_id>', methods=['POST'])
 @login_required
@@ -713,7 +718,7 @@ def update_status(course_id):
     
     if not new_status or new_status not in ['saved', 'in_progress', 'completed']:
         flash("Invalid status selected.")
-        return redirect(url_for('saved_courses'))
+        return redirect(url_for('enrolled_courses'))
     
     result = update_course_status(current_user.id, course_id, new_status)
     
