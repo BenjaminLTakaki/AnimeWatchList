@@ -465,6 +465,28 @@ with app.app_context():
     except Exception as e:
         print(f"Error creating database tables: {e}")
 
+# Import forms from animewatchlist
+try:
+    from auth import LoginForm, RegistrationForm
+except ImportError:
+    # Create fallback forms if import fails
+    from flask_wtf import FlaskForm
+    from wtforms import StringField, PasswordField, SubmitField, BooleanField
+    from wtforms.validators import DataRequired, Length, Email, EqualTo
+    
+    class LoginForm(FlaskForm):
+        email = StringField('Email', validators=[DataRequired(), Email()])
+        password = PasswordField('Password', validators=[DataRequired()])
+        remember = BooleanField('Remember Me')
+        submit = SubmitField('Login')
+    
+    class RegistrationForm(FlaskForm):
+        username = StringField('Username', validators=[DataRequired(), Length(min=4, max=25)])
+        email = StringField('Email', validators=[DataRequired(), Email()])
+        password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
+        confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
+        submit = SubmitField('Sign Up')
+
 # Routes
 @app.route('/')
 def index():
@@ -475,10 +497,103 @@ def index():
     
     return render_template('index.html', saved_courses_count=saved_courses_count)
 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(get_url_for('index'))
+    
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user and user.check_password(form.password.data):
+            login_user(user, remember=form.remember.data)
+            next_page = request.args.get('next')
+            flash('You have been logged in successfully!', 'success')
+            return redirect(next_page) if next_page else redirect(get_url_for('index'))
+        else:
+            flash('Login unsuccessful. Please check your email and password.', 'danger')
+    
+    return render_template('login.html', form=form)
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(get_url_for('index'))
+    
+    form = RegistrationForm()
+    if form.validate_on_submit():
+        # Check if username or email already exists
+        existing_user = User.query.filter(
+            (User.username == form.username.data) | 
+            (User.email == form.email.data)
+        ).first()
+        
+        if existing_user:
+            if existing_user.username == form.username.data:
+                flash('Username already exists. Please choose a different one.', 'danger')
+            else:
+                flash('Email already registered. Please use a different email or login.', 'danger')
+        else:
+            user = User(username=form.username.data, email=form.email.data)
+            user.set_password(form.password.data)
+            db.session.add(user)
+            db.session.commit()
+            flash('Your account has been created! You can now log in.', 'success')
+            return redirect(get_url_for('login'))
+    
+    return render_template('register.html', form=form)
+
+@app.route('/logout')
+def logout():
+    from flask_login import logout_user
+    logout_user()
+    flash('You have been logged out.', 'info')
+    return redirect(get_url_for('index'))
+
+@app.route('/profile')
+@login_required
+def profile():
+    # Get user's course statistics
+    saved_courses_count = UserCourse.query.filter_by(user_id=current_user.id).count()
+    in_progress_count = UserCourse.query.filter_by(user_id=current_user.id, status='in_progress').count()
+    completed_count = UserCourse.query.filter_by(user_id=current_user.id, status='completed').count()
+    
+    # Calculate completion percentage
+    if saved_courses_count > 0:
+        completion_percentage = round((completed_count / saved_courses_count) * 100)
+    else:
+        completion_percentage = 0
+    
+    # Get recent courses (last 5)
+    recent_courses = UserCourse.query.filter_by(user_id=current_user.id)\
+                                   .order_by(UserCourse.created_at.desc())\
+                                   .limit(5).all()
+    
+    # Format recent courses for display
+    recent_courses_data = []
+    for course in recent_courses:
+        recent_courses_data.append({
+            'course': course.course_name,
+            'category': course.category,
+            'status': course.status,
+            'created_at': course.created_at.strftime("%B %d, %Y")
+        })
+    
+    # Get member since date (assuming we can get it from the user model)
+    member_since = "January 2025"  # Placeholder - you might want to add a created_at field to User model
+    
+    return render_template('profile.html',
+                         saved_courses_count=saved_courses_count,
+                         in_progress_count=in_progress_count,
+                         completed_count=completed_count,
+                         completion_percentage=completion_percentage,
+                         recent_courses=recent_courses_data,
+                         member_since=member_since)
+
+@app.route('/login_redirect')
 def login_redirect():
-    """Redirect to AnimewatchList login page"""
-    return redirect(url_for('login', next=request.url))
+    """Redirect to login page with next parameter"""
+    return redirect(get_url_for('login', next=request.args.get('next', get_url_for('index'))))
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
