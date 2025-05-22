@@ -84,7 +84,7 @@
                         {% if saved_courses %}
                             <div class="saved-courses-grid">
                                 {% for course in saved_courses %}
-                                    {% include 'course_card.html' %}
+                                    {{ course_card(course) }}
                                 {% endfor %}
                             </div>
                         {% else %}
@@ -102,7 +102,7 @@
                         {% if progress_courses %}
                             <div class="saved-courses-grid">
                                 {% for course in progress_courses %}
-                                    {% include 'course_card.html' %}
+                                    {{ course_card(course) }}
                                 {% endfor %}
                             </div>
                         {% else %}
@@ -120,7 +120,7 @@
                         {% if completed_courses %}
                             <div class="saved-courses-grid">
                                 {% for course in completed_courses %}
-                                    {% include 'course_card.html' %}
+                                    {{ course_card(course) }}
                                 {% endfor %}
                             </div>
                         {% else %}
@@ -273,9 +273,7 @@
 {% endmacro %}
 
 <!-- Use the macro in the actual content -->
-{% for course in courses %}
-    {{ course_card(course) }}
-{% endfor %}
+<!-- The macro is called automatically in the loops above -->
 </div>
 
 {% endblock %}
