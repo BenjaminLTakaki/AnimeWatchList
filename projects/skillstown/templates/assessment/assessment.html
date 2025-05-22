@@ -26,32 +26,29 @@
                             <p class="mb-0">Our AI-powered tool analyzes your CV to identify your skills, assess your strengths, and suggest personalized course recommendations to help advance your career.</p>
                         </div>
                     </div>
-                    
-                    <form method="POST" action="{{ get_url_for('upload_file') }}" enctype="multipart/form-data" id="upload-form">
+                      <form method="POST" action="{{ get_url_for('assessment.upload_cv') }}" enctype="multipart/form-data" id="upload-form">
+                        {{ form.hidden_tag() }}
                         <div class="mb-4" id="upload-container">
-                            <div class="upload-area" id="dropzone" onclick="document.getElementById('file').click();">
+                            <div class="upload-area" id="dropzone" onclick="document.getElementById('cv_file-file').click();">
                                 <i class="fas fa-file-upload upload-icon"></i>
                                 <h4>Drag & Drop or Click to Upload</h4>
                                 <p class="text-muted">Accepted formats: PDF, DOCX, TXT</p>
                                 <p class="text-muted small">Your CV is only used for analysis and is not stored permanently</p>
                                 <div id="file-name" class="mt-3"></div>
                             </div>
-                            <input type="file" name="file" id="file" accept=".pdf,.docx,.txt" style="display: none;" onchange="updateFileName()">
+                            {{ form.cv_file(id="cv_file-file", style="display: none;", onchange="updateFileName()") }}
                         </div>
-                        
-                        {% if not current_user.is_authenticated %}
+                          {% if not current_user.is_authenticated %}
                             <div class="alert alert-warning d-flex align-items-center mb-4">
                                 <i class="fas fa-exclamation-circle me-3 fa-2x"></i>
                                 <div>
-                                    <strong>Note:</strong> To save your course recommendations, please <a href="{{ get_url_for('login_redirect') }}" class="alert-link">log in</a> before uploading your CV.
+                                    <strong>Note:</strong> To save your course recommendations, please <a href="{{ get_url_for('auth.login') }}?next={{ get_url_for('assessment.upload_cv') }}" class="alert-link">log in</a> before uploading your CV.
                                 </div>
                             </div>
                         {% endif %}
                         
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
-                                <i class="fas fa-search me-2"></i>Analyze CV & Recommend Courses
-                            </button>
+                            {{ form.submit(class="btn btn-primary btn-lg", id="submit-btn") }}
                         </div>
                     </form>
                 </div>
@@ -116,21 +113,21 @@
     }
     
     // Drag and drop functionality
-    const dropzone = document.getElementById('dropzone');
+    const dropzoneMain = document.getElementById('dropzone');
     
-    dropzone.addEventListener('dragover', (e) => {
+    dropzoneMain.addEventListener('dragover', (e) => {
         e.preventDefault();
-        dropzone.classList.add('bg-light');
+        dropzoneMain.classList.add('bg-light');
     });
     
-    dropzone.addEventListener('dragleave', (e) => {
+    dropzoneMain.addEventListener('dragleave', (e) => {
         e.preventDefault();
-        dropzone.classList.remove('bg-light');
+        dropzoneMain.classList.remove('bg-light');
     });
     
-    dropzone.addEventListener('drop', (e) => {
+    dropzoneMain.addEventListener('drop', (e) => {
         e.preventDefault();
-        dropzone.classList.remove('bg-light');
+        dropzoneMain.classList.remove('bg-light');
         
         const files = e.dataTransfer.files;
         const fileInput = document.getElementById('file');
@@ -193,4 +190,43 @@
         margin-bottom: 15px;
     }
 </style>
+
+<script>
+    // Handle file name display
+    function updateFileName() {
+        const input = document.getElementById('cv_file-file');
+        const fileNameDisplay = document.getElementById('file-name');
+        
+        if (input.files.length > 0) {
+            fileNameDisplay.textContent = 'Selected file: ' + input.files[0].name;
+            fileNameDisplay.classList.add('badge', 'bg-primary');
+            document.querySelector('.upload-area').classList.add('has-file');
+        } else {
+            fileNameDisplay.textContent = '';
+            fileNameDisplay.classList.remove('badge', 'bg-primary');
+            document.querySelector('.upload-area').classList.remove('has-file');
+        }
+    }
+    
+    // Handle drag and drop
+    const dropzone = document.getElementById('dropzone');
+    
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+    });
+    
+    dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('dragover');
+    });
+    
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        
+        const input = document.getElementById('cv_file-file');
+        input.files = e.dataTransfer.files;
+        updateFileName();
+    });
+</script>
 {% endblock %}

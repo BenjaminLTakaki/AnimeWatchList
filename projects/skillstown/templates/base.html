@@ -4,249 +4,70 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}SkillsTown Course Finder{% endblock %}</title>
-    
-    <!-- Bootstrap CSS -->
+      <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     
-    <!-- Font Awesome for icons -->
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+      <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ get_url_for('static', filename='css/custom.css') }}">
     
-    <!-- Custom CSS -->
-    <style>
-        :root {
-            --skillstown-blue: #00a0e3;
-            --skillstown-green: #4caf50;
-            --light-blue: #e1f5fe;
-            --dark-blue: #0277bd;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f8f9fa;
-            color: #333;
-            line-height: 1.6;
-        }
-        
-        .navbar {
-            background-color: var(--skillstown-blue);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        
-        .navbar-brand {
-            font-weight: bold;
-            color: white !important;
-            font-size: 1.3rem;
-        }
-        
-        .nav-link {
-            color: rgba(255, 255, 255, 0.9) !important;
-            margin: 0 5px;
-            font-weight: 500;
-            transition: color 0.3s;
-        }
-        
-        .nav-link:hover {
-            color: white !important;
-        }
-        
-        .nav-link.active {
-            color: white !important;
-            font-weight: 600;
-        }
-        
-        .hero-section {
-            background: linear-gradient(135deg, var(--skillstown-blue), var(--dark-blue));
-            color: white;
-            padding: 60px 0;
-            margin-bottom: 30px;
-        }
-        
-        .hero-section h1 {
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
-        
-        .hero-section p {
-            font-size: 1.2rem;
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        
-        .card {
-            border: none;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s, box-shadow 0.3s;
-            margin-bottom: 20px;
-            border-radius: 8px;
-        }
-        
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
-        }
-        
-        .card-header {
-            background-color: var(--skillstown-blue);
-            color: white;
-            font-weight: bold;
-            border-radius: 8px 8px 0 0 !important;
-        }
-        
-        .btn-primary {
-            background-color: var(--skillstown-blue);
-            border-color: var(--skillstown-blue);
-            font-weight: 500;
-        }
-        
-        .btn-primary:hover {
-            background-color: var(--dark-blue);
-            border-color: var(--dark-blue);
-        }
-        
-        .btn-success {
-            background-color: var(--skillstown-green);
-            border-color: var(--skillstown-green);
-        }
-        
-        .footer {
-            background-color: #333;
-            color: white;
-            padding: 30px 0;
-            margin-top: 50px;
-        }
-        
-        .alert {
-            border-radius: 8px;
-        }
-        
-        .badge {
-            font-size: 0.75rem;
-        }
-        
-        .input-group {
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        
-        .form-control {
-            border: none;
-            box-shadow: none;
-        }
-        
-        .form-control:focus {
-            border-color: var(--skillstown-blue);
-            box-shadow: 0 0 0 0.2rem rgba(0, 160, 227, 0.25);
-        }
-        
-        .notification-badge {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            background-color: #dc3545;
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 0.75rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .user-menu {
-            position: relative;
-        }
-        
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background-color: rgba(255, 255, 255, 0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 8px;
-        }
-        
-        @media (max-width: 768px) {
-            .hero-section h1 {
-                font-size: 2rem;
-            }
-            
-            .hero-section p {
-                font-size: 1rem;
-            }
-            
-            .navbar-nav {
-                text-align: center;
-            }
-        }
-    </style>
-
     {% block extra_css %}{% endblock %}
 </head>
 <body>
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container">
-            <a class="navbar-brand" href="{{ get_url_for('index') }}">
-                <i class="fas fa-graduation-cap me-2"></i>SkillsTown Course Finder
+        <div class="container">            <a class="navbar-brand" href="{{ get_url_for('main.index') }}">
+                <i class="fas fa-graduation-cap me-2"></i>SkillsTown
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ get_url_for('index') }}">
+                <ul class="navbar-nav me-auto">                    <li class="nav-item">
+                        <a class="nav-link" href="{{ get_url_for('main.index') }}">
                             <i class="fas fa-home me-1"></i>Home
                         </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ get_url_for('search') }}">
+                    </li>                    <li class="nav-item">
+                        <a class="nav-link" href="{{ get_url_for('courses.search') }}">
                             <i class="fas fa-search me-1"></i>Search
                         </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ get_url_for('assessment') }}">
+                    </li>                    <li class="nav-item">
+                        <a class="nav-link" href="{{ get_url_for('assessment.upload_cv') }}">
                             <i class="fas fa-file-alt me-1"></i>CV Assessment
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ get_url_for('about') }}">
+                        <a class="nav-link" href="{{ get_url_for('main.about') }}">
                             <i class="fas fa-info-circle me-1"></i>About
                         </a>
                     </li>
                 </ul>
                 <ul class="navbar-nav">
                     {% if current_user.is_authenticated %}
-                        <li class="nav-item dropdown user-menu">
-                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown">
                                 <div class="user-avatar">
                                     <i class="fas fa-user"></i>
                                 </div>
                                 {{ current_user.username }}
                             </a>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li>
-                                    <a class="dropdown-item" href="{{ get_url_for('profile') }}">
+                            <ul class="dropdown-menu dropdown-menu-end">                                <li>
+                                    <a class="dropdown-item" href="{{ get_url_for('main.profile') }}">
                                         <i class="fas fa-user me-2"></i>Profile
                                     </a>
                                 </li>
                                 <li>
-                                    <a class="dropdown-item" href="{{ get_url_for('saved_courses') }}">
-                                        <i class="fas fa-bookmark me-2"></i>
-                                        Saved Courses
-                                        {% if saved_courses_count and saved_courses_count > 0 %}
-                                            <span class="badge bg-primary ms-2">{{ saved_courses_count }}</span>
+                                    <a class="dropdown-item" href="{{ get_url_for('courses.enrolled') }}">
+                                        <i class="fas fa-graduation-cap me-2"></i>
+                                        My Courses
+                                        {% if enrolled_courses_count > 0 %}
+                                            <span class="badge bg-primary ms-2">{{ enrolled_courses_count }}</span>
                                         {% endif %}
                                     </a>
                                 </li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li>
-                                    <a class="dropdown-item" href="{{ get_url_for('logout') }}">
+                                <li><hr class="dropdown-divider"></li>                                <li>
+                                    <a class="dropdown-item" href="{{ get_url_for('auth.logout') }}">
                                         <i class="fas fa-sign-out-alt me-2"></i>Logout
                                     </a>
                                 </li>
@@ -254,14 +75,14 @@
                         </li>
                     {% else %}
                         <li class="nav-item">
-                            <a class="nav-link" href="/animewatchlist/login">
+                            <a class="nav-link" href="{{ get_url_for('auth.login') }}">
                                 <i class="fas fa-sign-in-alt me-1"></i>Login
                             </a>
                         </li>
                     {% endif %}
                     <li class="nav-item">
                         <a class="nav-link" href="/">
-                            <i class="fas fa-arrow-left me-1"></i>Back to Portfolio
+                            <i class="fas fa-arrow-left me-1"></i>Portfolio
                         </a>
                     </li>
                 </ul>
@@ -275,15 +96,7 @@
             {% if messages %}
                 {% for category, message in messages %}
                     <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
-                        {% if category == 'success' %}
-                            <i class="fas fa-check-circle me-2"></i>
-                        {% elif category == 'error' or category == 'danger' %}
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                        {% elif category == 'warning' %}
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                        {% else %}
-                            <i class="fas fa-info-circle me-2"></i>
-                        {% endif %}
+                        <i class="fas fa-{{ 'check-circle' if category == 'success' else 'exclamation-circle' if category in ['error', 'danger'] else 'info-circle' }} me-2"></i>
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
@@ -301,32 +114,23 @@
             <div class="row">
                 <div class="col-md-6">
                     <h5><i class="fas fa-graduation-cap me-2"></i>SkillsTown Course Finder</h5>
-                    <p>Discover your next professional development opportunity with AI-powered course recommendations.</p>
-                </div>
-                <div class="col-md-6 text-md-end">
-                    <h6>Quick Links</h6>
+                    <p>AI-powered course recommendations for your professional development.</p>
+                </div>                <div class="col-md-6 text-md-end">
                     <ul class="list-unstyled">
-                        <li><a href="{{ get_url_for('search') }}" class="text-light">Search Courses</a></li>
-                        <li><a href="{{ get_url_for('assessment') }}" class="text-light">CV Assessment</a></li>
-                        <li><a href="{{ get_url_for('about') }}" class="text-light">About</a></li>
+                        <li><a href="{{ get_url_for('courses.search') }}" class="text-light">Search Courses</a></li>
+                        <li><a href="{{ get_url_for('assessment.upload_cv') }}" class="text-light">CV Assessment</a></li>
                         <li><a href="https://www.skillstown.nl" target="_blank" class="text-light">Visit SkillsTown</a></li>
                     </ul>
                 </div>
             </div>
             <hr class="my-4">
-            <div class="row">
-                <div class="col-md-6">
-                    <p>&copy; 2025 SkillsTown Course Finder - Benjamin Takaki</p>
-                </div>
-                <div class="col-md-6 text-md-end">
-                    <p>Powered by AI and SkillsTown Course Database</p>
-                </div>
-            </div>
+            <p class="text-center">&copy; 2025 SkillsTown Course Finder - Benjamin Takaki</p>
         </div>
     </footer>
-    
-    <!-- Bootstrap JS Bundle with Popper -->
+      <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+      <!-- Custom JS -->
+    <script src="{{ get_url_for('static', filename='js/script.js') }}"></script>
     
     {% block extra_js %}{% endblock %}
 </body>

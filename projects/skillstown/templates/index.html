@@ -1,19 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}SkillsTown Course Finder - Your Professional Development Hub{% endblock %}
+{% block title %}SkillsTown Course Finder - Home{% endblock %}
 
 {% block content %}
 <!-- Hero Section -->
 <section class="hero-section">
     <div class="container text-center">
-        <h1>Discover Your Next Professional Development Opportunity</h1>
+        <h1>Discover Your Next Skill</h1>
         <p>Find the perfect SkillsTown courses to advance your career</p>
         
-        <!-- Main Search Box -->
-        <div class="search-container">
-            <form action="{{ get_url_for('search') }}" method="GET" class="search-form">
+        <!-- Quick Search -->
+        <div class="search-container">            <form action="{{ get_url_for('courses.search') }}" method="GET" class="search-form">
                 <div class="input-group">
-                    <input type="text" name="query" class="form-control" placeholder="Search for courses, skills, or topics..." aria-label="Search">
+                    <input type="text" name="query" class="form-control" placeholder="Search courses..." aria-label="Search">
                     <button class="btn btn-primary" type="submit">
                         <i class="fas fa-search me-2"></i>Search
                     </button>
@@ -21,48 +20,39 @@
             </form>
         </div>
         
-        <!-- Popular Categories Tags -->
-        <div class="popular-categories mt-4">
-            <p class="text-muted mb-2">Popular categories:</p>
-            <div class="category-tags">
-                <a href="{{ get_url_for('search') }}?query=Leadership" class="category-tag">Leadership</a>
-                <a href="{{ get_url_for('search') }}?query=Excel" class="category-tag">Excel</a>
-                <a href="{{ get_url_for('search') }}?query=Project" class="category-tag">Project Management</a>
-            </div>
+        <!-- Quick Tags -->
+        <div class="quick-tags mt-3">
+            <a href="{{ get_url_for('courses.search') }}?query=Python" class="tag-btn">Python</a>
+            <a href="{{ get_url_for('courses.search') }}?query=Excel" class="tag-btn">Excel</a>
+            <a href="{{ get_url_for('courses.search') }}?query=Leadership" class="tag-btn">Leadership</a>
+            <a href="{{ get_url_for('courses.search') }}?query=Communication" class="tag-btn">Communication</a>
         </div>
     </div>
 </section>
 
-<div class="container mt-5">
+<div class="container my-5">
     <div class="row">
-        <!-- Main Features Section -->
+        <!-- Main Content -->
         <div class="col-lg-8">
+            <!-- Features -->
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
-                    <h2 class="text-center mb-4">Two Ways to Find Your Perfect Courses</h2>
-                    
+                    <h2 class="text-center mb-4">Find Your Perfect Course</h2>
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="feature-box text-center p-4">
-                                <div class="feature-icon mb-3">
-                                    <i class="fas fa-search fa-3x text-primary"></i>
-                                </div>
-                                <h3>Search Directly</h3>
-                                <p>Quickly find specific courses by searching for skills, topics, or course names.</p>
-                                <a href="{{ get_url_for('search') }}" class="btn btn-outline-primary mt-2">
-                                    <i class="fas fa-search me-2"></i>Advanced Search
+                            <div class="feature-box">
+                                <i class="fas fa-search fa-3x text-primary mb-3"></i>
+                                <h3>Quick Search</h3>
+                                <p>Search our extensive catalog of professional courses.</p>                                <a href="{{ get_url_for('courses.search') }}" class="btn btn-outline-primary">
+                                    <i class="fas fa-search me-2"></i>Search Now
                                 </a>
                             </div>
                         </div>
-                        
                         <div class="col-md-6">
-                            <div class="feature-box text-center p-4">
-                                <div class="feature-icon mb-3">
-                                    <i class="fas fa-file-alt fa-3x text-primary"></i>
-                                </div>
-                                <h3>CV Assessment</h3>
-                                <p>Upload your CV/resume for personalized course recommendations and skill assessment.</p>
-                                <a href="{{ get_url_for('assessment') }}" class="btn btn-outline-primary mt-2">
+                            <div class="feature-box">
+                                <i class="fas fa-file-alt fa-3x text-primary mb-3"></i>
+                                <h3>CV Analysis</h3>                                <p>Upload your CV for personalized recommendations.</p>
+                                <a href="{{ get_url_for('assessment.upload_cv') }}" class="btn btn-outline-primary">
                                     <i class="fas fa-upload me-2"></i>Upload CV
                                 </a>
                             </div>
@@ -71,59 +61,32 @@
                 </div>
             </div>
             
-            <!-- Categories Preview -->
+            <!-- Categories -->
             <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0">Popular Course Categories</h3>
+                    <h3 class="mb-0">Popular Categories</h3>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <div class="category-box p-3 text-center">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="category-card">
                                 <i class="fas fa-laptop-code fa-2x mb-2 text-primary"></i>
                                 <h4>IT & Programming</h4>
                                 <p class="small">20+ courses</p>
-                                <a href="{{ get_url_for('search') }}?query=IT Programming" class="stretched-link"></a>
                             </div>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="category-box p-3 text-center">
+                        <div class="col-md-4">
+                            <div class="category-card">
                                 <i class="fas fa-chart-line fa-2x mb-2 text-primary"></i>
-                                <h4>Business & Management</h4>
+                                <h4>Business</h4>
                                 <p class="small">15+ courses</p>
-                                <a href="{{ get_url_for('search') }}?query=Business Management" class="stretched-link"></a>
                             </div>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="category-box p-3 text-center">
+                        <div class="col-md-4">
+                            <div class="category-card">
                                 <i class="fas fa-comments fa-2x mb-2 text-primary"></i>
                                 <h4>Communication</h4>
                                 <p class="small">10+ courses</p>
-                                <a href="{{ get_url_for('search') }}?query=Communication" class="stretched-link"></a>
-                            </div>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="category-box p-3 text-center">
-                                <i class="fas fa-calculator fa-2x mb-2 text-primary"></i>
-                                <h4>Finance</h4>
-                                <p class="small">8+ courses</p>
-                                <a href="{{ get_url_for('search') }}?query=Finance" class="stretched-link"></a>
-                            </div>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="category-box p-3 text-center">
-                                <i class="fas fa-heart fa-2x mb-2 text-primary"></i>
-                                <h4>Health & Wellness</h4>
-                                <p class="small">12+ courses</p>
-                                <a href="{{ get_url_for('search') }}?query=Health Wellness" class="stretched-link"></a>
-                            </div>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="category-box p-3 text-center">
-                                <i class="fas fa-users fa-2x mb-2 text-primary"></i>
-                                <h4>Leadership</h4>
-                                <p class="small">10+ courses</p>
-                                <a href="{{ get_url_for('search') }}?query=Leadership" class="stretched-link"></a>
                             </div>
                         </div>
                     </div>
@@ -133,236 +96,65 @@
         
         <!-- Sidebar -->
         <div class="col-lg-4">
-            <!-- User Status Card -->
             {% if current_user.is_authenticated %}
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-success text-white">
                         <h4 class="mb-0">
-                            <i class="fas fa-user-circle me-2"></i>
-                            Welcome back, {{ current_user.username }}!
+                            <i class="fas fa-user-circle me-2"></i>Welcome back!
                         </h4>
                     </div>
                     <div class="card-body">
-                        <p>Track your professional development journey with your saved courses.</p>
-                        <div class="d-grid">
-                            <a href="{{ get_url_for('saved_courses') }}" class="btn btn-success">
-                                <i class="fas fa-bookmark me-2"></i>
-                                Your Saved Courses ({{ saved_courses_count }})
-                            </a>
-                        </div>
+                        <p>Hello, {{ current_user.username }}!</p>
+                        <p>You have {{ enrolled_courses_count }} enrolled courses.</p>                        <a href="{{ get_url_for('courses.enrolled') }}" class="btn btn-success w-100">
+                            <i class="fas fa-graduation-cap me-2"></i>View My Courses
+                        </a>
                     </div>
                 </div>
             {% else %}
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0">
-                            <i class="fas fa-sign-in-alt me-2"></i>
-                            Sign In
-                        </h4>
+                        <h4 class="mb-0">Get Started</h4>
                     </div>
                     <div class="card-body">
-                        <p>Sign in to track your learning progress and save courses.</p>
-                        <div class="d-grid">
-                            <a href="{{ get_url_for('login_redirect') }}" class="btn btn-primary">
-                                <i class="fas fa-sign-in-alt me-2"></i>
-                                Login / Register
-                            </a>
-                        </div>
+                        <p>Sign in to track your learning progress.</p>                        <a href="{{ get_url_for('auth.login') }}" class="btn btn-primary w-100">
+                            <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                        </a>
                     </div>
                 </div>
             {% endif %}
             
-            <!-- How It Works Card -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-info text-white">
-                    <h4 class="mb-0">
-                        <i class="fas fa-info-circle me-2"></i>
-                        How It Works
-                    </h4>
-                </div>
-                <div class="card-body">
-                    <div class="how-it-works-step">
-                        <div class="step-number">1</div>
-                        <div class="step-content">
-                            <h5>Search or Upload</h5>
-                            <p>Search directly for courses or upload your CV for personalized recommendations.</p>
-                        </div>
-                    </div>
-                    <div class="how-it-works-step">
-                        <div class="step-number">2</div>
-                        <div class="step-content">
-                            <h5>Discover Courses</h5>
-                            <p>Browse through our course catalog tailored to your skills and interests.</p>
-                        </div>
-                    </div>
-                    <div class="how-it-works-step">
-                        <div class="step-number">3</div>
-                        <div class="step-content">
-                            <h5>Save & Track</h5>
-                            <p>Save courses for later and track your progress as you learn.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Benefits Card -->
+            <!-- How It Works -->
             <div class="card shadow-sm">
-                <div class="card-header bg-secondary text-white">
-                    <h4 class="mb-0">
-                        <i class="fas fa-star me-2"></i>
-                        Why Use Our Platform
-                    </h4>
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0">How It Works</h4>
                 </div>
                 <div class="card-body">
-                    <ul class="benefits-list">
-                        <li>
-                            <i class="fas fa-check-circle text-success me-2"></i>
-                            <strong>AI-Powered Analysis</strong> of your skills
-                        </li>
-                        <li>
-                            <i class="fas fa-check-circle text-success me-2"></i>
-                            <strong>Personalized Learning Paths</strong> for your career growth
-                        </li>
-                        <li>
-                            <i class="fas fa-check-circle text-success me-2"></i>
-                            <strong>Save & Track</strong> your course progress
-                        </li>
-                        <li>
-                            <i class="fas fa-check-circle text-success me-2"></i>
-                            <strong>Easy Access</strong> to the best professional development resources
-                        </li>
-                    </ul>
+                    <div class="steps">
+                        <div class="step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <h5>Search or Upload</h5>
+                                <p>Find courses or upload your CV</p>
+                            </div>
+                        </div>
+                        <div class="step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <h5>Get Recommendations</h5>
+                                <p>AI-powered course matching</p>
+                            </div>
+                        </div>
+                        <div class="step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <h5>Track Progress</h5>
+                                <p>Monitor your learning journey</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
-
-{% block extra_css %}
-<style>
-    .search-container {
-        max-width: 700px;
-        margin: 0 auto;
-    }
-    
-    .search-form input {
-        padding: 12px;
-        font-size: 1.1rem;
-        border-radius: 8px 0 0 8px;
-    }
-    
-    .search-form button {
-        padding: 12px 24px;
-        font-size: 1.1rem;
-        border-radius: 0 8px 8px 0;
-    }
-    
-    .category-tags {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 10px;
-    }
-    
-    .category-tag {
-        display: inline-block;
-        padding: 5px 15px;
-        background-color: rgba(0, 160, 227, 0.1);
-        color: var(--skillstown-blue);
-        border-radius: 20px;
-        font-size: 0.9rem;
-        text-decoration: none;
-        transition: all 0.3s;
-    }
-    
-    .category-tag:hover {
-        background-color: var(--skillstown-blue);
-        color: white;
-    }
-    
-    .feature-box {
-        height: 100%;
-        border-radius: 8px;
-        transition: transform 0.3s;
-        background-color: #f8f9fa;
-    }
-    
-    .feature-box:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-    }
-    
-    .feature-icon {
-        color: var(--skillstown-blue);
-    }
-    
-    .category-box {
-        border-radius: 8px;
-        border: 1px solid #eee;
-        transition: all 0.3s;
-        height: 100%;
-        position: relative;
-    }
-    
-    .category-box:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-        border-color: var(--skillstown-blue);
-    }
-    
-    .stretched-link::after {
-        position: absolute;
-        top: 0;
-        right: 0;
-        bottom: 0;
-        left: 0;
-        z-index: 1;
-        content: "";
-    }
-    
-    .how-it-works-step {
-        display: flex;
-        margin-bottom: 15px;
-    }
-    
-    .step-number {
-        width: 30px;
-        height: 30px;
-        border-radius: 50%;
-        background-color: var(--skillstown-blue);
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        margin-right: 15px;
-    }
-    
-    .step-content {
-        flex: 1;
-    }
-    
-    .step-content h5 {
-        margin-top: 0;
-        margin-bottom: 5px;
-    }
-    
-    .step-content p {
-        margin-bottom: 0;
-        color: #6c757d;
-    }
-    
-    .benefits-list {
-        list-style: none;
-        padding-left: 0;
-    }
-    
-    .benefits-list li {
-        margin-bottom: 12px;
-    }
-</style>
-{% endblock %}_url_for('search') }}?query=Python" class="category-tag">Python</a>
-                <a href="{{ get_url_for('search') }}?query=Management" class="category-tag">Management</a>
-                <a href="{{ get_url_for('search') }}?query=Communication" class="category-tag">Communication</a>
-                <a href="{{ get

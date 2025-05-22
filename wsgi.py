@@ -19,10 +19,22 @@ sys.path.insert(0, skillstown_path)
 
 # Define the paths to ensure they exist before import
 os.makedirs(os.path.join(skillstown_path, 'uploads'), exist_ok=True)
+os.makedirs(os.path.join(skillstown_path, 'static', 'data'), exist_ok=True)
 os.makedirs(os.path.join(skillstown_path, 'static'), exist_ok=True)
 
-# Import SkillsTown app
-from projects.skillstown.app import app as skillstown_app
+# Import SkillsTown app with factory pattern
+try:
+    from projects.skillstown.app import create_app
+    skillstown_app = create_app('production')
+    print("SkillsTown app imported successfully")
+except Exception as e:
+    print(f"Could not import SkillsTown app: {e}")
+    print("Creating a stub SkillsTown app")
+    skillstown_app = Flask("skillstown_stub")
+    
+    @skillstown_app.route('/')
+    def skillstown_index():
+        return "SkillsTown is currently unavailable. Please try again later."
 
 # AnimeWatchList app setup
 animewatchlist_path = os.path.join(project_root, 'projects/animewatchlist')

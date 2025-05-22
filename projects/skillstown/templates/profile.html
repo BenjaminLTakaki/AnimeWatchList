@@ -1,11 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Profile - SkillsTown Course Finder{% endblock %}
+{% block title %}Profile - SkillsTown{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container my-5">
     <div class="row">
-        <!-- Profile Header -->
         <div class="col-12">
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-primary text-white">
@@ -16,305 +15,111 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-4 text-center">
-                            <div class="profile-avatar">
+                            <div class="profile-avatar mb-3">
                                 <i class="fas fa-user-circle fa-5x text-primary"></i>
                             </div>
-                            <h4 class="mt-3">{{ current_user.username }}</h4>
+                            <h4>{{ current_user.username }}</h4>
                             <p class="text-muted">{{ current_user.email }}</p>
                         </div>
                         <div class="col-md-8">
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="stat-box text-center">
-                                        <div class="stat-number text-primary">{{ enrolled_courses_count }}</div>
-                                        <div class="stat-label">Enrolled Courses</div>
+                            <div class="row text-center">
+                                <div class="col-sm-3">
+                                    <div class="stat-box">
+                                        <div class="stat-number">{{ stats.total }}</div>
+                                        <div class="stat-label">Total Courses</div>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
-                                    <div class="stat-box text-center">
-                                        <div class="stat-number text-warning">{{ in_progress_count }}</div>
+                                <div class="col-sm-3">
+                                    <div class="stat-box">
+                                        <div class="stat-number">{{ stats.enrolled }}</div>
+                                        <div class="stat-label">Enrolled</div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-3">
+                                    <div class="stat-box">
+                                        <div class="stat-number">{{ stats.in_progress }}</div>
                                         <div class="stat-label">In Progress</div>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
-                                    <div class="stat-box text-center">
-                                        <div class="stat-number text-success">{{ completed_count }}</div>
+                                <div class="col-sm-3">
+                                    <div class="stat-box">
+                                        <div class="stat-number">{{ stats.completed }}</div>
                                         <div class="stat-label">Completed</div>
                                     </div>
                                 </div>
                             </div>
                             
                             <div class="mt-4">
-                                <h5>Account Information</h5>
-                                <table class="table table-borderless">
-                                    <tr>
-                                        <td><strong>Username:</strong></td>
-                                        <td>{{ current_user.username }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td><strong>Email:</strong></td>
-                                        <td>{{ current_user.email }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td><strong>Member Since:</strong></td>
-                                        <td>{{ member_since }}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Quick Actions -->
-        <div class="col-md-6">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-info text-white">
-                    <h4 class="mb-0">
-                        <i class="fas fa-rocket me-2"></i>Quick Actions
-                    </h4>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <a href="{{ get_url_for('search') }}" class="btn btn-outline-primary">
-                            <i class="fas fa-search me-2"></i>Search for New Courses
-                        </a>
-                        <a href="{{ get_url_for('assessment') }}" class="btn btn-outline-info">
-                            <i class="fas fa-file-alt me-2"></i>Upload CV for Analysis
-                        </a>
-                        <a href="{{ get_url_for('enrolled_courses') }}" class="btn btn-outline-success">
-                            <i class="fas fa-graduation-cap me-2"></i>View Enrolled Courses
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Learning Progress -->
-        <div class="col-md-6">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-success text-white">
-                    <h4 class="mb-0">
-                        <i class="fas fa-chart-pie me-2"></i>Learning Progress
-                    </h4>
-                </div>
-                <div class="card-body">
-                    {% if enrolled_courses_count > 0 %}
-                        <div class="progress-item mb-3">
-                            <div class="d-flex justify-content-between">
-                                <span>Course Completion Rate</span>
-                                <span>{{ completion_percentage }}%</span>
-                            </div>
-                            <div class="progress mt-1">
-                                <div class="progress-bar bg-success" role="progressbar" style="--width: {{ completion_percentage }}%"></div>
-                            </div>
-                        </div>
-                        
-                        <div class="learning-stats">
-                            <div class="stat-row">
-                                <i class="fas fa-graduation-cap text-primary me-2"></i>
-                                <span>{{ enrolled_courses_count }} courses enrolled</span>
-                            </div>
-                            <div class="stat-row">
-                                <i class="fas fa-play-circle text-warning me-2"></i>
-                                <span>{{ in_progress_count }} currently learning</span>
-                            </div>
-                            <div class="stat-row">
-                                <i class="fas fa-check-circle text-success me-2"></i>
-                                <span>{{ completed_count }} completed</span>
-                            </div>
-                        </div>
-                    {% else %}
-                        <div class="text-center py-4">
-                            <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
-                            <h5>Start Your Learning Journey</h5>
-                            <p class="text-muted">Enroll in your first course to see your progress here!</p>
-                            <a href="{{ get_url_for('search') }}" class="btn btn-primary">
-                                <i class="fas fa-search me-2"></i>Find Courses
-                            </a>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        
-        <!-- Recent Activity -->
-        <div class="col-12">
-            <div class="card shadow-sm">
-                <div class="card-header bg-secondary text-white">
-                    <h4 class="mb-0">
-                        <i class="fas fa-history me-2"></i>Recent Activity
-                    </h4>
-                </div>
-                <div class="card-body">
-                    {% if recent_courses %}
-                        <div class="activity-list">
-                            {% for course in recent_courses %}
-                                <div class="activity-item">
-                                    <div class="activity-icon">
-                                        {% if course.status == 'completed' %}
-                                            <i class="fas fa-check-circle text-success"></i>
-                                        {% elif course.status == 'in_progress' %}
-                                            <i class="fas fa-play-circle text-warning"></i>
-                                        {% else %}
-                                            <i class="fas fa-bookmark text-primary"></i>
-                                        {% endif %}
-                                    </div>
-                                    <div class="activity-content">
-                                        <h6>{{ course.course }}</h6>
-                                        <p class="text-muted mb-1">{{ course.category }}</p>
-                                        <small class="text-muted">
-                                            {% if course.status == 'completed' %}
-                                                Completed
-                                            {% elif course.status == 'in_progress' %}
-                                                In Progress
-                                            {% else %}
-                                                Saved
-                                            {% endif %}
-                                            on {{ course.created_at }}
-                                        </small>
-                                    </div>
-                                    <div class="activity-actions">
-                                        <a href="https://www.skillstown.nl" target="_blank" class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-external-link-alt"></i>
-                                        </a>
+                                <h5>Completion Progress</h5>
+                                <div class="progress" style="height: 25px;">
+                                    <div class="progress-bar bg-success" role="progressbar" 
+                                         style="--width: {{ stats.completion_percentage }}%;">
+                                        {{ stats.completion_percentage }}%
                                     </div>
                                 </div>
-                            {% endfor %}
+                            </div>
                         </div>
-                        
-                        {% if recent_courses|length >= 5 %}
-                            <div class="text-center mt-3">
-                                <a href="{{ get_url_for('saved_courses') }}" class="btn btn-outline-secondary">
-                                    <i class="fas fa-list me-2"></i>View All Courses
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-info text-white">
+                            <h4 class="mb-0">
+                                <i class="fas fa-clock me-2"></i>Recent Activity
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            {% if recent_courses %}
+                                <div class="activity-list">
+                                    {% for course in recent_courses %}
+                                        <div class="activity-item">
+                                            <i class="fas fa-graduation-cap text-primary"></i>
+                                            <div class="activity-content">
+                                                <h6>{{ course.course_name }}</h6>
+                                                <small class="text-muted">
+                                                    {{ course.category }} • {{ course.created_at.strftime('%B %d, %Y') }}
+                                                </small>
+                                            </div>
+                                            <span class="badge bg-{{ 'success' if course.status == 'completed' else 'warning' if course.status == 'in_progress' else 'primary' }}">
+                                                {{ course.status }}
+                                            </span>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-muted text-center">No recent activity</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-success text-white">
+                            <h4 class="mb-0">
+                                <i class="fas fa-rocket me-2"></i>Quick Actions
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a href="{{ get_url_for('search') }}" class="btn btn-outline-primary">
+                                    <i class="fas fa-search me-2"></i>Find New Courses
+                                </a>
+                                <a href="{{ get_url_for('assessment') }}" class="btn btn-outline-info">
+                                    <i class="fas fa-file-alt me-2"></i>Get CV Analysis
+                                </a>
+                                <a href="{{ get_url_for('enrolled_courses') }}" class="btn btn-outline-success">
+                                    <i class="fas fa-graduation-cap me-2"></i>View All Courses
                                 </a>
                             </div>
-                        {% endif %}
-                    {% else %}
-                        <div class="text-center py-4">
-                            <i class="fas fa-history fa-3x text-muted mb-3"></i>
-                            <h5>No Recent Activity</h5>
-                            <p class="text-muted">Your course activity will appear here once you start enrolling and learning!</p>
                         </div>
-                    {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .profile-avatar {
-        margin-bottom: 1rem;
-    }
-    
-    .stat-box {
-        padding: 1rem;
-        border-radius: 8px;
-        background-color: #f8f9fa;
-        margin-bottom: 1rem;
-    }
-    
-    .stat-number {
-        font-size: 2rem;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-    }
-    
-    .stat-label {
-        font-size: 0.9rem;
-        color: #6c757d;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    
-    .progress-item {
-        margin-bottom: 1rem;
-    }
-    
-    .learning-stats {
-        margin-top: 1rem;
-    }
-    
-    .stat-row {
-        display: flex;
-        align-items: center;
-        margin-bottom: 0.5rem;
-        font-size: 0.9rem;
-    }
-    
-    .activity-list {
-        max-height: 400px;
-        overflow-y: auto;
-    }
-    
-    .activity-item {
-        display: flex;
-        align-items: center;
-        padding: 1rem;
-        border-bottom: 1px solid #eee;
-        transition: background-color 0.3s;
-    }
-    
-    .activity-item:hover {
-        background-color: #f8f9fa;
-    }
-    
-    .activity-item:last-child {
-        border-bottom: none;
-    }
-    
-    .activity-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background-color: #f8f9fa;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 1rem;
-        flex-shrink: 0;
-    }
-    
-    .activity-content {
-        flex-grow: 1;
-    }
-    
-    .activity-content h6 {
-        margin-bottom: 0.5rem;
-        color: #333;
-    }
-    
-    .activity-content p {
-        margin-bottom: 0.25rem;
-        font-size: 0.9rem;
-    }
-    
-    .activity-actions {
-        flex-shrink: 0;
-    }
-    
-    @media (max-width: 768px) {
-        .stat-box {
-            margin-bottom: 0.5rem;
-        }
-        
-        .activity-item {
-            flex-direction: column;
-            text-align: center;
-        }
-        
-        .activity-icon {
-            margin-bottom: 1rem;
-            margin-right: 0;
-        }
-        
-        .activity-actions {
-            margin-top: 1rem;
-        }
-    }
-</style>
 {% endblock %}

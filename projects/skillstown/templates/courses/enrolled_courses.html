@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Your Enrolled Courses - SkillsTown{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container text-center">
+        <h1>Your Enrolled Courses</h1>
+        <p>Track your professional development journey</p>
+    </div>
+</section>
+
+<div class="container mt-4">
+    {% if courses %}
+        <!-- Course Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-number">{{ courses|length }}</div>
+                    <div class="stat-label">Total Courses</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-number">{{ courses|selectattr('status', 'equalto', 'enrolled')|list|length }}</div>
+                    <div class="stat-label">Enrolled</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card">
+                    <div class="stat-number">{{ courses|selectattr('status', 'equalto', 'in_progress')|list|length }}</div>
+                    <div class="stat-label">In Progress</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enrolled Courses List -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">
+                    <i class="fas fa-graduation-cap me-2"></i>Your Courses
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="enrolled-courses-grid">
+                    {% for course in courses %}
+                        <div class="enrolled-course-card">
+                            <div class="course-card-header">
+                                <span class="category-badge">{{ course.category }}</span>
+                                <div class="card-actions">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="fas fa-cog"></i>
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li>
+                                                <form method="POST" action="{{ get_url_for('update_status', course_id=course.id) }}" class="dropdown-form">
+                                                    <button type="submit" name="status" value="enrolled" class="dropdown-item {% if course.status == 'enrolled' %}active{% endif %}">
+                                                        <i class="fas fa-bookmark me-2"></i>Enrolled
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="POST" action="{{ get_url_for('update_status', course_id=course.id) }}" class="dropdown-form">
+                                                    <button type="submit" name="status" value="in_progress" class="dropdown-item {% if course.status == 'in_progress' %}active{% endif %}">
+                                                        <i class="fas fa-play-circle me-2"></i>In Progress
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="POST

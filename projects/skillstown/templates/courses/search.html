@@ -8,10 +8,9 @@
     <div class="container text-center">
         <h1>Search Courses</h1>
         <p>Find the perfect course for your professional development</p>
-        
-        <!-- Search Form -->
+          <!-- Search Form -->
         <div class="search-container">
-            <form action="{{ get_url_for('search') }}" method="GET" class="search-form">
+            <form action="{{ get_url_for('courses.search') }}" method="POST" class="search-form">
                 <div class="input-group">
                     <input type="text" name="query" class="form-control" placeholder="Search for courses, skills, or topics..." value="{{ query }}" aria-label="Search">
                     <button class="btn btn-primary" type="submit">
@@ -71,7 +70,7 @@
                                 <i class="fas fa-search-minus fa-4x text-muted mb-3"></i>
                                 <h4>No courses found</h4>
                                 <p>We couldn't find any courses matching "{{ query }}".</p>
-                                <p>Try using different keywords or <a href="{{ get_url_for('assessment') }}">upload your CV</a> for personalized recommendations.</p>
+                                <p>Try using different keywords or <a href="{{ get_url_for('assessment.upload_cv') }}">upload your CV</a> for personalized recommendations.</p>
                             </div>
                         {% endif %}
                     </div>
@@ -93,8 +92,7 @@
                                     <div class="suggestion-box p-4 text-center">
                                         <i class="fas fa-file-alt fa-3x mb-3 text-info"></i>
                                         <h4>Upload Your CV</h4>
-                                        <p>Get personalized course recommendations based on your skills and experience.</p>
-                                        <a href="{{ get_url_for('assessment') }}" class="btn btn-outline-info">
+                                        <p>Get personalized course recommendations based on your skills and experience.</p>                                        <a href="{{ get_url_for('assessment.upload_cv') }}" class="btn btn-outline-info">
                                             <i class="fas fa-upload me-2"></i>Upload CV
                                         </a>
                                     </div>
@@ -103,8 +101,7 @@
                                     <div class="suggestion-box p-4 text-center">
                                         <i class="fas fa-th fa-3x mb-3 text-info"></i>
                                         <h4>Browse Categories</h4>
-                                        <p>Explore all course categories to find the perfect match for your needs.</p>
-                                        <a href="{{ get_url_for('index') }}" class="btn btn-outline-info">
+                                        <p>Explore all course categories to find the perfect match for your needs.</p>                                        <a href="{{ get_url_for('main.index') }}" class="btn btn-outline-info">
                                             <i class="fas fa-list me-2"></i>View Categories
                                         </a>
                                     </div>
@@ -124,29 +121,21 @@
                         <h3 class="mb-0">Popular Searches</h3>
                     </div>
                     <div class="card-body">
-                        <div class="popular-searches">
-                            <a href="{{ get_url_for('search') }}?query=Python" class="popular-search-item">
+                        <div class="popular-searches">                            <a href="{{ get_url_for('courses.search') }}?query=Python" class="popular-search-item">
                                 <i class="fas fa-code me-2"></i>Python
-                            </a>
-                            <a href="{{ get_url_for('search') }}?query=Leadership" class="popular-search-item">
+                            </a>                            <a href="{{ get_url_for('courses.search') }}?query=Leadership" class="popular-search-item">
                                 <i class="fas fa-users me-2"></i>Leadership
-                            </a>
-                            <a href="{{ get_url_for('search') }}?query=Excel" class="popular-search-item">
+                            </a>                            <a href="{{ get_url_for('courses.search') }}?query=Excel" class="popular-search-item">
                                 <i class="fas fa-table me-2"></i>Excel
-                            </a>
-                            <a href="{{ get_url_for('search') }}?query=Project+Management" class="popular-search-item">
+                            </a>                            <a href="{{ get_url_for('courses.search') }}?query=Project+Management" class="popular-search-item">
                                 <i class="fas fa-tasks me-2"></i>Project Management
-                            </a>
-                            <a href="{{ get_url_for('search') }}?query=Communication" class="popular-search-item">
+                            </a>                            <a href="{{ get_url_for('courses.search') }}?query=Communication" class="popular-search-item">
                                 <i class="fas fa-comments me-2"></i>Communication
-                            </a>
-                            <a href="{{ get_url_for('search') }}?query=Data+Analysis" class="popular-search-item">
+                            </a>                            <a href="{{ get_url_for('courses.search') }}?query=Data+Analysis" class="popular-search-item">
                                 <i class="fas fa-chart-bar me-2"></i>Data Analysis
-                            </a>
-                            <a href="{{ get_url_for('search') }}?query=Marketing" class="popular-search-item">
+                            </a>                            <a href="{{ get_url_for('courses.search') }}?query=Marketing" class="popular-search-item">
                                 <i class="fas fa-bullhorn me-2"></i>Marketing
-                            </a>
-                            <a href="{{ get_url_for('search') }}?query=Time+Management" class="popular-search-item">
+                            </a>                            <a href="{{ get_url_for('courses.search') }}?query=Time+Management" class="popular-search-item">
                                 <i class="fas fa-clock me-2"></i>Time Management
                             </a>
                         </div>
@@ -168,56 +157,56 @@
                                 <div class="category-browse-box">
                                     <i class="fas fa-laptop-code fa-2x mb-2"></i>
                                     <h5>IT & Programming</h5>
-                                    <a href="{{ get_url_for('search') }}?query=IT" class="stretched-link"></a>
+                                    <a href="{{ get_url_for('courses.search') }}?query=IT" class="stretched-link"></a>
                                 </div>
                             </div>
                             <div class="col-md-3 mb-3">
                                 <div class="category-browse-box">
                                     <i class="fas fa-chart-line fa-2x mb-2"></i>
                                     <h5>Business & Management</h5>
-                                    <a href="{{ get_url_for('search') }}?query=Business" class="stretched-link"></a>
+                                    <a href="{{ get_url_for('courses.search') }}?query=Business" class="stretched-link"></a>
                                 </div>
                             </div>
                             <div class="col-md-3 mb-3">
                                 <div class="category-browse-box">
                                     <i class="fas fa-comments fa-2x mb-2"></i>
                                     <h5>Communication</h5>
-                                    <a href="{{ get_url_for('search') }}?query=Communication" class="stretched-link"></a>
+                                    <a href="{{ get_url_for('courses.search') }}?query=Communication" class="stretched-link"></a>
                                 </div>
                             </div>
                             <div class="col-md-3 mb-3">
                                 <div class="category-browse-box">
                                     <i class="fas fa-calculator fa-2x mb-2"></i>
                                     <h5>Finance</h5>
-                                    <a href="{{ get_url_for('search') }}?query=Finance" class="stretched-link"></a>
+                                    <a href="{{ get_url_for('courses.search') }}?query=Finance" class="stretched-link"></a>
                                 </div>
                             </div>
                             <div class="col-md-3 mb-3">
                                 <div class="category-browse-box">
                                     <i class="fas fa-tasks fa-2x mb-2"></i>
                                     <h5>Project Management</h5>
-                                    <a href="{{ get_url_for('search') }}?query=Project Management" class="stretched-link"></a>
+                                    <a href="{{ get_url_for('courses.search') }}?query=Project Management" class="stretched-link"></a>
                                 </div>
                             </div>
                             <div class="col-md-3 mb-3">
                                 <div class="category-browse-box">
                                     <i class="fas fa-users fa-2x mb-2"></i>
                                     <h5>Leadership</h5>
-                                    <a href="{{ get_url_for('search') }}?query=Leadership" class="stretched-link"></a>
+                                    <a href="{{ get_url_for('courses.search') }}?query=Leadership" class="stretched-link"></a>
                                 </div>
                             </div>
                             <div class="col-md-3 mb-3">
                                 <div class="category-browse-box">
                                     <i class="fas fa-language fa-2x mb-2"></i>
                                     <h5>Languages</h5>
-                                    <a href="{{ get_url_for('search') }}?query=Languages" class="stretched-link"></a>
+                                    <a href="{{ get_url_for('courses.search') }}?query=Languages" class="stretched-link"></a>
                                 </div>
                             </div>
                             <div class="col-md-3 mb-3">
                                 <div class="category-browse-box">
                                     <i class="fas fa-heart fa-2x mb-2"></i>
                                     <h5>Health & Wellness</h5>
-                                    <a href="{{ get_url_for('search') }}?query=Health" class="stretched-link"></a>
+                                    <a href="{{ get_url_for('courses.search') }}?query=Health" class="stretched-link"></a>
                                 </div>
                             </div>
                         </div>
@@ -230,9 +219,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    function enrollInCourse(category, courseName) {
-        fetch('{{ get_url_for("enroll_course_route") }}', {
+<script>    function enrollInCourse(category, courseName) {
+        fetch('{{ get_url_for("courses.enroll") }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',

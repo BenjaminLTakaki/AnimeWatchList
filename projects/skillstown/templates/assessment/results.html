@@ -370,9 +370,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    function enrollInCourse(category, courseName) {
-        fetch('{{ get_url_for("enroll_course_route") }}', {
+<script>    function enrollInCourse(category, courseName) {
+        fetch('{{ get_url_for("courses.enroll") }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
