@@ -39,22 +39,24 @@
                         <div class="card h-100">
                             <div class="card-body">
                                 <h6 class="card-title">{{ result.course }}</h6>
-                                <p class="card-text">{{ result.description[:100] }}...</p>
-                                <span class="badge bg-secondary">{{ result.category }}</span>
-                                <span class="badge bg-info">Relevance: {{ result.relevance_score }}</span>
-                            </div>
-                            <div class="card-footer">
-                                {% if current_user.is_authenticated %}
-                                <button class="btn btn-success btn-sm enroll-btn" 
-                                        data-category="{{ result.category }}" 
-                                        data-course="{{ result.course }}">
-                                    <i class="fas fa-plus me-1"></i>Enroll
-                                </button>
-                                {% else %}
-                                <a href="{{ get_url_for('auth.login') }}" class="btn btn-outline-primary btn-sm">
-                                    Login to Enroll
-                                </a>
-                                {% endif %}
+                                <p class="card-text">{{ result.description[:150] }}...</p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="btn-group">
+                                        <a href="#" class="btn btn-sm btn-outline-secondary">View Details</a>
+                                        {% if current_user.is_authenticated %}
+                                            <button class="btn btn-sm btn-outline-primary enroll-btn" 
+                                                    data-category="{{ result.category }}" 
+                                                    data-course="{{ result.course }}">
+                                                <i class="fas fa-plus me-1"></i>Enroll
+                                            </button>
+                                        {% else %}
+                                            <a href="{{ get_url_for('login') }}" class="btn btn-outline-primary btn-sm">
+                                                Login to Enroll
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-muted">Relevance: {{ result.relevance_score }}</small>
+                                </div>
                             </div>
                         </div>
                     </div>

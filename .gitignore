@@ -362,4 +362,15 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
-.env 
+# Python testing
+.coverage
+htmlcov/
+.pytest_cache/
+nosetests.xml
+junit*.xml
+.tox/
+**/instance/test.db
+projects/skillstown/test_files/
+
+.env
+

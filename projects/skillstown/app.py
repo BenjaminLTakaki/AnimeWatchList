@@ -16,6 +16,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from sqlalchemy import inspect
+from jinja2 import ChoiceLoader, FileSystemLoader # ADDED
 
 # Production detection
 is_production = os.environ.get('RENDER', False) or os.environ.get('FLASK_ENV') == 'production'
@@ -46,6 +47,16 @@ def create_app(config_name=None):  # MODIFIED
 
     # Create the Flask app
     app = Flask(__name__)
+
+    # Configure the Jinja2 loader to look in both skillstown and animewatchlist template folders
+    skillstown_template_dir = os.path.join(os.path.dirname(__file__), 'templates')
+    # animewatchlist_path is already defined globally and points to the animewatchlist project directory
+    animewatchlist_template_dir = os.path.join(animewatchlist_path, 'templates')
+    
+    app.jinja_loader = ChoiceLoader([
+        FileSystemLoader(skillstown_template_dir),
+        FileSystemLoader(animewatchlist_template_dir)
+    ])
 
     # Configure the app
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -395,7 +406,7 @@ def create_app(config_name=None):  # MODIFIED
 
     @app.route("/profile")
     @login_required
-    def profile():
+    def skillstown_user_profile():  # Renamed from 'profile'
         """User profile page"""
         stats = get_skillstown_stats(current_user.id)
         recent_courses = UserCourse.query.filter_by(user_id=current_user.id).order_by(UserCourse.created_at.desc()).limit(5).all()
