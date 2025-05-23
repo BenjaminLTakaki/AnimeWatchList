@@ -5,21 +5,38 @@ Software Developer
 SKILLS
 - Python Programming
 - JavaScript
-- Web Development
+- HTML and CSS
+- React
+- Node.js
+- SQL and NoSQL databases
 - Machine Learning
 - Data Analysis
+- AWS Cloud Services
+- Git version control
 
 EXPERIENCE
-Software Developer, ABC Company
-- Developed web applications using Python and Django
-- Implemented machine learning algorithms for data analysis
-- Created interactive dashboards using JavaScript and React
+Senior Software Developer, ABC Technologies (2022-Present)
+- Developed and maintained web applications using React and Node.js
+- Implemented machine learning algorithms for predictive analytics
+- Led a team of 5 developers for a major client project
+- Reduced server response time by 40% through code optimization
 
-Data Analyst, XYZ Corporation
+Software Developer, XYZ Corporation (2019-2022)
+- Built RESTful APIs using Python and Flask
 - Performed data analysis using Python and pandas
-- Created data visualizations with Matplotlib and Tableau
-- Generated reports and insights for business stakeholders
+- Created data visualizations with Matplotlib and D3.js
+- Implemented CI/CD pipelines using GitHub Actions
+
+Junior Developer, Tech Innovations (2017-2019)
+- Developed frontend components using HTML, CSS, and JavaScript
+- Created and maintained SQL databases
+- Assisted in the development of mobile applications
 
 EDUCATION
-Master's in Computer Science, University of Technology
-Bachelor's in Information Systems, State University
+Master's in Computer Science, University of Technology (2017)
+Bachelor's in Software Engineering, State University (2015)
+
+CERTIFICATIONS
+- AWS Certified Developer
+- Microsoft Certified: Azure Developer Associate
+- Certified Scrum Master

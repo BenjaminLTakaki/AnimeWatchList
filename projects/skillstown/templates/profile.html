@@ -3,118 +3,141 @@
 {% block title %}Profile - SkillsTown{% endblock %}
 
 {% block content %}
-<div class="container my-5">
+<div class="container mt-4">
     <div class="row">
-        <div class="col-12">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0">
-                        <i class="fas fa-user-circle me-2"></i>Your Profile
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4 text-center">
-                            <div class="profile-avatar mb-3">
-                                <i class="fas fa-user-circle fa-5x text-primary"></i>
-                            </div>
-                            <h4>{{ current_user.username }}</h4>
-                            <p class="text-muted">{{ current_user.email }}</p>
+        <div class="col-lg-10 mx-auto">
+            <div class="row">
+                <!-- User Info Card -->
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-user me-2"></i>Profile</h5>
                         </div>
-                        <div class="col-md-8">
-                            <div class="row text-center">
-                                <div class="col-sm-3">
-                                    <div class="stat-box">
-                                        <div class="stat-number">{{ stats.total }}</div>
-                                        <div class="stat-label">Total Courses</div>
-                                    </div>
-                                </div>
-                                <div class="col-sm-3">
-                                    <div class="stat-box">
-                                        <div class="stat-number">{{ stats.enrolled }}</div>
-                                        <div class="stat-label">Enrolled</div>
-                                    </div>
-                                </div>
-                                <div class="col-sm-3">
-                                    <div class="stat-box">
-                                        <div class="stat-number">{{ stats.in_progress }}</div>
-                                        <div class="stat-label">In Progress</div>
-                                    </div>
-                                </div>
-                                <div class="col-sm-3">
-                                    <div class="stat-box">
-                                        <div class="stat-number">{{ stats.completed }}</div>
-                                        <div class="stat-label">Completed</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="mt-4">
-                                <h5>Completion Progress</h5>
-                                <div class="progress" style="height: 25px;">
-                                    <div class="progress-bar bg-success" role="progressbar" 
-                                         style="--width: {{ stats.completion_percentage }}%;">
-                                        {{ stats.completion_percentage }}%
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="card-body text-center">
+                            <i class="fas fa-user-circle fa-5x text-muted mb-3"></i>
+                            <h5>{{ current_user.username }}</h5>
+                            <p class="text-muted">{{ current_user.email }}</p>
+                            <small class="text-muted">Member since {{ current_user.date_joined.strftime('%B %Y') }}</small>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <div class="row">
-                <div class="col-md-6">
+
+                <!-- Stats Card -->
+                <div class="col-md-8 mb-4">
                     <div class="card shadow-sm">
-                        <div class="card-header bg-info text-white">
-                            <h4 class="mb-0">
-                                <i class="fas fa-clock me-2"></i>Recent Activity
-                            </h4>
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Learning Statistics</h5>
                         </div>
                         <div class="card-body">
-                            {% if recent_courses %}
-                                <div class="activity-list">
-                                    {% for course in recent_courses %}
-                                        <div class="activity-item">
-                                            <i class="fas fa-graduation-cap text-primary"></i>
-                                            <div class="activity-content">
-                                                <h6>{{ course.course_name }}</h6>
-                                                <small class="text-muted">
-                                                    {{ course.category }} • {{ course.created_at.strftime('%B %d, %Y') }}
-                                                </small>
-                                            </div>
-                                            <span class="badge bg-{{ 'success' if course.status == 'completed' else 'warning' if course.status == 'in_progress' else 'primary' }}">
-                                                {{ course.status }}
-                                            </span>
-                                        </div>
-                                    {% endfor %}
+                            <div class="row">
+                                <div class="col-6 col-md-3 text-center mb-3">
+                                    <h3 class="text-primary">{{ stats.total }}</h3>
+                                    <small class="text-muted">Total Courses</small>
                                 </div>
-                            {% else %}
-                                <p class="text-muted text-center">No recent activity</p>
+                                <div class="col-6 col-md-3 text-center mb-3">
+                                    <h3 class="text-info">{{ stats.enrolled }}</h3>
+                                    <small class="text-muted">Enrolled</small>
+                                </div>
+                                <div class="col-6 col-md-3 text-center mb-3">
+                                    <h3 class="text-warning">{{ stats.in_progress }}</h3>
+                                    <small class="text-muted">In Progress</small>
+                                </div>
+                                <div class="col-6 col-md-3 text-center mb-3">
+                                    <h3 class="text-success">{{ stats.completed }}</h3>
+                                    <small class="text-muted">Completed</small>
+                                </div>
+                            </div>
+                            
+                            {% if stats.total > 0 %}
+                            <div class="mt-3">
+                                <label class="form-label">Completion Progress</label>
+                                <div class="progress">
+                                    <div class="progress-bar bg-success" role="progressbar" 
+                                         style="--width: {{ stats.completion_percentage }}%">
+                                        {{ "%.1f"|format(stats.completion_percentage) }}%
+                                    </div>
+                                </div>
+                            </div>
                             {% endif %}
                         </div>
                     </div>
                 </div>
-                
-                <div class="col-md-6">
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-success text-white">
-                            <h4 class="mb-0">
-                                <i class="fas fa-rocket me-2"></i>Quick Actions
-                            </h4>
-                        </div>
-                        <div class="card-body">
-                            <div class="d-grid gap-2">
-                                <a href="{{ get_url_for('search') }}" class="btn btn-outline-primary">
-                                    <i class="fas fa-search me-2"></i>Find New Courses
-                                </a>
-                                <a href="{{ get_url_for('assessment') }}" class="btn btn-outline-info">
-                                    <i class="fas fa-file-alt me-2"></i>Get CV Analysis
-                                </a>
-                                <a href="{{ get_url_for('enrolled_courses') }}" class="btn btn-outline-success">
-                                    <i class="fas fa-graduation-cap me-2"></i>View All Courses
-                                </a>
+            </div>
+
+            <!-- Recent Courses -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Recent Courses</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_courses %}
+                    <div class="list-group list-group-flush">
+                        {% for course in recent_courses %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">{{ course.course_name }}</h6>
+                                <small class="text-muted">{{ course.category }} • Enrolled {{ course.created_at.strftime('%Y-%m-%d') }}</small>
                             </div>
+                            <div>
+                                {% if course.status == 'enrolled' %}
+                                <span class="badge bg-info">Enrolled</span>
+                                {% elif course.status == 'in_progress' %}
+                                <span class="badge bg-warning">In Progress</span>
+                                {% elif course.status == 'completed' %}
+                                <span class="badge bg-success">Completed</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-3 text-center">
+                        <a href="{{ get_url_for('my_courses') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-list me-1"></i>View All Courses
+                        </a>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-graduation-cap fa-3x text-muted mb-3"></i>
+                        <h6>No courses yet</h6>
+                        <p class="text-muted">Start your learning journey by enrolling in courses!</p>
+                        <a href="{{ get_url_for('search') }}" class="btn btn-primary">
+                            <i class="fas fa-search me-1"></i>Find Courses
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <a href="{{ get_url_for('assessment') }}" class="btn btn-outline-success w-100">
+                                <i class="fas fa-file-upload d-block mb-1"></i>
+                                Upload CV
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{{ get_url_for('search') }}" class="btn btn-outline-primary w-100">
+                                <i class="fas fa-search d-block mb-1"></i>
+                                Search Courses
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{{ get_url_for('my_courses') }}" class="btn btn-outline-info w-100">
+                                <i class="fas fa-book d-block mb-1"></i>
+                                My Courses
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{{ get_url_for('auth.logout') }}" class="btn btn-outline-danger w-100">
+                                <i class="fas fa-sign-out-alt d-block mb-1"></i>
+                                Logout
+                            </a>
                         </div>
                     </div>
                 </div>

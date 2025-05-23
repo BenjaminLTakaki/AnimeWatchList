@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Upload CV - SkillsTown{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-6 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-file-upload me-2"></i>Upload Your CV</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="mb-4">
+                            <label for="cv_file" class="form-label">Select CV File (PDF only)</label>
+                            <input type="file" class="form-control" id="cv_file" name="cv_file" 
+                                   accept=".pdf" required>
+                            <div class="form-text">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Please upload your CV in PDF format. Maximum file size: 10MB
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-upload me-2"></i>Upload & Analyze CV
+                            </button>
+                            <a href="{{ get_url_for('assessment') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Assessment
+                            </a>
+                        </div>
+                    </form>
+
+                    <hr class="my-4">
+
+                    <div class="text-center">
+                        <h6><i class="fas fa-lightbulb me-2"></i>Tips for better analysis:</h6>
+                        <ul class="list-unstyled text-start mt-3">
+                            <li><i class="fas fa-check text-success me-2"></i>Include a detailed skills section</li>
+                            <li><i class="fas fa-check text-success me-2"></i>List programming languages and technologies</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Mention frameworks and tools you've used</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Include certifications and courses completed</li>
+                        </ul>
+                    </div>
+
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Note:</strong> The file will be processed and then deleted from our servers. Only the extracted skills will be saved to your profile.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('cv_file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        if (file.type !== 'application/pdf') {
+            alert('Please select a PDF file only.');
+            this.value = '';
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) { // 10MB limit
+            alert('File size must be less than 10MB.');
+            this.value = '';
+            return;
+        }
+    }
+});
+</script>
+{% endblock %}

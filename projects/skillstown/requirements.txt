@@ -1,24 +1,8 @@
-# Flask and extensions
-Flask==2.3.3
+Flask==3.0.0
 Flask-Login==0.6.3
 Flask-SQLAlchemy==3.1.1
-Flask-WTF==1.2.1
-Werkzeug==2.3.7
-WTForms==3.1.2
-
-# Database
-SQLAlchemy==2.0.26
-psycopg2-binary==2.9.9
-
-# Environment variables
-python-dotenv==1.0.0
-
-# Document processing
+Werkzeug==3.0.1
 PyPDF2==3.0.1
-python-docx==1.1.0
-
-# AI and ML
-google-generativeai==0.3.1
-
-# Other utilities
+SQLAlchemy==2.0.23
+psycopg2-binary==2.9.9
 gunicorn==21.2.0

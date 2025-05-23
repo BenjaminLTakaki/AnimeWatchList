@@ -3,763 +3,149 @@
 {% block title %}CV Analysis Results - SkillsTown{% endblock %}
 
 {% block content %}
-<!-- Hero Section -->
-<section class="hero-section">
-    <div class="container text-center">
-        <h1>Your CV Analysis Results</h1>
-        <p>Personalized skill assessment and course recommendations</p>
-    </div>
-</section>
-
 <div class="container mt-4">
     <div class="row">
-        <!-- Skill Analysis Column -->
-        <div class="col-lg-4">
-            <!-- CV Details Card -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0"><i class="fas fa-file-alt me-2"></i>CV Analysis</h3>
-                </div>
-                <div class="card-body">
-                    <p><strong>Filename:</strong> {{ filename }}</p>
-                    
-                    <!-- Skill Analysis Tabs -->
-                    <div class="skills-tabs">
-                        <ul class="nav nav-tabs" id="skillsTabs" role="tablist">
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link active" id="technical-tab" data-bs-toggle="tab" data-bs-target="#technical" type="button" role="tab" aria-controls="technical" aria-selected="true">
-                                    Technical
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="soft-tab" data-bs-toggle="tab" data-bs-target="#soft" type="button" role="tab" aria-controls="soft" aria-selected="false">
-                                    Soft Skills
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="domain-tab" data-bs-toggle="tab" data-bs-target="#domain" type="button" role="tab" aria-controls="domain" aria-selected="false">
-                                    Domain
-                                </button>
-                            </li>
-                        </ul>
-                        <div class="tab-content" id="skillsTabsContent">
-                            <!-- Technical Skills Tab -->
-                            <div class="tab-pane fade show active" id="technical" role="tabpanel" aria-labelledby="technical-tab">
-                                <div class="skill-list mt-3">
-                                    {% if skills_data.technical_skills %}
-                                        {% for skill_info in skills_data.technical_skills %}
-                                            <div class="skill-item">
-                                                <div class="skill-header">
-                                                    <span class="skill-name">{{ skill_info.skill }}</span>
-                                                    <span class="skill-level level-{{ skill_info.level }}">{{ skill_info.level }}</span>
-                                                </div>
-                                                <div class="skill-bar">
-                                                    {% set level_percentage = 100 if skill_info.level == "expert" else 75 if skill_info.level == "advanced" else 50 if skill_info.level == "intermediate" else 25 %}
-                                                    <div class="skill-progress level-{{ skill_info.level }}" style="--width: {{ level_percentage }}%;"></div>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
-                                    {% else %}
-                                        <p class="text-muted mt-3">No technical skills detected. Try uploading a more detailed CV.</p>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            
-                            <!-- Soft Skills Tab -->
-                            <div class="tab-pane fade" id="soft" role="tabpanel" aria-labelledby="soft-tab">
-                                <div class="skill-list mt-3">
-                                    {% if skills_data.soft_skills %}
-                                        {% for skill_info in skills_data.soft_skills %}
-                                            <div class="skill-item">
-                                                <div class="skill-header">
-                                                    <span class="skill-name">{{ skill_info.skill }}</span>
-                                                    <span class="skill-level level-{{ skill_info.level }}">{{ skill_info.level }}</span>
-                                                </div>
-                                                <div class="skill-bar">
-                                                    {% set level_percentage = 100 if skill_info.level == "expert" else 75 if skill_info.level == "advanced" else 50 if skill_info.level == "intermediate" else 25 %}
-                                                    <div class="skill-progress level-{{ skill_info.level }}" style="--width: {{ level_percentage }}%;"></div>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
-                                    {% else %}
-                                        <p class="text-muted mt-3">No soft skills detected. Try uploading a more detailed CV.</p>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            
-                            <!-- Domain Knowledge Tab -->
-                            <div class="tab-pane fade" id="domain" role="tabpanel" aria-labelledby="domain-tab">
-                                <div class="skill-list mt-3">
-                                    {% if skills_data.domain_knowledge %}
-                                        {% for domain_info in skills_data.domain_knowledge %}
-                                            <div class="skill-item">
-                                                <div class="skill-header">
-                                                    <span class="skill-name">{{ domain_info.area }}</span>
-                                                    <span class="skill-level level-{{ domain_info.level }}">{{ domain_info.level }}</span>
-                                                </div>
-                                                <div class="skill-bar">
-                                                    {% set level_percentage = 100 if domain_info.level == "expert" else 75 if domain_info.level == "advanced" else 50 if domain_info.level == "intermediate" else 25 %}
-                                                    <div class="skill-progress level-{{ domain_info.level }}" style="--width: {{ level_percentage }}%;"></div>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
-                                    {% else %}
-                                        <p class="text-muted mt-3">No domain knowledge detected. Try uploading a more detailed CV.</p>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-4">
-                        <h4>Suggested Improvement Areas</h4>
-                        {% if skills_data.development_areas %}
-                            <ul class="development-areas">
-                                {% for area in skills_data.development_areas %}
-                                    <li>{{ area }}</li>
-                                {% endfor %}
-                            </ul>
-                        {% else %}
-                            <p class="text-muted">No specific development areas identified.</p>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="mt-4">
-                        <h4>Recommended Career Paths</h4>
-                        {% if skills_data.career_paths %}
-                            <ul class="career-paths">
-                                {% for path in skills_data.career_paths %}
-                                    <li>{{ path }}</li>
-                                {% endfor %}
-                            </ul>
-                        {% else %}
-                            <p class="text-muted">No specific career paths identified.</p>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="mt-4 text-center">
-                        <a href="{{ get_url_for('assessment') }}" class="btn btn-outline-primary">
-                            <i class="fas fa-upload me-2"></i>Upload Another CV
-                        </a>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Analysis Information Card -->
-            <div class="card shadow-sm">
-                <div class="card-header bg-info text-white">
-                    <h3 class="mb-0"><i class="fas fa-info-circle me-2"></i>About This Analysis</h3>
-                </div>
-                <div class="card-body">
-                    <p>Our AI-powered analysis evaluates your CV to identify your skills, experience, and potential areas for growth.</p>
-                    <div class="analysis-info">
-                        <div class="info-item">
-                            <i class="fas fa-shield-alt text-info"></i>
-                            <span>Your CV data is processed securely and not stored permanently.</span>
-                        </div>
-                        <div class="info-item">
-                            <i class="fas fa-robot text-info"></i>
-                            <span>Our AI analyzes patterns in your CV to identify skills and suggest courses.</span>
-                        </div>
-                        <div class="info-item">
-                            <i class="fas fa-chart-line text-info"></i>
-                            <span>Skill levels are estimated based on descriptions, job duration, and other factors.</span>
-                        </div>
-                    </div>
-                    
-                    <p class="mt-3 small">Note: This analysis is meant as a guide and may not capture all aspects of your professional background.</p>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Course Recommendations Column -->
-        <div class="col-lg-8">
-            <!-- Recommendations Card -->
+        <div class="col-lg-10 mx-auto">
             <div class="card shadow-sm">
                 <div class="card-header bg-success text-white">
-                    <h3 class="mb-0"><i class="fas fa-graduation-cap me-2"></i>Recommended SkillsTown Courses</h3>
+                    <h4 class="mb-0"><i class="fas fa-chart-line me-2"></i>CV Analysis Results</h4>
                 </div>
                 <div class="card-body">
-                    {% if recommendations %}
-                        <div class="alert alert-info d-flex align-items-center">
-                            <i class="fas fa-info-circle me-3 fa-2x"></i>
-                            <div>
-                                <strong>We've found {{ recommendations|length }} courses</strong> that match your skills and could help you advance your career.
-                                {% if not current_user.is_authenticated %}
-                                    <br>
-                                    <a href="{{ get_url_for('login_redirect') }}" class="alert-link">Log in</a> to save these recommendations for later.
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5><i class="fas fa-cogs me-2"></i>Extracted Skills</h5>
+                            {% if skills %}
+                            <div class="mb-3">
+                                {% for skill in skills %}
+                                <span class="badge bg-primary me-1 mb-1">{{ skill }}</span>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="alert alert-warning">
+                                No specific skills were automatically detected. You may want to ensure your CV includes a clear skills section.
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <h5><i class="fas fa-info-circle me-2"></i>Analysis Summary</h5>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-calendar me-2"></i><strong>Analyzed:</strong> {{ profile.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</li>
+                                <li><i class="fas fa-list me-2"></i><strong>Skills Found:</strong> {{ skills|length }}</li>
+                                <li><i class="fas fa-graduation-cap me-2"></i><strong>Recommendations:</strong> Available below</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="row">
+                        <div class="col-12">
+                            <h5><i class="fas fa-lightbulb me-2"></i>Recommended Learning Paths</h5>
+                            <p class="text-muted">Based on your current skills, here are courses to advance your career:</p>
+                            
+                            <div class="row">
+                                <!-- Programming Enhancement -->
+                                {% if skills|select('match', '.*(?i)(python|java|javascript).*')|list %}
+                                <div class="col-md-6 mb-3">
+                                    <div class="card border-primary">
+                                        <div class="card-header bg-primary text-white">
+                                            <h6 class="mb-0">Advanced Programming</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <p>Enhance your programming skills with advanced concepts</p>
+                                            <ul class="list-unstyled">
+                                                <li>• Advanced Python Development</li>
+                                                <li>• Design Patterns & Architecture</li>
+                                                <li>• Performance Optimization</li>
+                                            </ul>
+                                            <a href="{{ get_url_for('search') }}?query=advanced programming" class="btn btn-primary btn-sm">
+                                                Find Courses
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Data Science Path -->
+                                {% if skills|select('match', '.*(?i)(python|data|sql).*')|list %}
+                                <div class="col-md-6 mb-3">
+                                    <div class="card border-info">
+                                        <div class="card-header bg-info text-white">
+                                            <h6 class="mb-0">Data Science & Analytics</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <p>Advance into data science and machine learning</p>
+                                            <ul class="list-unstyled">
+                                                <li>• Machine Learning Fundamentals</li>
+                                                <li>• Data Visualization</li>
+                                                <li>• Statistical Analysis</li>
+                                            </ul>
+                                            <a href="{{ get_url_for('search') }}?query=data science machine learning" class="btn btn-info btn-sm">
+                                                Find Courses
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Web Development -->
+                                {% if skills|select('match', '.*(?i)(html|css|javascript|react).*')|list %}
+                                <div class="col-md-6 mb-3">
+                                    <div class="card border-warning">
+                                        <div class="card-header bg-warning text-white">
+                                            <h6 class="mb-0">Full-Stack Web Development</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <p>Build modern web applications</p>
+                                            <ul class="list-unstyled">
+                                                <li>• Advanced React Development</li>
+                                                <li>• Backend API Development</li>
+                                                <li>• Database Design</li>
+                                            </ul>
+                                            <a href="{{ get_url_for('search') }}?query=web development react" class="btn btn-warning btn-sm">
+                                                Find Courses
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Cloud & DevOps -->
+                                {% if skills|select('match', '.*(?i)(aws|docker|git).*')|list or skills|length > 3 %}
+                                <div class="col-md-6 mb-3">
+                                    <div class="card border-success">
+                                        <div class="card-header bg-success text-white">
+                                            <h6 class="mb-0">Cloud & DevOps</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <p>Scale your applications with cloud technologies</p>
+                                            <ul class="list-unstyled">
+                                                <li>• Cloud Architecture (AWS/Azure)</li>
+                                                <li>• Container Orchestration</li>
+                                                <li>• CI/CD Pipelines</li>
+                                            </ul>
+                                            <a href="{{ get_url_for('search') }}?query=cloud aws devops" class="btn btn-success btn-sm">
+                                                Find Courses
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
                                 {% endif %}
                             </div>
-                        </div>
-                        
-                        <div class="recommendation-tabs">
-                            <ul class="nav nav-pills mb-3" id="recommendationTabs" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active" id="all-tab" data-bs-toggle="pill" data-bs-target="#all-recommendations" type="button" role="tab" aria-controls="all-recommendations" aria-selected="true">
-                                        All Recommendations
-                                    </button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="skills-tab" data-bs-toggle="pill" data-bs-target="#skills-recommendations" type="button" role="tab" aria-controls="skills-recommendations" aria-selected="false">
-                                        By Skill Match
-                                    </button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="categories-tab" data-bs-toggle="pill" data-bs-target="#categories-recommendations" type="button" role="tab" aria-controls="categories-recommendations" aria-selected="false">
-                                        By Category
-                                    </button>
-                                </li>
-                            </ul>
-                            
-                            <div class="tab-content" id="recommendationTabsContent">
-                                <!-- All Recommendations Tab -->
-                                <div class="tab-pane fade show active" id="all-recommendations" role="tabpanel" aria-labelledby="all-tab">
-                                    <div class="course-recommendation-grid">
-                                        {% for recommendation in recommendations %}
-                                            <div class="recommendation-card">
-                                                <div class="recommendation-header">
-                                                    <span class="category-badge">{{ recommendation.category }}</span>
-                                                    {% if current_user.is_authenticated %}
-                                                        <button type="button" class="btn-enroll-course" 
-                                                                onclick="enrollInCourse('{{ recommendation.category }}', '{{ recommendation.course }}')">
-                                                            <i class="fas fa-graduation-cap"></i>
-                                                        </button>
-                                                    {% endif %}
-                                                </div>
-                                                <h4 class="recommendation-title">{{ recommendation.course }}</h4>
-                                                {% if recommendation.description %}
-                                                    <p class="recommendation-description">{{ recommendation.description }}</p>
-                                                {% endif %}
-                                                
-                                                <div class="matching-skills mb-3">
-                                                    <h6>Matches your skills:</h6>
-                                                    <div class="skill-tags">
-                                                        {% for skill in recommendation.matching_skills %}
-                                                            <span class="skill-tag">{{ skill }}</span>
-                                                        {% endfor %}
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="recommendation-footer">
-                                                    <div class="match-score">
-                                                        <span class="match-label">Match Score:</span>
-                                                        <div class="match-bar">
-                                                            {% set match_percentage = (recommendation.match_score / 20) * 100 if recommendation.match_score <= 20 else 100 %}
-                                                            <div class="match-fill" style="width: {{ match_percentage }}%;"></div>
-                                                        </div>
-                                                    </div>
-                                                    <a href="https://www.skillstown.nl" target="_blank" class="btn btn-sm btn-success">
-                                                        <i class="fas fa-external-link-alt me-1"></i>View Course
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-                                
-                                <!-- Skills Match Tab -->
-                                <div class="tab-pane fade" id="skills-recommendations" role="tabpanel" aria-labelledby="skills-tab">
-                                    <div class="skills-grouped-recommendations">
-                                        {% set skills_groups = {} %}
-                                        {% for recommendation in recommendations %}
-                                            {% for skill in recommendation.matching_skills %}
-                                                {% if skill not in skills_groups %}
-                                                    {% set _ = skills_groups.update({skill: []}) %}
-                                                {% endif %}
-                                                {% set _ = skills_groups[skill].append(recommendation) %}
-                                            {% endfor %}
-                                        {% endfor %}
-                                        
-                                        {% for skill, courses in skills_groups.items() %}
-                                            <div class="skill-group mb-4">
-                                                <h5 class="skill-group-title">
-                                                    <i class="fas fa-tag me-2"></i>{{ skill | title }}
-                                                    <span class="badge bg-primary">{{ courses | length }} courses</span>
-                                                </h5>
-                                                <div class="skill-group-courses">
-                                                    {% for course in courses[:3] %}
-                                                        <div class="mini-course-card">
-                                                            <span class="mini-category-badge">{{ course.category }}</span>
-                                                            <h6>{{ course.course }}</h6>
-                                                            {% if current_user.is_authenticated %}
-                                                                <button type="button" class="btn-enroll-mini" 
-                                                                        onclick="enrollInCourse('{{ course.category }}', '{{ course.course }}')">
-                                                                    <i class="fas fa-graduation-cap"></i>
-                                                                </button>
-                                                            {% endif %}
-                                                        </div>
-                                                    {% endfor %}
-                                                </div>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-                                
-                                <!-- Categories Tab -->
-                                <div class="tab-pane fade" id="categories-recommendations" role="tabpanel" aria-labelledby="categories-tab">
-                                    <div class="categories-grouped-recommendations">
-                                        {% set categories_groups = {} %}
-                                        {% for recommendation in recommendations %}
-                                            {% if recommendation.category not in categories_groups %}
-                                                {% set _ = categories_groups.update({recommendation.category: []}) %}
-                                            {% endif %}
-                                            {% set _ = categories_groups[recommendation.category].append(recommendation) %}
-                                        {% endfor %}
-                                        
-                                        {% for category, courses in categories_groups.items() %}
-                                            <div class="category-group mb-4">
-                                                <h5 class="category-group-title">
-                                                    <i class="fas fa-folder me-2"></i>{{ category }}
-                                                    <span class="badge bg-secondary">{{ courses | length }} courses</span>
-                                                </h5>
-                                                <div class="category-group-courses">
-                                                    {% for course in courses %}
-                                                        <div class="category-course-item">
-                                                            <div class="course-item-header">
-                                                                <h6>{{ course.course }}</h6>
-                                                                {% if current_user.is_authenticated %}
-                                                                    <button type="button" class="btn-enroll-mini" 
-                                                                            onclick="enrollInCourse('{{ course.category }}', '{{ course.course }}')">
-                                                                        <i class="fas fa-graduation-cap"></i>
-                                                                    </button>
-                                                                {% endif %}
-                                                            </div>
-                                                            {% if course.description %}
-                                                                <p class="course-item-description">{{ course.description }}</p>
-                                                            {% endif %}
-                                                            <div class="course-item-skills">
-                                                                {% for skill in course.matching_skills %}
-                                                                    <span class="mini-skill-tag">{{ skill }}</span>
-                                                                {% endfor %}
-                                                            </div>
-                                                        </div>
-                                                    {% endfor %}
-                                                </div>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    {% else %}
-                        <div class="text-center p-4">
-                            <i class="fas fa-exclamation-triangle fa-4x text-warning mb-3"></i>
-                            <h4>No specific course matches found</h4>
-                            <p>We couldn't find courses that specifically match your CV content.</p>
-                            <p>This might happen if:</p>
-                            <ul class="text-start d-inline-block">
-                                <li>Your CV has very specialized skills not covered in our catalog</li>
-                                <li>The CV content couldn't be properly analyzed</li>
-                                <li>You might benefit from browsing all available courses</li>
-                            </ul>
-                            <div class="mt-4">
+
+                            <div class="mt-4 text-center">
                                 <a href="{{ get_url_for('search') }}" class="btn btn-primary me-2">
-                                    <i class="fas fa-search me-2"></i>Browse All Courses
+                                    <i class="fas fa-search me-1"></i>Search More Courses
                                 </a>
-                                <a href="{{ get_url_for('assessment') }}" class="btn btn-outline-primary">
-                                    <i class="fas fa-upload me-2"></i>Try Another CV
+                                <a href="{{ get_url_for('upload_cv') }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-upload me-1"></i>Upload New CV
                                 </a>
                             </div>
                         </div>
-                    {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script>    function enrollInCourse(category, courseName) {
-        fetch('{{ get_url_for("courses.enroll") }}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `category=${encodeURIComponent(category)}&course=${encodeURIComponent(courseName)}`
-        })
-        .then(response => response.json())
-        .then(data => {
-            if(data.success) {
-                // Change the icon to show enrolled
-                event.target.style.color = '#28a745';
-                
-                // Show a notification
-                const toast = document.createElement('div');
-                toast.className = 'toast-notification';
-                toast.innerHTML = `<i class="fas fa-check-circle me-2"></i>${data.message}`;
-                document.body.appendChild(toast);
-                
-                // Remove the notification after 3 seconds
-                setTimeout(() => {
-                    toast.style.opacity = '0';
-                    setTimeout(() => {
-                        if (document.body.contains(toast)) {
-                            document.body.removeChild(toast);
-                        }
-                    }, 300);
-                }, 3000);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-        });
-    }
-</script>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .skills-tabs .nav-tabs {
-        border-bottom: 1px solid #ddd;
-    }
-    
-    .skills-tabs .nav-link {
-        color: #666;
-        font-size: 0.9rem;
-        padding: 8px 12px;
-    }
-    
-    .skills-tabs .nav-link.active {
-        color: var(--skillstown-blue);
-        border-color: var(--skillstown-blue);
-    }
-    
-    .skill-list {
-        max-height: 300px;
-        overflow-y: auto;
-    }
-    
-    .skill-item {
-        margin-bottom: 15px;
-        padding: 10px;
-        border: 1px solid #f0f0f0;
-        border-radius: 6px;
-        background-color: #fafafa;
-    }
-    
-    .skill-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
-    }
-    
-    .skill-name {
-        font-weight: 500;
-        color: #333;
-        text-transform: capitalize;
-    }
-    
-    .skill-level {
-        font-size: 0.8rem;
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-weight: 500;
-        text-transform: uppercase;
-    }
-    
-    .skill-level.level-beginner {
-        background-color: #fff3cd;
-        color: #856404;
-    }
-    
-    .skill-level.level-intermediate {
-        background-color: #cce7ff;
-        color: #004085;
-    }
-    
-    .skill-level.level-advanced {
-        background-color: #d4edda;
-        color: #155724;
-    }
-    
-    .skill-level.level-expert {
-        background-color: #f8d7da;
-        color: #721c24;
-    }
-    
-    .skill-bar {
-        height: 6px;
-        background-color: #e9ecef;
-        border-radius: 3px;
-        overflow: hidden;
-    }
-    
-    .skill-progress {
-        height: 100%;
-        border-radius: 3px;
-        transition: width 0.3s ease;
-    }
-    
-    .skill-progress.level-beginner {
-        background-color: #ffc107;
-    }
-    
-    .skill-progress.level-intermediate {
-        background-color: #007bff;
-    }
-    
-    .skill-progress.level-advanced {
-        background-color: #28a745;
-    }
-    
-    .skill-progress.level-expert {
-        background-color: #dc3545;
-    }
-    
-    .development-areas, .career-paths {
-        padding-left: 20px;
-    }
-    
-    .development-areas li, .career-paths li {
-        margin-bottom: 5px;
-        color: #666;
-    }
-    
-    .analysis-info {
-        margin-top: 15px;
-    }
-    
-    .info-item {
-        display: flex;
-        align-items: flex-start;
-        margin-bottom: 10px;
-        font-size: 0.9rem;
-    }
-    
-    .info-item i {
-        margin-right: 10px;
-        margin-top: 2px;
-        flex-shrink: 0;
-    }
-    
-    .course-recommendation-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-        gap: 20px;
-    }
-    
-    .recommendation-card {
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        overflow: hidden;
-        transition: transform 0.3s, box-shadow 0.3s;
-        background-color: #fff;
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-    
-    .recommendation-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-    }
-    
-    .recommendation-header {
-        padding: 15px;
-        border-bottom: 1px solid #f0f0f0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .category-badge {
-        background-color: var(--light-blue);
-        color: var(--skillstown-blue);
-        padding: 4px 10px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 500;
-    }
-    
-    .btn-enroll-course, .btn-enroll-mini {
-        background: none;
-        border: none;
-        color: #aaa;
-        cursor: pointer;
-        font-size: 1.1rem;
-        transition: color 0.3s;
-    }
-    
-    .btn-enroll-course:hover, .btn-enroll-mini:hover {
-        color: var(--skillstown-blue);
-    }
-    
-    .recommendation-title {
-        padding: 15px 15px 0;
-        margin: 0;
-        font-size: 1.2rem;
-        font-weight: 600;
-        color: #333;
-    }
-    
-    .recommendation-description {
-        padding: 10px 15px;
-        margin: 0;
-        font-size: 0.9rem;
-        color: #666;
-        flex-grow: 1;
-    }
-    
-    .matching-skills {
-        padding: 0 15px;
-    }
-    
-    .matching-skills h6 {
-        font-size: 0.9rem;
-        color: #666;
-        margin-bottom: 8px;
-    }
-    
-    .skill-tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
-    }
-    
-    .skill-tag, .mini-skill-tag {
-        background-color: #e8f5e9;
-        color: #2e7d32;
-        padding: 3px 8px;
-        border-radius: 12px;
-        font-size: 0.75rem;
-        font-weight: 500;
-    }
-    
-    .mini-skill-tag {
-        font-size: 0.7rem;
-        padding: 2px 6px;
-    }
-    
-    .recommendation-footer {
-        padding: 15px;
-        border-top: 1px solid #f0f0f0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .match-score {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        margin-right: 15px;
-    }
-    
-    .match-label {
-        font-size: 0.8rem;
-        color: #888;
-        margin-bottom: 5px;
-    }
-    
-    .match-bar {
-        height: 6px;
-        background-color: #f0f0f0;
-        border-radius: 3px;
-        overflow: hidden;
-    }
-    
-    .match-fill {
-        height: 100%;
-        background-color: var(--skillstown-green);
-        border-radius: 3px;
-    }
-    
-    .skill-group, .category-group {
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 20px;
-        background-color: #fafafa;
-    }
-    
-    .skill-group-title, .category-group-title {
-        color: #333;
-        margin-bottom: 15px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    
-    .skill-group-courses, .category-group-courses {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .mini-course-card, .category-course-item {
-        background-color: white;
-        border: 1px solid #e0e0e0;
-        border-radius: 6px;
-        padding: 15px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .category-course-item {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .course-item-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
-    }
-    
-    .course-item-description {
-        font-size: 0.9rem;
-        color: #666;
-        margin-bottom: 10px;
-    }
-    
-    .course-item-skills {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
-    }
-    
-    .mini-category-badge {
-        background-color: rgba(0, 160, 227, 0.1);
-        color: var(--skillstown-blue);
-        padding: 2px 8px;
-        border-radius: 10px;
-        font-size: 0.7rem;
-        font-weight: 500;
-    }
-    
-    .mini-course-card h6, .course-item-header h6 {
-        margin: 0;
-        font-size: 1rem;
-        color: #333;
-    }
-    
-    .toast-notification {
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
-        background-color: #333;
-        color: white;
-        padding: 15px 25px;
-        border-radius: 8px;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        z-index: 1000;
-        opacity: 1;
-        transition: opacity 0.3s;
-    }
-    
-    @media (max-width: 768px) {
-        .course-recommendation-grid {
-            grid-template-columns: 1fr;
-        }
-        
-        .mini-course-card {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 10px;
-        }
-    }
-</style>
 {% endblock %}

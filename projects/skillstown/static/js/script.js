@@ -1,6 +1,3 @@
-// Custom JavaScript for SkillsTown CV Analyzer
-
-// File upload handling
 function updateFileName() {
     const fileInput = document.getElementById('file');
     const fileNameContainer = document.getElementById('file-name');
@@ -16,13 +13,10 @@ function updateFileName() {
     }
 }
 
-// Initialize drag and drop functionality when the DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Only initialize if the elements exist on the page
     const dropzone = document.getElementById('dropzone');
     if (!dropzone) return;
     
-    // Drag and drop functionality
     dropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
         dropzone.classList.add('bg-light');
@@ -41,7 +35,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const fileInput = document.getElementById('file');
         
         if (files.length > 0) {
-            // Check file extension
             const fileName = files[0].name;
             const fileExt = fileName.split('.').pop().toLowerCase();
             
@@ -56,7 +49,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Form validation
     const uploadForm = document.getElementById('upload-form');
     if (uploadForm) {
         uploadForm.addEventListener('submit', function(event) {
@@ -67,7 +59,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     <i class="fas fa-exclamation-circle me-2"></i>Please select a file to upload.
                 </div>`;
             } else {
-                // Show loading state
                 document.getElementById('submit-btn').innerHTML = `
                     <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
                     Analyzing CV...
@@ -77,19 +68,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Enable tooltips
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 });
 
-// Animation for skill badges on results page
 document.addEventListener('DOMContentLoaded', function() {
     const skillBadges = document.querySelectorAll('.skills-badge');
     
     skillBadges.forEach((badge, index) => {
-        // Add a slight delay for each badge to create a cascade effect
         setTimeout(() => {
             badge.style.opacity = '1';
             badge.style.transform = 'translateY(0)';
@@ -97,12 +85,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Print functionality for results page
 function printResults() {
     window.print();
 }
 
-// Copy skill list to clipboard
 function copySkillsToClipboard() {
     const skillsContainer = document.querySelector('.skills-container');
     if (!skillsContainer) return;
@@ -113,14 +99,12 @@ function copySkillsToClipboard() {
     
     if (skills) {
         navigator.clipboard.writeText(skills).then(() => {
-            // Show success message
             const alertDiv = document.createElement('div');
             alertDiv.className = 'alert alert-success mt-3';
             alertDiv.innerHTML = '<i class="fas fa-check-circle me-2"></i>Skills copied to clipboard!';
             
             skillsContainer.parentNode.insertBefore(alertDiv, skillsContainer.nextSibling);
             
-            // Remove the alert after 3 seconds
             setTimeout(() => {
                 alertDiv.remove();
             }, 3000);

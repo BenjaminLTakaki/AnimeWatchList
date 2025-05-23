@@ -3,454 +3,105 @@
 {% block title %}Search Courses - SkillsTown{% endblock %}
 
 {% block content %}
-<!-- Hero Section -->
-<section class="hero-section">
-    <div class="container text-center">
-        <h1>Search Courses</h1>
-        <p>Find the perfect course for your professional development</p>
-          <!-- Search Form -->
-        <div class="search-container">
-            <form action="{{ get_url_for('courses.search') }}" method="POST" class="search-form">
-                <div class="input-group">
-                    <input type="text" name="query" class="form-control" placeholder="Search for courses, skills, or topics..." value="{{ query }}" aria-label="Search">
-                    <button class="btn btn-primary" type="submit">
-                        <i class="fas fa-search me-2"></i>Search
-                    </button>
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-search me-2"></i>Search Courses by Keywords</h4>
                 </div>
-            </form>
+                <div class="card-body">
+                    <form method="GET" action="{{ get_url_for('search') }}">
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control form-control-lg" name="query" 
+                                   value="{{ query }}" placeholder="Enter skills you want to learn (e.g., Python, Machine Learning, React)">
+                            <button class="btn btn-primary" type="submit">
+                                <i class="fas fa-search me-1"></i>Search
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div class="text-muted">
+                        <small><i class="fas fa-lightbulb me-1"></i>
+                        Search for courses to learn new skills, not skills you already have!</small>
+                    </div>
+                </div>
+            </div>
+
+            {% if query %}
+            <div class="mt-4">
+                <h5>Search Results for "{{ query }}" ({{ results|length }} found)</h5>
+                
+                {% if results %}
+                <div class="row">
+                    {% for result in results %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6 class="card-title">{{ result.course }}</h6>
+                                <p class="card-text">{{ result.description[:100] }}...</p>
+                                <span class="badge bg-secondary">{{ result.category }}</span>
+                                <span class="badge bg-info">Relevance: {{ result.relevance_score }}</span>
+                            </div>
+                            <div class="card-footer">
+                                {% if current_user.is_authenticated %}
+                                <button class="btn btn-success btn-sm enroll-btn" 
+                                        data-category="{{ result.category }}" 
+                                        data-course="{{ result.course }}">
+                                    <i class="fas fa-plus me-1"></i>Enroll
+                                </button>
+                                {% else %}
+                                <a href="{{ get_url_for('auth.login') }}" class="btn btn-outline-primary btn-sm">
+                                    Login to Enroll
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>No courses found for "{{ query }}". Try different keywords!
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
     </div>
-</section>
-
-<div class="container mt-4">
-    <!-- Search Results -->
-    {% if query %}
-        <div class="row">
-            <div class="col-12">
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                        <h3 class="mb-0">Search Results for "{{ query }}"</h3>
-                        <span class="badge bg-light text-primary">{{ results|length }} results</span>
-                    </div>
-                    <div class="card-body">
-                        {% if results %}
-                            <div class="course-grid">
-                                {% for course in results %}
-                                    <div class="course-card">
-                                        <div class="course-header">
-                                            <span class="category-badge">{{ course.category }}</span>
-                                            {% if current_user.is_authenticated %}
-                                                <button type="button" class="btn-enroll-course" 
-                                                        onclick="enrollInCourse('{{ course.category }}', '{{ course.course }}')">
-                                                    <i class="fas fa-graduation-cap"></i>
-                                                </button>
-                                            {% endif %}
-                                        </div>
-                                        <h4 class="course-title">{{ course.course }}</h4>
-                                        {% if course.description %}
-                                            <p class="course-description">{{ course.description }}</p>
-                                        {% else %}
-                                            <p class="course-description text-muted">No description available</p>
-                                        {% endif %}
-                                        <div class="course-footer">
-                                            <div class="relevance">
-                                                <span class="relevance-label">Relevance:</span>
-                                                <div class="relevance-bar">
-                                                    {% set relevance_percentage = (course.relevance_score / 100) * 100 if course.relevance_score <= 100 else 100 %}
-                                                    <div class="relevance-fill" style="width: {{ relevance_percentage }}%;"></div>
-                                                </div>
-                                            </div>
-                                            <a href="https://www.skillstown.nl" target="_blank" class="btn btn-sm btn-outline-primary">View on SkillsTown</a>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <div class="text-center p-4">
-                                <i class="fas fa-search-minus fa-4x text-muted mb-3"></i>
-                                <h4>No courses found</h4>
-                                <p>We couldn't find any courses matching "{{ query }}".</p>
-                                <p>Try using different keywords or <a href="{{ get_url_for('assessment.upload_cv') }}">upload your CV</a> for personalized recommendations.</p>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        {% if results %}
-            <!-- Additional Suggestions -->
-            <div class="row">
-                <div class="col-12">
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-info text-white">
-                            <h3 class="mb-0">Looking for more options?</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="suggestion-box p-4 text-center">
-                                        <i class="fas fa-file-alt fa-3x mb-3 text-info"></i>
-                                        <h4>Upload Your CV</h4>
-                                        <p>Get personalized course recommendations based on your skills and experience.</p>                                        <a href="{{ get_url_for('assessment.upload_cv') }}" class="btn btn-outline-info">
-                                            <i class="fas fa-upload me-2"></i>Upload CV
-                                        </a>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="suggestion-box p-4 text-center">
-                                        <i class="fas fa-th fa-3x mb-3 text-info"></i>
-                                        <h4>Browse Categories</h4>
-                                        <p>Explore all course categories to find the perfect match for your needs.</p>                                        <a href="{{ get_url_for('main.index') }}" class="btn btn-outline-info">
-                                            <i class="fas fa-list me-2"></i>View Categories
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {% endif %}
-    {% else %}
-        <!-- Popular Searches -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-primary text-white">
-                        <h3 class="mb-0">Popular Searches</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="popular-searches">                            <a href="{{ get_url_for('courses.search') }}?query=Python" class="popular-search-item">
-                                <i class="fas fa-code me-2"></i>Python
-                            </a>                            <a href="{{ get_url_for('courses.search') }}?query=Leadership" class="popular-search-item">
-                                <i class="fas fa-users me-2"></i>Leadership
-                            </a>                            <a href="{{ get_url_for('courses.search') }}?query=Excel" class="popular-search-item">
-                                <i class="fas fa-table me-2"></i>Excel
-                            </a>                            <a href="{{ get_url_for('courses.search') }}?query=Project+Management" class="popular-search-item">
-                                <i class="fas fa-tasks me-2"></i>Project Management
-                            </a>                            <a href="{{ get_url_for('courses.search') }}?query=Communication" class="popular-search-item">
-                                <i class="fas fa-comments me-2"></i>Communication
-                            </a>                            <a href="{{ get_url_for('courses.search') }}?query=Data+Analysis" class="popular-search-item">
-                                <i class="fas fa-chart-bar me-2"></i>Data Analysis
-                            </a>                            <a href="{{ get_url_for('courses.search') }}?query=Marketing" class="popular-search-item">
-                                <i class="fas fa-bullhorn me-2"></i>Marketing
-                            </a>                            <a href="{{ get_url_for('courses.search') }}?query=Time+Management" class="popular-search-item">
-                                <i class="fas fa-clock me-2"></i>Time Management
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Course Categories -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-secondary text-white">
-                        <h3 class="mb-0">Browse by Category</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-3 mb-3">
-                                <div class="category-browse-box">
-                                    <i class="fas fa-laptop-code fa-2x mb-2"></i>
-                                    <h5>IT & Programming</h5>
-                                    <a href="{{ get_url_for('courses.search') }}?query=IT" class="stretched-link"></a>
-                                </div>
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="category-browse-box">
-                                    <i class="fas fa-chart-line fa-2x mb-2"></i>
-                                    <h5>Business & Management</h5>
-                                    <a href="{{ get_url_for('courses.search') }}?query=Business" class="stretched-link"></a>
-                                </div>
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="category-browse-box">
-                                    <i class="fas fa-comments fa-2x mb-2"></i>
-                                    <h5>Communication</h5>
-                                    <a href="{{ get_url_for('courses.search') }}?query=Communication" class="stretched-link"></a>
-                                </div>
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="category-browse-box">
-                                    <i class="fas fa-calculator fa-2x mb-2"></i>
-                                    <h5>Finance</h5>
-                                    <a href="{{ get_url_for('courses.search') }}?query=Finance" class="stretched-link"></a>
-                                </div>
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="category-browse-box">
-                                    <i class="fas fa-tasks fa-2x mb-2"></i>
-                                    <h5>Project Management</h5>
-                                    <a href="{{ get_url_for('courses.search') }}?query=Project Management" class="stretched-link"></a>
-                                </div>
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="category-browse-box">
-                                    <i class="fas fa-users fa-2x mb-2"></i>
-                                    <h5>Leadership</h5>
-                                    <a href="{{ get_url_for('courses.search') }}?query=Leadership" class="stretched-link"></a>
-                                </div>
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="category-browse-box">
-                                    <i class="fas fa-language fa-2x mb-2"></i>
-                                    <h5>Languages</h5>
-                                    <a href="{{ get_url_for('courses.search') }}?query=Languages" class="stretched-link"></a>
-                                </div>
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="category-browse-box">
-                                    <i class="fas fa-heart fa-2x mb-2"></i>
-                                    <h5>Health & Wellness</h5>
-                                    <a href="{{ get_url_for('courses.search') }}?query=Health" class="stretched-link"></a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    {% endif %}
 </div>
-{% endblock %}
 
-{% block extra_js %}
-<script>    function enrollInCourse(category, courseName) {
-        fetch('{{ get_url_for("courses.enroll") }}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `category=${encodeURIComponent(category)}&course=${encodeURIComponent(courseName)}`
-        })
-        .then(response => response.json())
-        .then(data => {
-            if(data.success) {
-                // Change the icon to show enrolled
-                event.target.classList.remove('fas');
-                event.target.classList.add('fas');
-                event.target.style.color = '#28a745';
-                
-                // Show a notification
-                const toast = document.createElement('div');
-                toast.className = 'toast-notification';
-                toast.innerHTML = `<i class="fas fa-check-circle me-2"></i>${data.message}`;
-                document.body.appendChild(toast);
-                
-                // Remove the notification after 3 seconds
-                setTimeout(() => {
-                    toast.style.opacity = '0';
-                    setTimeout(() => {
-                        document.body.removeChild(toast);
-                    }, 300);
-                }, 3000);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
+{% if current_user.is_authenticated %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.enroll-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const category = this.dataset.category;
+            const course = this.dataset.course;
+            
+            fetch('{{ get_url_for("enroll_course") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `category=${encodeURIComponent(category)}&course=${encodeURIComponent(course)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    this.innerHTML = '<i class="fas fa-check me-1"></i>Enrolled';
+                    this.classList.remove('btn-success');
+                    this.classList.add('btn-secondary');
+                    this.disabled = true;
+                }
+                alert(data.message);
+            })
+            .catch(error => {
+                alert('Error enrolling in course');
+            });
         });
-    }
+    });
+});
 </script>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .search-container {
-        max-width: 700px;
-        margin: 0 auto;
-    }
-    
-    .search-form input {
-        padding: 12px;
-        font-size: 1.1rem;
-        border-radius: 8px 0 0 8px;
-    }
-    
-    .search-form button {
-        padding: 12px 24px;
-        font-size: 1.1rem;
-        border-radius: 0 8px 8px 0;
-    }
-    
-    .course-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 20px;
-    }
-    
-    .course-card {
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        overflow: hidden;
-        transition: transform 0.3s, box-shadow 0.3s;
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        background-color: #fff;
-    }
-    
-    .course-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-    }
-    
-    .course-header {
-        padding: 15px;
-        border-bottom: 1px solid #f0f0f0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .category-badge {
-        background-color: var(--light-blue);
-        color: var(--skillstown-blue);
-        padding: 4px 10px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 500;
-    }
-    
-    .btn-enroll-course {
-        background: none;
-        border: none;
-        color: #aaa;
-        cursor: pointer;
-        font-size: 1.1rem;
-        transition: color 0.3s;
-    }
-    
-    .btn-enroll-course:hover {
-        color: var(--skillstown-blue);
-    }
-    
-    .course-title {
-        padding: 15px 15px 0;
-        margin: 0;
-        font-size: 1.2rem;
-        font-weight: 600;
-        color: #333;
-    }
-    
-    .course-description {
-        padding: 10px 15px;
-        margin: 0;
-        font-size: 0.9rem;
-        color: #666;
-        flex-grow: 1;
-    }
-    
-    .course-footer {
-        padding: 15px;
-        border-top: 1px solid #f0f0f0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .relevance {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        margin-right: 15px;
-    }
-    
-    .relevance-label {
-        font-size: 0.8rem;
-        color: #888;
-        margin-bottom: 5px;
-    }
-    
-    .relevance-bar {
-        height: 6px;
-        background-color: #f0f0f0;
-        border-radius: 3px;
-        overflow: hidden;
-    }
-    
-    .relevance-fill {
-        height: 100%;
-        background-color: var(--skillstown-blue);
-        border-radius: 3px;
-    }
-    
-    .suggestion-box {
-        border-radius: 8px;
-        border: 1px solid #e0e0e0;
-        height: 100%;
-        transition: transform 0.3s, box-shadow 0.3s;
-    }
-    
-    .suggestion-box:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-    }
-    
-    .popular-searches {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    
-    .popular-search-item {
-        background-color: #f8f9fa;
-        color: #333;
-        padding: 8px 15px;
-        border-radius: 8px;
-        text-decoration: none;
-        font-size: 0.9rem;
-        transition: all 0.3s;
-        border: 1px solid #e0e0e0;
-    }
-    
-    .popular-search-item:hover {
-        background-color: var(--skillstown-blue);
-        color: white;
-    }
-    
-    .category-browse-box {
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 20px;
-        text-align: center;
-        transition: all 0.3s;
-        height: 100%;
-        position: relative;
-        background-color: #f8f9fa;
-    }
-    
-    .category-browse-box:hover {
-        background-color: var(--skillstown-blue);
-        color: white;
-        transform: translateY(-5px);
-    }
-    
-    .stretched-link::after {
-        position: absolute;
-        top: 0;
-        right: 0;
-        bottom: 0;
-        left: 0;
-        z-index: 1;
-        content: "";
-    }
-    
-    .toast-notification {
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
-        background-color: #333;
-        color: white;
-        padding: 15px 25px;
-        border-radius: 8px;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        z-index: 1000;
-        opacity: 1;
-        transition: opacity 0.3s;
-    }
-</style>
+{% endif %}
 {% endblock %}

@@ -1,160 +1,108 @@
 {% extends "base.html" %}
 
-{% block title %}SkillsTown Course Finder - Home{% endblock %}
+{% block title %}SkillsTown Course Recommender - Upload Your CV{% endblock %}
 
 {% block content %}
 <!-- Hero Section -->
 <section class="hero-section">
     <div class="container text-center">
-        <h1>Discover Your Next Skill</h1>
-        <p>Find the perfect SkillsTown courses to advance your career</p>
-        
-        <!-- Quick Search -->
-        <div class="search-container">            <form action="{{ get_url_for('courses.search') }}" method="GET" class="search-form">
-                <div class="input-group">
-                    <input type="text" name="query" class="form-control" placeholder="Search courses..." aria-label="Search">
-                    <button class="btn btn-primary" type="submit">
-                        <i class="fas fa-search me-2"></i>Search
-                    </button>
-                </div>
-            </form>
-        </div>
-        
-        <!-- Quick Tags -->
-        <div class="quick-tags mt-3">
-            <a href="{{ get_url_for('courses.search') }}?query=Python" class="tag-btn">Python</a>
-            <a href="{{ get_url_for('courses.search') }}?query=Excel" class="tag-btn">Excel</a>
-            <a href="{{ get_url_for('courses.search') }}?query=Leadership" class="tag-btn">Leadership</a>
-            <a href="{{ get_url_for('courses.search') }}?query=Communication" class="tag-btn">Communication</a>
-        </div>
+        <h1>Discover Your Perfect SkillsTown Courses</h1>
     </div>
 </section>
 
-<div class="container my-5">
-    <div class="row">
-        <!-- Main Content -->
-        <div class="col-lg-8">
-            <!-- Features -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-body">
-                    <h2 class="text-center mb-4">Find Your Perfect Course</h2>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="feature-box">
-                                <i class="fas fa-search fa-3x text-primary mb-3"></i>
-                                <h3>Quick Search</h3>
-                                <p>Search our extensive catalog of professional courses.</p>                                <a href="{{ get_url_for('courses.search') }}" class="btn btn-outline-primary">
-                                    <i class="fas fa-search me-2"></i>Search Now
-                                </a>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="feature-box">
-                                <i class="fas fa-file-alt fa-3x text-primary mb-3"></i>
-                                <h3>CV Analysis</h3>                                <p>Upload your CV for personalized recommendations.</p>
-                                <a href="{{ get_url_for('assessment.upload_cv') }}" class="btn btn-outline-primary">
-                                    <i class="fas fa-upload me-2"></i>Upload CV
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Categories -->
-            <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0">Popular Categories</h3>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-upload me-2"></i>Upload Your CV
                 </div>
                 <div class="card-body">
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <div class="category-card">
-                                <i class="fas fa-laptop-code fa-2x mb-2 text-primary"></i>
-                                <h4>IT & Programming</h4>
-                                <p class="small">20+ courses</p>
+                    <form method="POST" action="/upload" enctype="multipart/form-data" id="upload-form">
+                        <div class="mb-4" id="upload-container">
+                            <div class="upload-area" id="dropzone" onclick="document.getElementById('file').click();">
+                                <i class="fas fa-file-upload upload-icon"></i>
+                                <h4>Drag & Drop or Click to Upload</h4>
+                                <p class="text-muted">Accepted formats: PDF, DOCX, TXT</p>
+                                <div id="file-name" class="mt-3"></div>
                             </div>
+                            <input type="file" name="file" id="file" accept=".pdf,.docx,.txt" style="display: none;" onchange="updateFileName()">
                         </div>
-                        <div class="col-md-4">
-                            <div class="category-card">
-                                <i class="fas fa-chart-line fa-2x mb-2 text-primary"></i>
-                                <h4>Business</h4>
-                                <p class="small">15+ courses</p>
-                            </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
+                                <i class="fas fa-search me-2"></i>Analyze CV & Recommend Courses
+                            </button>
                         </div>
-                        <div class="col-md-4">
-                            <div class="category-card">
-                                <i class="fas fa-comments fa-2x mb-2 text-primary"></i>
-                                <h4>Communication</h4>
-                                <p class="small">10+ courses</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Sidebar -->
-        <div class="col-lg-4">
-            {% if current_user.is_authenticated %}
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-success text-white">
-                        <h4 class="mb-0">
-                            <i class="fas fa-user-circle me-2"></i>Welcome back!
-                        </h4>
-                    </div>
-                    <div class="card-body">
-                        <p>Hello, {{ current_user.username }}!</p>
-                        <p>You have {{ enrolled_courses_count }} enrolled courses.</p>                        <a href="{{ get_url_for('courses.enrolled') }}" class="btn btn-success w-100">
-                            <i class="fas fa-graduation-cap me-2"></i>View My Courses
-                        </a>
-                    </div>
-                </div>
-            {% else %}
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0">Get Started</h4>
-                    </div>
-                    <div class="card-body">
-                        <p>Sign in to track your learning progress.</p>                        <a href="{{ get_url_for('auth.login') }}" class="btn btn-primary w-100">
-                            <i class="fas fa-sign-in-alt me-2"></i>Sign In
-                        </a>
-                    </div>
-                </div>
-            {% endif %}
-            
-            <!-- How It Works -->
-            <div class="card shadow-sm">
-                <div class="card-header bg-info text-white">
-                    <h4 class="mb-0">How It Works</h4>
-                </div>
-                <div class="card-body">
-                    <div class="steps">
-                        <div class="step">
-                            <div class="step-number">1</div>
-                            <div class="step-content">
-                                <h5>Search or Upload</h5>
-                                <p>Find courses or upload your CV</p>
-                            </div>
-                        </div>
-                        <div class="step">
-                            <div class="step-number">2</div>
-                            <div class="step-content">
-                                <h5>Get Recommendations</h5>
-                                <p>AI-powered course matching</p>
-                            </div>
-                        </div>
-                        <div class="step">
-                            <div class="step-number">3</div>
-                            <div class="step-content">
-                                <h5>Track Progress</h5>
-                                <p>Monitor your learning journey</p>
-                            </div>
-                        </div>
-                    </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // File upload handling
+    function updateFileName() {
+        const fileInput = document.getElementById('file');
+        const fileNameContainer = document.getElementById('file-name');
+        
+        if (fileInput.files.length > 0) {
+            const fileName = fileInput.files[0].name;
+            fileNameContainer.innerHTML = `<div class="alert alert-success">
+                <i class="fas fa-check-circle me-2"></i>Selected file: <strong>${fileName}</strong>
+            </div>`;
+            document.getElementById('submit-btn').removeAttribute('disabled');
+        } else {
+            fileNameContainer.innerHTML = '';
+        }
+    }
+    
+    // Drag and drop functionality
+    const dropzone = document.getElementById('dropzone');
+    
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('bg-light');
+    });
+    
+    dropzone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('bg-light');
+    });
+    
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('bg-light');
+        
+        const files = e.dataTransfer.files;
+        const fileInput = document.getElementById('file');
+        
+        if (files.length > 0) {
+            const fileName = files[0].name;
+            const fileExt = fileName.split('.').pop().toLowerCase();
+            
+            if (['pdf', 'docx', 'txt'].includes(fileExt)) {
+                fileInput.files = files;
+                updateFileName();
+            } else {
+                document.getElementById('file-name').innerHTML = `<div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>Invalid file format. Please upload PDF, DOCX, or TXT files.
+                </div>`;
+            }
+        }
+    });
+    
+    // Form validation
+    document.getElementById('upload-form').addEventListener('submit', function(event) {
+        const fileInput = document.getElementById('file');
+        if (fileInput.files.length === 0) {
+            event.preventDefault();
+            document.getElementById('file-name').innerHTML = `<div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle me-2"></i>Please select a file to upload.
+            </div>`;
+        }
+    });
+</script>
 {% endblock %}
