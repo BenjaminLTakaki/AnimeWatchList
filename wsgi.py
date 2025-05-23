@@ -3,6 +3,7 @@ import sys
 import datetime
 from flask import Flask, send_from_directory, redirect, request
 from dotenv import load_dotenv
+from flask_migrate import Migrate  # ADDED
 
 # Load environment variables
 load_dotenv()
@@ -32,6 +33,11 @@ try:
     
     from skillstown.app import create_app
     skillstown_app = create_app('production')
+    # db instance is created within create_app and init_auth, need to access it
+    # However, Flask-Migrate should be initialized where both app and db are available.
+    # It's already initialized in skillstown.app.create_app
+    # For wsgi.py, if we need to run flask db commands, we might need a way to access the db instance.
+    # For now, assuming the initialization in skillstown.app.create_app is sufficient for Render's context.
     print("SkillsTown app imported successfully")
 except Exception as e:
     skillstown_error = str(e)
@@ -50,7 +56,8 @@ sys.path.insert(0, animewatchlist_path)
 
 # Import the AnimeWatchList app with error handling
 try:
-    from projects.animewatchlist.app import app as animewatchlist_app
+    from projects.animewatchlist.app import app as animewatchlist_app, db as animewatchlist_db  # MODIFIED
+    Migrate(animewatchlist_app, animewatchlist_db)  # Initialize Flask-Migrate for AnimeWatchList
     print("AnimeWatchList app imported successfully")
     has_animewatchlist_app = True
 except Exception as e:

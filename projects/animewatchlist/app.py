@@ -7,6 +7,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from flask_login import login_required, current_user
 from dotenv import load_dotenv
 from sqlalchemy import inspect
+from flask_migrate import Migrate # ADDED
 
 # Load environment variables
 load_dotenv()
@@ -44,6 +45,7 @@ def inject_template_vars():
 # Import and initialize auth system
 from auth import init_auth
 db = init_auth(app, get_url_for, lambda user_id: (0, 0))  # Temporary function, will be replaced
+migrate = Migrate(app, db) # ADDED: Initialize Flask-Migrate
 
 # Create tables explicitly
 with app.app_context():

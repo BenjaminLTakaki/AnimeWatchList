@@ -17,6 +17,7 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from sqlalchemy import inspect
 from jinja2 import ChoiceLoader, FileSystemLoader # ADDED
+from flask_migrate import Migrate # ADDED
 
 # Production detection
 is_production = os.environ.get('RENDER', False) or os.environ.get('FLASK_ENV') == 'production'
@@ -87,6 +88,8 @@ def create_app(config_name=None):  # MODIFIED
     
     # Initialize auth with skillstown-specific functions
     db = init_auth(app, get_url_for, lambda user_id: get_skillstown_stats(user_id))
+
+    Migrate(app, db) # Initialize Flask-Migrate
 
     # Create base tables
     with app.app_context():
