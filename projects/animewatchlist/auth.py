@@ -92,7 +92,7 @@ def init_auth(app, get_url_for_func, get_status_counts_func):
     # Initialize LoginManager
     login_manager = LoginManager()
     login_manager.init_app(app)
-    login_manager.login_view = 'login'
+    login_manager.login_view = 'login'  # Endpoint name for the login view
     login_manager.login_message_category = 'info'
     
     @login_manager.user_loader
@@ -109,6 +109,12 @@ def init_auth(app, get_url_for_func, get_status_counts_func):
     
     # Register routes
     # Views will now use current_app.config to get their specific get_url_for and get_status_counts
+
+    app.add_url_rule('/register', endpoint='register', view_func=register, methods=['GET', 'POST'])
+    app.add_url_rule('/login', endpoint='login', view_func=login, methods=['GET', 'POST'])
+    app.add_url_rule('/logout', endpoint='logout', view_func=logout, methods=['GET', 'POST'])
+    app.add_url_rule('/profile', endpoint='profile', view_func=profile, methods=['GET', 'POST'])
+
 
     # Store auth route functions in a global dict for access from outside
     # This part might also need rethinking if multiple apps have different auth views for same names.
