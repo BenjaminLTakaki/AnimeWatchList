@@ -18,7 +18,7 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import inspect
 
 # Production detection
-is_production = os.getenv('RENDER') == 'true' or os.getenv('VERCEL') == '1'
+is_production = os.environ.get('RENDER', False) or os.environ.get('FLASK_ENV') == 'production'
 
 def get_url_for(*args, **kwargs):
     url = url_for(*args, **kwargs)
@@ -33,8 +33,17 @@ sys.path.insert(0, animewatchlist_path)
 from auth import init_auth, User
 from user_data import get_status_counts
 
-def create_app():
+def create_app(config_name=None):  # MODIFIED
     """Create and configure the Flask application"""
+    global is_production  # MODIFIED
+
+    # If config_name is provided, it can influence the is_production flag
+    if config_name == 'production':
+        is_production = True
+    elif config_name is not None:  # For any other explicit config_name like 'development'
+        is_production = False
+    # If config_name is None, is_production retains its value from environment variables (already set globally)
+
     # Create the Flask app
     app = Flask(__name__)
 
@@ -43,7 +52,7 @@ def create_app():
     app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
 
     # Set up static folder for production
-    if is_production:
+    if is_production: # This now uses the (potentially) updated global is_production
         app.static_url_path = '/skillstown/static'
     
     @app.context_processor
