@@ -9,13 +9,15 @@ class Config:
     # App configuration
     SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "skillstown_secret_key_change_this")
     
-    # Database configuration
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///skillstown.db')
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # Database configuration - Try multiple environment variable names
+    database_url = os.environ.get('DATABASE_URL') or os.environ.get('SQLALCHEMY_DATABASE_URI', 'sqlite:///skillstown.db')
     
-    # Fix Render PostgreSQL URLs
-    if SQLALCHEMY_DATABASE_URI.startswith('postgres://'):
-        SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace('postgres://', 'postgresql://', 1)
+    # Fix Render PostgreSQL URLs (postgres:// -> postgresql://)
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    
+    SQLALCHEMY_DATABASE_URI = database_url
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Paths
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -28,6 +30,7 @@ class Config:
     
     # Create required directories
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    os.makedirs(os.path.join(STATIC_FOLDER, 'data'), exist_ok=True)
 
 
 class DevelopmentConfig(Config):

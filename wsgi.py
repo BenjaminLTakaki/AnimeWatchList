@@ -24,17 +24,23 @@ os.makedirs(os.path.join(skillstown_path, 'static'), exist_ok=True)
 
 # Import SkillsTown app with factory pattern
 try:
-    from projects.skillstown.app import create_app
+    # First add the projects directory to the path
+    projects_path = os.path.join(project_root, 'projects')
+    if projects_path not in sys.path:
+        sys.path.insert(0, projects_path)
+    
+    from skillstown.app import create_app
     skillstown_app = create_app('production')
     print("SkillsTown app imported successfully")
 except Exception as e:
     print(f"Could not import SkillsTown app: {e}")
+    print(f"Current sys.path: {sys.path}")
     print("Creating a stub SkillsTown app")
     skillstown_app = Flask("skillstown_stub")
     
     @skillstown_app.route('/')
     def skillstown_index():
-        return "SkillsTown is currently unavailable. Please try again later."
+        return f"SkillsTown is currently unavailable. Error: {str(e)}"
 
 # AnimeWatchList app setup
 animewatchlist_path = os.path.join(project_root, 'projects/animewatchlist')
@@ -58,13 +64,20 @@ except Exception as e:
 
 # Spotify Cover Generator app setup
 spotify_path = os.path.join(project_root, 'projects/spotify-cover-generator')
-sys.path.insert(0, spotify_path)
 
-# Import Spotify app
+# Import Spotify app - add its path first to avoid config conflicts
 try:
+    # Clear the conflicting paths
+    original_sys_path = sys.path.copy()
+    sys.path = [p for p in sys.path if 'skillstown' not in p and 'animewatchlist' not in p]
+    sys.path.insert(0, spotify_path)
+    
     from app import app as spotify_app
     print("Spotify app imported successfully")
     has_spotify_app = True
+    
+    # Restore original path
+    sys.path = original_sys_path
 except ImportError as e:
     print(f"Could not import Spotify app: {e}")
     has_spotify_app = False

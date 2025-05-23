@@ -19,21 +19,14 @@ def search():
         if query:
             results = CourseService.search_courses(query)
     
-    return render_template('search.html', results=results, query=query)
+    return render_template('courses/search.html', results=results, query=query)
 
 @courses_bp.route('/enrolled')
 @login_required
 def enrolled():
     """Enrolled courses route."""
     courses = CourseService.get_user_courses(current_user)
-    return render_template('enrolled_courses.html', courses=courses)
-
-@courses_bp.route('/saved')
-@login_required
-def saved():
-    """Saved courses route."""
-    courses = CourseService.get_user_courses(current_user, status='saved')
-    return render_template('saved_courses.html', courses=courses)
+    return render_template('courses/enrolled_courses.html', courses=courses)
 
 @courses_bp.route('/enroll', methods=['POST'])
 @login_required
@@ -64,7 +57,7 @@ def update_status():
     if not course_id or not status:
         return jsonify({"success": False, "message": "Missing required fields"}), 400
         
-    if status not in ['enrolled', 'in_progress', 'completed', 'saved']:
+    if status not in ['enrolled', 'in_progress', 'completed']:
         return jsonify({"success": False, "message": "Invalid status"}), 400
         
     success = CourseService.update_course_status(course_id, status, current_user.id)

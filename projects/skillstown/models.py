@@ -11,7 +11,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
-    courses = db.relationship('UserCourse', backref='user', lazy='dynamic', cascade='all, delete-orphan')
+    enrolled_courses = db.relationship('UserCourse', backref='user', lazy='dynamic', cascade='all, delete-orphan')
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -21,11 +21,11 @@ class User(UserMixin, db.Model):
     
     @property
     def enrolled_courses_count(self):
-        return self.courses.count()
+        return self.enrolled_courses.count()
     
     @property
     def completed_courses_count(self):
-        return self.courses.filter_by(status='completed').count()
+        return self.enrolled_courses.filter_by(status='completed').count()
 
 class UserCourse(db.Model):
     __tablename__ = 'skillstown_user_courses'

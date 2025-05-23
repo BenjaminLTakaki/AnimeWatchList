@@ -1,8 +1,9 @@
 import os
 import sys
-from flask import Flask
-from flask_login import LoginManager, current_user
+from flask import Flask, render_template, request, redirect, flash, jsonify
+from flask_login import LoginManager, current_user, login_required
 from datetime import datetime
+from werkzeug.utils import secure_filename
 
 # Add the current directory to Python path to allow proper imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -10,8 +11,7 @@ if current_dir not in sys.path:
     sys.path.append(current_dir)
 
 from config import config
-from models import db, User
-from utils.url_helpers import get_url_for
+from models import db, User, UserCourse
 
 def create_app(config_name=None):
     """
@@ -44,7 +44,7 @@ def create_app(config_name=None):
     def load_user(user_id):
         return User.query.get(int(user_id))
     
-    # Register blueprints
+    # Import blueprints here to avoid circular imports
     from routes.main import main_bp
     from routes.auth import auth_bp
     from routes.assessment import assessment_bp
@@ -55,12 +55,18 @@ def create_app(config_name=None):
     app.register_blueprint(assessment_bp, url_prefix='/assessment')
     app.register_blueprint(courses_bp, url_prefix='/courses')
     
+    # Import helper functions
+    from utils.url_helpers import get_url_for
+    from utils.file_utils import allowed_file, extract_text
+    from utils.text_processing import analyze_cv
+    from services.course_service import CourseService
+    
     # Context processors
     @app.context_processor
     def inject_globals():
         return {
             'get_url_for': get_url_for,
-            'enrolled_courses_count': current_user.enrolled_courses_count if current_user.is_authenticated else 0,
+            'enrolled_courses_count': current_user.enrolled_courses.count() if current_user.is_authenticated else 0,
             'current_year': datetime.now().year
         }
     
@@ -68,122 +74,119 @@ def create_app(config_name=None):
     with app.app_context():
         db.create_all()
     
+    # Additional routes that were in the original app.py
+    @app.route('/upload', methods=['POST'])
+    @login_required
+    def upload_file():
+        if 'file' not in request.files:
+            flash('No file selected', 'error')
+            return redirect(get_url_for('assessment.upload_cv'))
+        
+        file = request.files['file']
+        if file.filename == '':
+            flash('No file selected', 'error')
+            return redirect(get_url_for('assessment.upload_cv'))
+        
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            
+            try:
+                # Process file
+                text = extract_text(filepath)
+                skills_data = analyze_cv(text)
+                recommendations = CourseService.recommend_courses(skills_data)
+                
+                # Clean up file
+                os.remove(filepath)
+                
+                return render_template('assessment/results.html',
+                                     skills_data=skills_data,
+                                     recommendations=recommendations,
+                                     filename=filename)
+            except Exception as e:
+                flash(f'Error processing file: {str(e)}', 'error')
+                return redirect(get_url_for('assessment.upload_cv'))
+        
+        flash('Invalid file type. Please upload PDF, DOCX, or TXT.', 'error')
+        return redirect(get_url_for('assessment.upload_cv'))
+
+    @app.route('/search')
+    def search():
+        query = request.args.get('query', '')
+        results = CourseService.search_courses(query) if query else []
+        
+        if query and not results:
+            flash('No courses found. Try different keywords.', 'info')
+        
+        return render_template('courses/search.html', results=results, query=query)
+
+    @app.route('/enrolled-courses')
+    @login_required
+    def enrolled_courses():
+        courses = current_user.enrolled_courses.all()
+        return render_template('courses/enrolled_courses.html', courses=courses)
+
+    @app.route('/enroll-course', methods=['POST'])
+    @login_required
+    def enroll_course():
+        category = request.form.get('category')
+        course_name = request.form.get('course')
+        
+        if not category or not course_name:
+            return jsonify({'success': False, 'message': 'Missing course information'})
+        
+        # Check if already enrolled
+        existing = UserCourse.query.filter_by(
+            user_id=current_user.id,
+            course_name=course_name
+        ).first()
+        
+        if existing:
+            return jsonify({'success': True, 'message': f'Already enrolled in {course_name}'})
+        
+        # Enroll
+        course = UserCourse(
+            user_id=current_user.id,
+            category=category,
+            course_name=course_name
+        )
+        db.session.add(course)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': f'Successfully enrolled in {course_name}!'})
+
+    @app.route('/update-course-status/<int:course_id>', methods=['POST'])
+    @login_required
+    def update_course_status(course_id):
+        course = UserCourse.query.filter_by(id=course_id, user_id=current_user.id).first_or_404()
+        
+        new_status = request.form.get('status')
+        if new_status in ['enrolled', 'in_progress', 'completed']:
+            course.status = new_status
+            db.session.commit()
+            flash(f'Course status updated to {new_status}', 'success')
+        
+        return redirect(get_url_for('courses.enrolled'))
+
+    @app.route('/remove-course/<int:course_id>', methods=['POST'])
+    @login_required
+    def remove_course(course_id):
+        course = UserCourse.query.filter_by(id=course_id, user_id=current_user.id).first_or_404()
+        db.session.delete(course)
+        db.session.commit()
+        flash('Course removed successfully', 'success')
+        
+        return redirect(get_url_for('courses.enrolled'))
+
+    @app.route('/about')
+    def about():
+        return render_template('about.html')
+    
     return app
 
 # Create app instance for direct running
-app = create_app()
-
-# Run the app if executed directly
 if __name__ == '__main__':
-    app.run(debug=True)
-
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        flash('No file selected', 'error')
-        return redirect(get_url_for('assessment'))
-    
-    file = request.files['file']
-    if file.filename == '':
-        flash('No file selected', 'error')
-        return redirect(get_url_for('assessment'))
-    
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        
-        try:
-            # Process file
-            text = extract_text(filepath)
-            skills_data = analyze_cv(text)
-            recommendations = recommend_courses(skills_data)
-            
-            # Clean up file
-            os.remove(filepath)
-            
-            return render_template('results.html',
-                                 skills_data=skills_data,
-                                 recommendations=recommendations,
-                                 filename=filename)
-        except Exception as e:
-            flash(f'Error processing file: {str(e)}', 'error')
-            return redirect(get_url_for('assessment'))
-    
-    flash('Invalid file type. Please upload PDF, DOCX, or TXT.', 'error')
-    return redirect(get_url_for('assessment'))
-
-@app.route('/search')
-def search():
-    query = request.args.get('query', '')
-    results = search_courses(query) if query else []
-    
-    if query and not results:
-        flash('No courses found. Try different keywords.', 'info')
-    
-    return render_template('search.html', results=results, query=query)
-
-@app.route('/enrolled-courses')
-@login_required
-def enrolled_courses():
-    courses = current_user.courses.all()
-    return render_template('enrolled_courses.html', courses=courses)
-
-@app.route('/enroll-course', methods=['POST'])
-@login_required
-def enroll_course():
-    category = request.form.get('category')
-    course_name = request.form.get('course')
-    
-    if not category or not course_name:
-        return jsonify({'success': False, 'message': 'Missing course information'})
-    
-    # Check if already enrolled
-    existing = UserCourse.query.filter_by(
-        user_id=current_user.id,
-        course_name=course_name
-    ).first()
-    
-    if existing:
-        return jsonify({'success': True, 'message': f'Already enrolled in {course_name}'})
-    
-    # Enroll
-    course = UserCourse(
-        user_id=current_user.id,
-        category=category,
-        course_name=course_name
-    )
-    db.session.add(course)
-    db.session.commit()
-    
-    return jsonify({'success': True, 'message': f'Successfully enrolled in {course_name}!'})
-
-@app.route('/update-course-status/<int:course_id>', methods=['POST'])
-@login_required
-def update_course_status(course_id):
-    course = UserCourse.query.filter_by(id=course_id, user_id=current_user.id).first_or_404()
-    
-    new_status = request.form.get('status')
-    if new_status in ['enrolled', 'in_progress', 'completed']:
-        course.status = new_status
-        db.session.commit()
-        flash(f'Course status updated to {new_status}', 'success')
-    
-    return redirect(get_url_for('enrolled_courses'))
-
-@app.route('/remove-course/<int:course_id>', methods=['POST'])
-@login_required
-def remove_course(course_id):
-    course = UserCourse.query.filter_by(id=course_id, user_id=current_user.id).first_or_404()
-    db.session.delete(course)
-    db.session.commit()
-    flash('Course removed successfully', 'success')
-    
-    return redirect(get_url_for('enrolled_courses'))
-
-@app.route('/about')
-def about():
-    return render_template('about.html')
-
-if __name__ == '__main__':
+    app = create_app()
     app.run(debug=True)
