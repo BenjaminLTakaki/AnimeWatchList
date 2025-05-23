@@ -45,7 +45,7 @@
                             
                             <div class="row">
                                 <!-- Programming Enhancement -->
-                                {% if skills|select('match', '.*(?i)(python|java|javascript).*')|list %}
+                                {% if has_programming_skills %}
                                 <div class="col-md-6 mb-3">
                                     <div class="card border-primary">
                                         <div class="card-header bg-primary text-white">
@@ -67,7 +67,7 @@
                                 {% endif %}
 
                                 <!-- Data Science Path -->
-                                {% if skills|select('match', '.*(?i)(python|data|sql).*')|list %}
+                                {% if has_data_skills %}
                                 <div class="col-md-6 mb-3">
                                     <div class="card border-info">
                                         <div class="card-header bg-info text-white">
@@ -89,7 +89,7 @@
                                 {% endif %}
 
                                 <!-- Web Development -->
-                                {% if skills|select('match', '.*(?i)(html|css|javascript|react).*')|list %}
+                                {% if has_web_skills %}
                                 <div class="col-md-6 mb-3">
                                     <div class="card border-warning">
                                         <div class="card-header bg-warning text-white">
@@ -111,7 +111,7 @@
                                 {% endif %}
 
                                 <!-- Cloud & DevOps -->
-                                {% if skills|select('match', '.*(?i)(aws|docker|git).*')|list or skills|length > 3 %}
+                                {% if has_devops_skills or skills|length > 3 %}
                                 <div class="col-md-6 mb-3">
                                     <div class="card border-success">
                                         <div class="card-header bg-success text-white">

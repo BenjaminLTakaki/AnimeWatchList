@@ -336,9 +336,22 @@ def create_app(config_name=None):  # MODIFIED
             skills = json.loads(profile.skills) if profile.skills else []
         except:
             skills = []
+
+        # Perform skill matching for categories
+        skills_text = " ".join(skills).lower() # Join skills into a single string for easier regex matching
+
+        has_programming_skills = bool(re.search(r'(python|java|javascript)', skills_text, re.IGNORECASE))
+        has_data_skills = bool(re.search(r'(python|data|sql)', skills_text, re.IGNORECASE))
+        has_web_skills = bool(re.search(r'(html|css|javascript|react)', skills_text, re.IGNORECASE))
+        has_devops_skills = bool(re.search(r'(aws|docker|git)', skills_text, re.IGNORECASE))
         
         return render_template('assessment/results.html',
-                             profile=profile,                             skills=skills,
+                             profile=profile,
+                             skills=skills,
+                             has_programming_skills=has_programming_skills,
+                             has_data_skills=has_data_skills,
+                             has_web_skills=has_web_skills,
+                             has_devops_skills=has_devops_skills,
                              get_url_for=get_url_for)
 
     @app.route("/my-courses")

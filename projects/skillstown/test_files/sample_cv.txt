@@ -17,7 +17,7 @@ SKILLS
 EXPERIENCE
 Senior Software Developer, ABC Technologies (2022-Present)
 - Developed and maintained web applications using React and Node.js
-- Implemented machine learning algorithms for predictive analytics
+- Implemented machine learning algorithms f127.0.0.1 - - [23/May/2025 21:14:24] "POST /upload HTTP/1.1" 405 -or predictive analytics
 - Led a team of 5 developers for a major client project
 - Reduced server response time by 40% through code optimization
 
