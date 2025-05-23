@@ -5,11 +5,18 @@ from flask import Blueprint, render_template, request, redirect, flash, current_
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
-from services.cv_service import CVService
-from services.course_service import CourseService
-from utils.file_utils import allowed_file, extract_text
-from utils.url_helpers import get_url_for
-from projects.skillstown.forms import CVUploadForm
+try:
+    from services.cv_service import CVService
+    from services.course_service import CourseService
+    from utils.file_utils import allowed_file, extract_text
+    from utils.url_helpers import get_url_for
+    from forms import CVUploadForm
+except ImportError:
+    from skillstown.services.cv_service import CVService
+    from skillstown.services.course_service import CourseService
+    from skillstown.utils.file_utils import allowed_file, extract_text
+    from skillstown.utils.url_helpers import get_url_for
+    from skillstown.forms import CVUploadForm
 
 # Create blueprint
 assessment_bp = Blueprint('assessment', __name__, template_folder='../templates/assessment')

@@ -1,16 +1,12 @@
-import os
-import sys
-
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, BooleanField, TextAreaField, FileField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
 
-# Add the current directory to Python path to allow proper imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
-
-from models import User
+# Import will be resolved by the app's import system
+try:
+    from models import User
+except ImportError:
+    from skillstown.models import User
 
 class LoginForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])

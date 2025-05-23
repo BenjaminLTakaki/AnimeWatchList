@@ -10,8 +10,15 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.append(current_dir)
 
-from config import config
-from models import db, User, UserCourse
+try:
+    from config import config
+    from models import db, User, UserCourse
+except ImportError as e:
+    print(f"Import error in app.py: {e}")
+    # Try alternative import
+    sys.path.insert(0, os.path.dirname(current_dir))
+    from skillstown.config import config
+    from skillstown.models import db, User, UserCourse
 
 def create_app(config_name=None):
     """
@@ -45,10 +52,17 @@ def create_app(config_name=None):
         return User.query.get(int(user_id))
     
     # Import blueprints here to avoid circular imports
-    from routes.main import main_bp
-    from routes.auth import auth_bp
-    from routes.assessment import assessment_bp
-    from routes.courses import courses_bp
+    try:
+        from routes.main import main_bp
+        from routes.auth import auth_bp
+        from routes.assessment import assessment_bp
+        from routes.courses import courses_bp
+    except ImportError:
+        # Try alternative imports
+        from skillstown.routes.main import main_bp
+        from skillstown.routes.auth import auth_bp
+        from skillstown.routes.assessment import assessment_bp
+        from skillstown.routes.courses import courses_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -56,10 +70,16 @@ def create_app(config_name=None):
     app.register_blueprint(courses_bp, url_prefix='/courses')
     
     # Import helper functions
-    from utils.url_helpers import get_url_for
-    from utils.file_utils import allowed_file, extract_text
-    from utils.text_processing import analyze_cv
-    from services.course_service import CourseService
+    try:
+        from utils.url_helpers import get_url_for
+        from utils.file_utils import allowed_file, extract_text
+        from utils.text_processing import analyze_cv
+        from services.course_service import CourseService
+    except ImportError:
+        from skillstown.utils.url_helpers import get_url_for
+        from skillstown.utils.file_utils import allowed_file, extract_text
+        from skillstown.utils.text_processing import analyze_cv
+        from skillstown.services.course_service import CourseService
     
     # Context processors
     @app.context_processor

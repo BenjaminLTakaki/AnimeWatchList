@@ -1,18 +1,15 @@
 """Authentication blueprint for user registration and login."""
-import os
-import sys
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import current_user, login_required
 
-# Add the current directory to Python path to allow proper imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
-
-from forms import LoginForm, RegistrationForm
-from services.auth_service import AuthService
-from utils.url_helpers import get_url_for
+try:
+    from forms import LoginForm, RegistrationForm
+    from services.auth_service import AuthService
+    from utils.url_helpers import get_url_for
+except ImportError:
+    from skillstown.forms import LoginForm, RegistrationForm
+    from skillstown.services.auth_service import AuthService
+    from skillstown.utils.url_helpers import get_url_for
 
 # Create blueprint
 auth_bp = Blueprint('auth', __name__, template_folder='../templates/auth')
@@ -38,7 +35,7 @@ def login():
             
         flash(error, 'danger')
     
-    return render_template('login.html', form=form)
+    return render_template('auth/login.html', form=form)
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
@@ -60,7 +57,7 @@ def register():
             
         flash(error, 'danger')
     
-    return render_template('register.html', form=form)
+    return render_template('auth/register.html', form=form)
 
 @auth_bp.route('/logout')
 @login_required
