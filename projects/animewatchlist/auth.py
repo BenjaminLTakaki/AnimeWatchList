@@ -135,14 +135,24 @@ def register():
     if current_user.is_authenticated:
         return redirect(guf('profile'))  # Use guf
     form = RegistrationForm()
-    if form.validate_on_submit():
-        user = User(username=form.username.data, email=form.email.data)
-        user.set_password(form.password.data)
-        db.session.add(user)
-        db.session.commit()
-        flash('Your account has been created! You are now able to log in.', 'success')
-        login_user(user) # Log in the user automatically after registration
-        return redirect(guf('profile'))  # Use guf
+    if request.method == 'POST':
+        print(f"Registration form submitted. Validating... Data: {form.data}") # DEBUG
+        if form.validate_on_submit():
+            print("Form validation successful.") # DEBUG
+            user = User(username=form.username.data, email=form.email.data)
+            user.set_password(form.password.data)
+            db.session.add(user)
+            db.session.commit()
+            flash('Your account has been created! You are now able to log in.', 'success')
+            login_user(user) # Log in the user automatically after registration
+            return redirect(guf('profile'))  # Use guf
+        else:
+            print(f"Form validation failed. Errors: {form.errors}") # DEBUG
+            # Explicitly flash errors if any for debugging, though template should show them
+            for field, errors in form.errors.items():
+                for error in errors:
+                    flash(f"Error in {getattr(form, field).label.text}: {error}", 'danger')
+
     return render_template('register.html', title='Register', form=form, get_url_for=guf) # Use guf
 
 def login():
