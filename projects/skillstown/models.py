@@ -37,5 +37,5 @@ class UserCourse(db.Model):
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     
     __table_args__ = (
-        db.UniqueConstraint('user_id', 'course_name', name='user_course_unique'),
+        db.UniqueConstraint('user_id', 'course_name', name='skillstown_user_course_unique'),
     )

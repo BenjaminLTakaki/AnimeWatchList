@@ -90,9 +90,37 @@ def create_app(config_name=None):
             'current_year': datetime.now().year
         }
     
-    # Create tables
+    # Create tables with error handling
     with app.app_context():
-        db.create_all()
+        try:
+            # First, let's check if tables exist
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            existing_tables = inspector.get_table_names()
+            
+            print(f"Existing tables in database: {existing_tables}")
+            
+            # If tables don't exist, create them
+            if 'skillstown_users' not in existing_tables or 'skillstown_user_courses' not in existing_tables:
+                db.create_all()
+                print("SkillsTown tables created successfully")
+            else:
+                print("SkillsTown tables already exist")
+                
+        except Exception as e:
+            print(f"Database initialization error: {e}")
+            # Try to handle the specific constraint error
+            if "user_course_unique" in str(e):
+                print("Constraint already exists, continuing...")
+            else:
+                # For other errors, we might want to try dropping and recreating
+                # Only do this in development!
+                if app.config.get('ENV') == 'development':
+                    print("WARNING: Dropping and recreating tables (development mode)")
+                    db.drop_all()
+                    db.create_all()
+                else:
+                    print("Database error in production, please check manually")
     
     # Additional routes that were in the original app.py
     @app.route('/upload', methods=['POST'])
