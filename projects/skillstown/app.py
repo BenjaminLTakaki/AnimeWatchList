@@ -458,42 +458,46 @@ def create_app(config_name=None):  # MODIFIED
             flash(f"Error creating tables: {e}")
         return redirect(url_for('index'))
 
-    return app
+    # Add this new route INSIDE create_app
+    @app.route("/admin/reset-skillstown-tables", methods=['POST'])
+    @login_required
+    def reset_skillstown_tables_route():
+        if current_user.email != 'bentakaki7@gmail.com':
+            flash('You are not authorized to perform this action.', 'danger')
+            return redirect(get_url_for('skillstown_user_profile'))
 
-# Add this new route
-@app.route("/admin/reset-skillstown-tables", methods=['POST'])
-@login_required
-def reset_skillstown_tables_route():
-    if current_user.email != 'bentakaki7@gmail.com':
-        flash('You are not authorized to perform this action.', 'danger')
+        try:
+            # Logic from reset_skillstown_db.py, adapted for a route
+            # Ensure db is available here, it should be if init_auth was called
+            
+            # Drop tables in reverse order of dependencies
+            drop_commands = [
+                "DROP TABLE IF EXISTS skillstown_user_courses CASCADE;",
+                "DROP TABLE IF EXISTS skillstown_user_profiles CASCADE;", 
+                "DROP TABLE IF EXISTS skillstown_courses CASCADE;"
+            ]
+            
+            for command in drop_commands:
+                db.session.execute(text(command))
+            
+            db.session.commit()
+            
+            # Recreate all tables (this will create SkillsTown tables with correct foreign keys)
+            # Ensure all relevant models are imported and known to db instance before calling create_all
+            # For example, User, SkillsTownCourse, UserCourse, UserProfile
+            db.create_all() 
+            
+            flash('SkillsTown tables have been reset successfully!', 'success')
+        except Exception as e:
+            db.session.rollback() # Rollback in case of error
+            flash(f'Error resetting tables: {str(e)}', 'danger')
+            current_app.logger.error(f"Error resetting tables: {e}")
+
         return redirect(get_url_for('skillstown_user_profile'))
 
-    try:
-        # Logic from reset_skillstown_db.py, adapted for a route
-        # Ensure db is available here, it should be if init_auth was called
-        
-        # Drop tables in reverse order of dependencies
-        drop_commands = [
-            "DROP TABLE IF EXISTS skillstown_user_courses CASCADE;",
-            "DROP TABLE IF EXISTS skillstown_user_profiles CASCADE;", 
-            "DROP TABLE IF EXISTS skillstown_courses CASCADE;"
-        ]
-        
-        for command in drop_commands:
-            db.session.execute(text(command))
-        
-        db.session.commit()
-        
-        # Recreate all tables (this will create SkillsTown tables with correct foreign keys)
-        db.create_all() # This uses the models defined in this app context
-        
-        flash('SkillsTown tables have been reset successfully!', 'success')
-    except Exception as e:
-        db.session.rollback() # Rollback in case of error
-        flash(f'Error resetting tables: {str(e)}', 'danger')
-        current_app.logger.error(f"Error resetting tables: {e}")
+    return app
 
-    return redirect(get_url_for('skillstown_user_profile'))
+# The route definition that was here previously has been moved inside create_app
 
 if __name__ == '__main__':
     app = create_app()
