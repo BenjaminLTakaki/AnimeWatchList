@@ -106,6 +106,16 @@
         .auth-links a:hover {
             text-decoration: underline;
         }
+
+        .spotify-logo-inline {
+            height: 24px; /* Resized logo */
+            width: auto;
+            margin-right: 8px;
+            vertical-align: middle; /* Aligns image nicely with text */
+            background-color: white; /* White background for visibility on green button */
+            border-radius: 50%;     /* Circular background */
+            padding: 3px;           /* Padding around the logo inside the white bg */
+        }
     </style>
 </head>
 <body>
@@ -124,7 +134,7 @@
         
         <!-- Spotify Login -->
         <a href="{{ url_for('spotify_login') }}" class="spotify-btn">
-            <img src="{{ url_for('static', filename='images/Spotify_Primary_Logo_RGB_Green.png') }}" alt="Spotify Logo">  Continue with Spotify
+            <img src="{{ url_for('static', filename='images/Spotify_Primary_Logo_RGB_Green.png') }}" alt="Spotify Logo" class="spotify-logo-inline"> Continue with Spotify
         </a>
         
         <div class="divider">

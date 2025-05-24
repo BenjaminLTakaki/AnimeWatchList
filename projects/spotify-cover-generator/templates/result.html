@@ -78,6 +78,16 @@
             background: rgba(255, 82, 82, 0.1);
             color: #ff5252;
         }
+
+        .spotify-logo-inline {
+            height: 24px; /* Resized logo */
+            width: auto;
+            margin-right: 8px;
+            vertical-align: middle; /* Aligns image nicely with text */
+            background-color: white; /* White background for visibility on green button */
+            border-radius: 50%;     /* Circular background */
+            padding: 3px;           /* Padding around the logo inside the white bg */
+        }
     </style>
 </head>
 <body>
@@ -168,7 +178,9 @@
         <div class="spotify-edit-section">
             <h3>🎵 Want to Edit Your Playlist?</h3>
             <p>Connect your Spotify account to automatically update playlist titles and covers!</p>
-            <a href="{{ url_for('spotify_login') }}" class="edit-btn">Connect Spotify</a>
+            <a href="{{ url_for('spotify_login') }}" class="edit-btn">
+                <img src="{{ url_for('static', filename='images/Spotify_Primary_Logo_RGB_Green.png') }}" alt="Spotify Logo" class="spotify-logo-inline"> Connect Spotify
+            </a>
         </div>
         {% endif %}
         
