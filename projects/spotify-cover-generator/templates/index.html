@@ -1,17 +1,51 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spotify Music Cover Generator</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
+        <!-- User Header -->
+        <div class="user-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: #252525; border-radius: 8px;">
+            <div>
+                <span style="color: #1DB954;">Welcome, {{ user.display_name or user.username }}!</span>
+                {% if user.is_premium_user() %}
+                <span style="background: #1DB954; color: #000; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 10px;">Premium</span>
+                {% endif %}
+            </div>
+            <div class="user-actions">
+                <span style="color: #ccc; margin-right: 15px;">{{ user.get_generations_today() }}/{{ user.get_daily_generation_limit() }} today</span>
+                <a href="{{ url_for('profile') }}" class="button secondary" style="margin-right: 10px;">Profile</a>
+                <a href="{{ url_for('logout') }}" class="button secondary">Logout</a>
+            </div>
+        </div>
+
         <h1>Spotify Music Cover Generator</h1>
         <p>Create AI-generated album art based on your playlist or album's genres</p>
         
         {% if error %}
             <p class="error">{{ error }}</p>
+        {% endif %}
+        
+        <!-- Generation Limit Warning -->
+        {% if not user.can_generate_today() %}
+        <div class="alert alert-error" style="background-color: rgba(255, 82, 82, 0.1); color: #ff5252; border-left: 4px solid #ff5252; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+            <strong>Daily Limit Reached!</strong><br>
+            You've used all {{ user.get_daily_generation_limit() }} of your daily generations. 
+            {% if not user.is_premium_user() %}
+            Try again tomorrow or <a href="mailto:bentakaki7@gmail.com" style="color: #1DB954;">contact us</a> for premium access.
+            {% else %}
+            Please try again tomorrow.
+            {% endif %}
+        </div>
+        {% elif user.get_generations_today() >= user.get_daily_generation_limit() - 1 %}
+        <div class="alert alert-warning" style="background-color: rgba(255, 152, 0, 0.1); color: #ff9800; border-left: 4px solid #ff9800; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+            <strong>Almost at your limit!</strong><br>
+            You have {{ user.get_daily_generation_limit() - user.get_generations_today() }} generation(s) remaining today.
+        </div>
         {% endif %}
         
         <form method="POST" enctype="multipart/form-data">
@@ -54,9 +88,16 @@
                 </div>
             </div>
             
-            <button type="submit" class="submit-btn">Generate Cover</button>
+            <button type="submit" class="submit-btn" {% if not user.can_generate_today() %}disabled{% endif %}>
+                {% if user.can_generate_today() %}
+                Generate Cover
+                {% else %}
+                Daily Limit Reached
+                {% endif %}
+            </button>
         </form>
         
+        {% if user.is_premium_user() %}
         <div class="lora-upload">
             <h3>Upload LoRA</h3>
             
@@ -70,6 +111,7 @@
             
             <div id="upload-status"></div>
         </div>
+        {% endif %}
         
         <div class="info-section">
             <h3>How it works</h3>
@@ -80,10 +122,25 @@
                 <li><strong>Gemini AI Titles</strong> - Using Google's Gemini 2.5 Flash Preview API for creative album titles</li>
                 <li><strong>Custom Prompts</strong> - Add additional words to customize the image generation</li>
                 <li><strong>Custom Negative Prompts</strong> - Control what you don't want in your generated images</li>
-                <li><strong>LoRA Support</strong> - Add LoRAs via file upload for custom styles</li>
+                {% if user.spotify_access_token %}
+                <li><strong>Spotify Integration</strong> - Edit playlist titles and covers directly from generated results</li>
+                {% endif %}
+                {% if user.is_premium_user() %}
+                <li><strong>LoRA Support</strong> - Add LoRAs via file upload for custom styles (Premium only)</li>
+                {% endif %}
                 <li><strong>Stable Diffusion API</strong> - Faster image generation using cloud-based Stable Diffusion</li>
             </ul>
             
+            <h4>Usage Limits</h4>
+            <ul>
+                <li><strong>Free Users:</strong> 2 generations per day</li>
+                <li><strong>Premium Users:</strong> Unlimited generations</li>
+                {% if not user.is_premium_user() %}
+                <li>Need more generations? <a href="mailto:bentakaki7@gmail.com" style="color: #1DB954;">Contact us</a> for premium access!</li>
+                {% endif %}
+            </ul>
+            
+            {% if user.is_premium_user() %}
             <h4>Tips for Using LoRAs</h4>
             <p>LoRAs (Low-Rank Adaptations) are specialized models that can dramatically change the visual style of generated images:</p>
             <ul>
@@ -91,6 +148,7 @@
                 <li>Use the dropdown to select previously uploaded LoRAs</li>
                 <li>Different LoRAs can produce vastly different visual styles</li>
             </ul>
+            {% endif %}
             
             <h4>About Negative Prompts</h4>
             <p>Negative prompts tell the AI what you don't want in the image. The default negative prompt helps avoid common issues like extra fingers or distorted faces. You can customize this to further refine your results.</p>

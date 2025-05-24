@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Spotify Music Cover Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .auth-container {
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 40px;
+            background: #1e1e1e;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .auth-title {
+            text-align: center;
+            color: #1DB954;
+            margin-bottom: 30px;
+            font-size: 2rem;
+        }
+        
+        .spotify-btn {
+            width: 100%;
+            padding: 15px;
+            background-color: #1DB954;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+        }
+        
+        .spotify-btn:hover {
+            background-color: #1ed760;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(29, 185, 84, 0.3);
+        }
+        
+        .divider {
+            text-align: center;
+            margin: 30px 0;
+            position: relative;
+            color: #666;
+        }
+        
+        .divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #333;
+            z-index: 1;
+        }
+        
+        .divider span {
+            background: #1e1e1e;
+            padding: 0 20px;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .alert {
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .alert-error {
+            background-color: rgba(255, 82, 82, 0.1);
+            color: #ff5252;
+            border-left: 4px solid #ff5252;
+        }
+        
+        .alert-success {
+            background-color: rgba(29, 185, 84, 0.1);
+            color: #1DB954;
+            border-left: 4px solid #1DB954;
+        }
+        
+        .alert-info {
+            background-color: rgba(33, 150, 243, 0.1);
+            color: #2196F3;
+            border-left: 4px solid #2196F3;
+        }
+        
+        .auth-links {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .auth-links a {
+            color: #1DB954;
+            text-decoration: none;
+        }
+        
+        .auth-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h1 class="auth-title">Welcome Back</h1>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'error' if category == 'error' else 'success' if category == 'success' else 'info' }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <!-- Spotify Login -->
+        <a href="{{ url_for('spotify_login') }}" class="spotify-btn">
+            🎵 Continue with Spotify
+        </a>
+        
+        <div class="divider">
+            <span>or</span>
+        </div>
+        
+        <!-- Regular Login Form -->
+        <form method="POST">
+            <div class="form-group">
+                <label for="email">Email or Username:</label>
+                <input type="text" id="email" name="email" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            
+            <button type="submit" class="submit-btn">Sign In</button>
+        </form>
+        
+        <div class="auth-links">
+            <p>Don't have an account? <a href="{{ url_for('register') }}">Sign up here</a></p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,3 +1,5 @@
+# Updated generator.py to include user tracking
+
 import os
 import datetime
 import base64
@@ -9,12 +11,65 @@ from spotify_client import extract_playlist_data
 from image_generator import create_prompt_from_data, generate_cover_image
 from title_generator import generate_title
 from chart_generator import generate_genre_chart
-from utils import save_generation_data, create_image_filename, get_available_loras
+from utils import create_image_filename, get_available_loras
 from models import GenerationResult
 from config import COVERS_DIR
 
-def generate_cover(url, user_mood=None, lora_input=None, output_path=None, negative_prompt=None):
-    """Generate album cover and title from Spotify URL and save data"""
+def save_generation_data_with_user(data, user_id=None):
+    """Save generation data to database with user tracking"""
+    try:
+        # Import here to avoid circular imports
+        from app import GenerationResultDB, db, app
+        
+        with app.app_context():
+            # Create a new generation result record
+            new_result = GenerationResultDB(
+                title=data.get("title", "New Album"),
+                output_path=data.get("output_path", ""),
+                item_name=data.get("item_name", ""),
+                genres=data.get("genres", []),
+                all_genres=data.get("all_genres", []),
+                style_elements=data.get("style_elements", []),
+                mood=data.get("mood", ""),
+                energy_level=data.get("energy_level", ""),
+                spotify_url=data.get("spotify_url", ""),
+                lora_name=data.get("lora_name", ""),
+                lora_type=data.get("lora_type", ""),
+                lora_url=data.get("lora_url", ""),
+                user_id=user_id  # Add user tracking
+            )
+            
+            db.session.add(new_result)
+            db.session.commit()
+            
+            # Return the ID as a string
+            return str(new_result.id)
+    except Exception as e:
+        print(f"Error saving data to database: {e}")
+        
+        # Fall back to saving to a JSON file if database fails
+        try:
+            from config import DATA_DIR
+            import json
+            
+            # Create a unique filename based on timestamp
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_name = "".join(c for c in data.get("item_name", "") if c.isalnum() or c in [' ', '-', '_']).strip()
+            safe_name = safe_name.replace(' ', '_')
+            json_filename = f"{timestamp}_{safe_name}.json"
+            
+            with open(DATA_DIR / json_filename, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            
+            print(f"Data saved to file {DATA_DIR / json_filename} (database failed)")
+            
+            return str(DATA_DIR / json_filename)
+        except Exception as file_error:
+            print(f"Error saving data to file: {file_error}")
+            return None
+
+def generate_cover(url, user_mood=None, lora_input=None, output_path=None, negative_prompt=None, user_id=None):
+    """Generate album cover and title from Spotify URL with user tracking"""
     print(f"Processing Spotify URL: {url}")
     
     # Extract playlist/album data
@@ -130,8 +185,8 @@ def generate_cover(url, user_mood=None, lora_input=None, output_path=None, negat
     # Add the base64 data to the result dict
     result_dict["image_data_base64"] = img_base64
     
-    # Save data to JSON file
-    data_file = save_generation_data(result_dict)
+    # Save data to database with user tracking
+    data_file = save_generation_data_with_user(result_dict, user_id)
     if data_file:
         result_dict["data_file"] = data_file
     

@@ -9,89 +9,91 @@
     <title>Generated Album Cover</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
-        .fallback-indicator {
-            display: inline-block;
-            background-color: #ff9800;
-            color: #000;
-            font-size: 0.7rem;
-            padding: 2px 6px;
-            border-radius: 4px;
-            margin-left: 6px;
-            vertical-align: middle;
-        }
-        
-        .info-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        
-        .fallback-warning {
-            background-color: rgba(255, 152, 0, 0.1);
-            border-left: 4px solid #ff9800;
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 0 4px 4px 0;
-        }
-        
-        .lora-tag {
-            display: inline-block;
-            background-color: #1DB954;
-            color: #000;
-            font-size: 0.8rem;
-            padding: 3px 8px;
-            border-radius: 4px;
-            margin-left: 10px;
-            vertical-align: middle;
-        }
-        
-        .lora-link {
-            margin-left: 5px;
-            text-decoration: none;
-            color: #fff;
-            padding: 2px 6px;
-            background-color: #333;
-            border-radius: 4px;
-            font-size: 0.7rem;
-        }
-        
-        .lora-link:hover {
-            background-color: #444;
-        }
-        
-        .prompt-section {
+        .spotify-edit-section {
             background-color: #252525;
             border-radius: 8px;
-            padding: 15px;
-            margin-top: 20px;
+            padding: 20px;
+            margin: 30px auto;
+            border: 2px solid #1DB954;
         }
         
-        .prompt-section h4 {
+        .spotify-edit-section h3 {
             color: #1DB954;
             margin-top: 0;
         }
         
-        .prompt-text {
-            background-color: #333;
-            padding: 10px;
-            border-radius: 4px;
-            font-family: monospace;
-            white-space: pre-wrap;            
-            max-height: 150px;
-            overflow-y: auto;
+        .edit-form {
+            display: grid;
+            gap: 15px;
         }
         
-        .genre-percentage-bar {
-            height: 100%;
-            background-color: #1DB954;
-            border-radius: 2px;
-            width: 0;                    /* default */
-            transition: width 0.3s ease; /* optional animation */
+        .edit-form input {
+            width: 100%;
+            padding: 10px;
+            background: #333;
+            border: none;
+            border-radius: 5px;
+            color: white;
+        }
+        
+        .edit-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .edit-btn {
+            padding: 10px 20px;
+            background: #1DB954;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .edit-btn:hover {
+            background: #1ed760;
+        }
+        
+        .edit-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        
+        .edit-status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        
+        .edit-status.success {
+            background: rgba(29, 185, 84, 0.1);
+            color: #1DB954;
+        }
+        
+        .edit-status.error {
+            background: rgba(255, 82, 82, 0.1);
+            color: #ff5252;
         }
     </style>
 </head>
 <body>
     <div class="container result-container">
+        <!-- User Header -->
+        <div class="user-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: #252525; border-radius: 8px;">
+            <div>
+                <span style="color: #1DB954;">{{ user.display_name or user.username }}</span>
+                <span style="color: #ccc; margin-left: 15px;">{{ user.get_generations_today() }}/{{ user.get_daily_generation_limit() }} today</span>
+            </div>
+            <div class="user-actions">
+                <a href="{{ url_for('profile') }}" class="button secondary" style="margin-right: 10px;">Profile</a>
+                <a href="{{ url_for('logout') }}" class="button secondary">Logout</a>
+            </div>
+        </div>
+
         <h1 class="album-title">
             {{ title }}
             {% if lora_name %}
@@ -107,12 +109,13 @@
             {% set placeholder_url = url_for('static', filename='images/image-placeholder.png') %}
 
             {% if image_data_base64 %}
-                <img src="data:image/png;base64,{{ image_data_base64 }}" alt="Album Cover" class="album-cover">
+                <img src="data:image/png;base64,{{ image_data_base64 }}" alt="Album Cover" class="album-cover" id="generated-cover">
             {% else %}
                 <img 
                     src="{{ url_for('serve_image', filename=image_file) }}" 
                     alt="Album Cover" 
                     class="album-cover" 
+                    id="generated-cover"
                     onerror="this.src='{{ placeholder_url }}'; this.onerror=null;"
                 >
             {% endif %}
@@ -128,6 +131,46 @@
             </div>
             {% endif %}
         </div>
+        
+        <!-- Spotify Playlist Editing Section -->
+        {% if can_edit_playlist and playlist_id %}
+        <div class="spotify-edit-section">
+            <h3>🎵 Edit Your Spotify Playlist</h3>
+            <p>You can update your playlist with the generated title and cover image!</p>
+            
+            <div class="edit-form">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <label for="playlist-title" style="display: block; margin-bottom: 5px; color: #ccc;">New Playlist Title:</label>
+                        <input type="text" id="playlist-title" placeholder="{{ title }}" value="{{ title }}">
+                    </div>
+                    <div>
+                        <label for="playlist-description" style="display: block; margin-bottom: 5px; color: #ccc;">New Description:</label>
+                        <input type="text" id="playlist-description" placeholder="Generated with AI cover art">
+                    </div>
+                </div>
+                
+                <div class="edit-buttons">
+                    <button class="edit-btn" id="update-title-btn">Update Title & Description</button>
+                    <button class="edit-btn" id="update-cover-btn">Set as Playlist Cover</button>
+                    <button class="edit-btn" id="update-both-btn">Update Both</button>
+                </div>
+                
+                <div class="edit-status" id="edit-status"></div>
+            </div>
+        </div>
+        {% elif user.spotify_access_token and playlist_id %}
+        <div class="spotify-edit-section">
+            <h3>⚠️ Cannot Edit Playlist</h3>
+            <p>You don't have permission to edit this playlist. Only the playlist owner can make changes.</p>
+        </div>
+        {% elif playlist_id %}
+        <div class="spotify-edit-section">
+            <h3>🎵 Want to Edit Your Playlist?</h3>
+            <p>Connect your Spotify account to automatically update playlist titles and covers!</p>
+            <a href="{{ url_for('spotify_login') }}" class="edit-btn">Connect Spotify</a>
+        </div>
+        {% endif %}
         
         <div class="playlist-info">
             <div class="info-section">
@@ -189,11 +232,13 @@
         
         <div class="actions">
             <a href="{{ url_for('index') }}" class="button">Generate Another Cover</a>
+            {% if user.can_generate_today() %}
             <button id="regenerate-cover" class="button" 
                     data-playlist-url="{{ playlist_url }}" 
                     data-mood="{{ user_mood }}"
                     data-negative-prompt="{{ negative_prompt }}"
                     data-lora-name="{{ lora_name }}">Regenerate Cover</button>
+            {% endif %}
             <button id="copy-title" class="button secondary">Copy Title</button>
             <button id="copy-cover" class="button secondary" data-image-path="{{ image_file }}">Download Cover</button>
         </div>
@@ -209,15 +254,186 @@
                     <strong>Style Enhancement:</strong> {{ lora_name }} LoRA
                 </li>
                 {% endif %}
+                <li><strong>Generated by:</strong> {{ user.display_name or user.username }}</li>
             </ul>
             
             <p class="note">Cover generated on {{ timestamp|default('today') }}</p>
         </div>
     </div>
+    
+    <!-- Template data for JavaScript -->
+    <script type="application/json" id="template-data">
+        {
+            "playlistId": {% if playlist_id %}"{{ playlist_id }}"{% else %}null{% endif %},
+            "canEdit": {% if can_edit_playlist %}true{% else %}false{% endif %}
+        }
+    </script>
+    
     <script>
-        // JavaScript for handling image download and title copying
+        // JavaScript for Spotify playlist editing
         document.addEventListener('DOMContentLoaded', function() {
-            // Copy title button
+            // Get data from template
+            const templateDataElement = document.getElementById('template-data');
+            const templateData = JSON.parse(templateDataElement.textContent);
+            const playlistId = templateData.playlistId;
+            const canEdit = templateData.canEdit;
+            
+            if (canEdit && playlistId) {
+                // Update title and description
+                document.getElementById('update-title-btn').addEventListener('click', function() {
+                    updatePlaylistInfo();
+                });
+                
+                // Update cover image
+                document.getElementById('update-cover-btn').addEventListener('click', function() {
+                    updatePlaylistCover();
+                });
+                
+                // Update both
+                document.getElementById('update-both-btn').addEventListener('click', function() {
+                    updateBoth();
+                });
+            }
+            
+            function updatePlaylistInfo() {
+                const title = document.getElementById('playlist-title').value;
+                const description = document.getElementById('playlist-description').value;
+                const statusDiv = document.getElementById('edit-status');
+                
+                if (!title.trim()) {
+                    showStatus('Please enter a title', 'error');
+                    return;
+                }
+                
+                showStatus('Updating playlist...', 'info');
+                
+                fetch('/api/playlist/edit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        playlist_id: playlistId,
+                        name: title.trim(),
+                        description: description.trim()
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showStatus('Playlist updated successfully!', 'success');
+                    } else {
+                        showStatus(data.error || 'Failed to update playlist', 'error');
+                    }
+                })
+                .catch(error => {
+                    showStatus('Error updating playlist', 'error');
+                    console.error('Error:', error);
+                });
+            }
+            
+            function updatePlaylistCover() {
+                const coverImg = document.getElementById('generated-cover');
+                const statusDiv = document.getElementById('edit-status');
+                
+                if (!coverImg.src) {
+                    showStatus('No cover image available', 'error');
+                    return;
+                }
+                
+                showStatus('Updating playlist cover...', 'info');
+                
+                // Get image data
+                let imageData;
+                if (coverImg.src.startsWith('data:image')) {
+                    imageData = coverImg.src;
+                } else {
+                    // Need to convert to base64
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = coverImg.naturalWidth;
+                    canvas.height = coverImg.naturalHeight;
+                    ctx.drawImage(coverImg, 0, 0);
+                    imageData = canvas.toDataURL('image/jpeg', 0.8);
+                }
+                
+                fetch('/api/playlist/cover', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        playlist_id: playlistId,
+                        image_data: imageData
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showStatus('Playlist cover updated successfully!', 'success');
+                    } else {
+                        showStatus(data.error || 'Failed to update cover', 'error');
+                    }
+                })
+                .catch(error => {
+                    showStatus('Error updating cover', 'error');
+                    console.error('Error:', error);
+                });
+            }
+            
+            function updateBoth() {
+                showStatus('Updating playlist and cover...', 'info');
+                
+                // Update info first, then cover
+                const title = document.getElementById('playlist-title').value;
+                const description = document.getElementById('playlist-description').value;
+                
+                if (!title.trim()) {
+                    showStatus('Please enter a title', 'error');
+                    return;
+                }
+                
+                // Update playlist info
+                fetch('/api/playlist/edit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        playlist_id: playlistId,
+                        name: title.trim(),
+                        description: description.trim()
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Now update cover
+                        return updatePlaylistCover();
+                    } else {
+                        throw new Error(data.error || 'Failed to update playlist');
+                    }
+                })
+                .catch(error => {
+                    showStatus('Error updating playlist: ' + error.message, 'error');
+                    console.error('Error:', error);
+                });
+            }
+            
+            function showStatus(message, type) {
+                const statusDiv = document.getElementById('edit-status');
+                statusDiv.textContent = message;
+                statusDiv.className = `edit-status ${type}`;
+                statusDiv.style.display = 'block';
+                
+                if (type === 'success') {
+                    setTimeout(() => {
+                        statusDiv.style.display = 'none';
+                    }, 3000);
+                }
+            }
+            
+            // Original result page functionality
             const copyTitleButton = document.getElementById('copy-title');
             if (copyTitleButton) {
                 copyTitleButton.addEventListener('click', function() {
@@ -225,10 +441,7 @@
                     
                     navigator.clipboard.writeText(title)
                         .then(function() {
-                            // Show success message
                             copyTitleButton.textContent = 'Title Copied!';
-                            
-                            // Reset button text after a delay
                             setTimeout(function() {
                                 copyTitleButton.textContent = 'Copy Title';
                             }, 2000);
@@ -239,14 +452,11 @@
                 });
             }
             
-            // Copy/Download cover button
             const downloadCoverButton = document.getElementById('copy-cover');
             if (downloadCoverButton) {
                 downloadCoverButton.addEventListener('click', function() {
-                    // Try to download the base64 image if it exists
                     const albumCover = document.querySelector('.album-cover');
                     if (albumCover && albumCover.src.startsWith('data:image/png;base64,')) {
-                        // Create a temporary link to download the image
                         const a = document.createElement('a');
                         a.href = albumCover.src;
                         a.download = 'album_cover_' + new Date().getTime() + '.png';
@@ -254,20 +464,14 @@
                         a.click();
                         document.body.removeChild(a);
                         
-                        // Show success message
                         this.textContent = 'Cover Downloaded!';
-                        
-                        // Reset button text after a delay
                         setTimeout(() => {
                             this.textContent = 'Download Cover';
                         }, 2000);
                     } else {
-                        // Fall back to server-side image if available
                         const imagePath = this.getAttribute('data-image-path');
                         if (imagePath) {
                             const imageUrl = '/generated_covers/' + imagePath;
-                            
-                            // Create a temporary link to download the image
                             const a = document.createElement('a');
                             a.href = imageUrl;
                             a.download = imagePath;
@@ -275,10 +479,7 @@
                             a.click();
                             document.body.removeChild(a);
                             
-                            // Show success message
                             this.textContent = 'Cover Downloaded!';
-                            
-                            // Reset button text after a delay
                             setTimeout(() => {
                                 this.textContent = 'Download Cover';
                             }, 2000);
@@ -287,7 +488,6 @@
                 });
             }
             
-            // Regenerate button (ajax functionality)
             const regenerateButton = document.getElementById('regenerate-cover');
             if (regenerateButton) {
                 regenerateButton.addEventListener('click', function() {
@@ -296,16 +496,13 @@
                     const negative_prompt = this.getAttribute('data-negative-prompt') || '';
                     const lora_name = this.getAttribute('data-lora-name') || '';
                     
-                    // Show loading state
                     this.disabled = true;
                     this.innerHTML = 'Regenerating... <span class="spinner"></span>';
                     
-                    // Submit form to regenerate
                     const form = document.createElement('form');
                     form.method = 'POST';
                     form.action = window.location.pathname;
                     
-                    // Add hidden fields
                     const addHidden = (name, value) => {
                         const input = document.createElement('input');
                         input.type = 'hidden';
@@ -319,7 +516,6 @@
                     addHidden('negative_prompt', negative_prompt);
                     addHidden('lora_name', lora_name);
                     
-                    // Submit the form
                     document.body.appendChild(form);
                     form.submit();
                 });
