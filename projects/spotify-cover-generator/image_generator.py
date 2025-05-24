@@ -7,12 +7,7 @@ import io
 import time
 import random
 import ssl
-try:
-    # First try importing with absolute module paths (for production)
-    from projects.spotify_cover_generator.config import STABILITY_API_KEY, DEFAULT_NEGATIVE_PROMPT, COVERS_DIR
-except ImportError:
-    # Fallback to relative imports (for local development)
-    from config import STABILITY_API_KEY, DEFAULT_NEGATIVE_PROMPT, COVERS_DIR
+from config import STABILITY_API_KEY, DEFAULT_NEGATIVE_PROMPT, COVERS_DIR
 
 def create_prompt_from_data(playlist_data, user_mood=None):
     """Create optimized prompt for stable diffusion"""

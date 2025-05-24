@@ -7,12 +7,7 @@ import urllib.parse
 from pathlib import Path
 import os
 import requests
-try:
-    # First try importing with absolute module paths (for production)
-    from projects.spotify_cover_generator.config import DATA_DIR, LORA_DIR, COVERS_DIR
-except ImportError:
-    # Fallback to relative imports (for local development)
-    from config import DATA_DIR, LORA_DIR, COVERS_DIR
+from config import DATA_DIR, LORA_DIR, COVERS_DIR
 
 def generate_random_string(size=10):
     """Generate a random string of letters and digits."""
