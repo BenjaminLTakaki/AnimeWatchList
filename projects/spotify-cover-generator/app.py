@@ -675,42 +675,303 @@ def admin_create_tables():
         }), 500
 
 # Update your spotify_login route to ensure tables exist
-@app.route('/login/spotify')
-def spotify_login():
+@app.route('/login/spotify') # This is the route for initiating Spotify login
+def spotify_login(): # Renamed from spotify_login_initiate to avoid confusion
     """Redirect to Spotify OAuth with table verification"""
     try:
-        # Ensure tables exist before creating state
-        ensure_tables_exist()
-        
+        ensure_tables_exist() # Ensure tables are there before we create a state
         state = SpotifyState.create_state()
+        scope = 'user-read-email user-read-private playlist-read-private playlist-modify-public playlist-modify-private ugc-image-upload'
         
         auth_url = (
-            "https://accounts.spotify.com/authorize"
-            f"?client_id={SPOTIFY_CLIENT_ID}"
-            "&response_type=code"
-            f"&redirect_uri={request.url_root}auth/spotify/callback"
-            "&scope=playlist-modify-public playlist-modify-private ugc-image-upload user-read-private user-read-email"
-            f"&state={state}"
+            f"https://accounts.spotify.com/authorize?"
+            f"client_id={SPOTIFY_CLIENT_ID}&"
+            f"response_type=code&"
+            f"redirect_uri={url_for('spotify_callback', _external=True)}&"
+            f"state={state}&"
+            f"scope={scope}"
         )
-        
         return redirect(auth_url)
     except Exception as e:
-        print(f"❌ Spotify login error: {e}")
-        flash('Database setup error. Please try again.', 'error')
+        print(f"Error during Spotify login initiation: {e}")
+        flash("Could not connect to Spotify. Please try again later.", "error")
         return redirect(url_for('login'))
 
-# Authentication helpers
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        user = get_current_user()
-        if user is None:
-            flash("Please log in to access this page.", "info")
-            return redirect(url_for('login', next=request.url))
-        return f(*args, **kwargs)
-    return decorated_function
+# NEW AUTHENTICATION AND USER ROUTES
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login page"""
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        if not email or not password:
+            flash('Please fill in all fields', 'error')
+            return render_template('auth/login.html')
+        
+        # Try to find user by email or username
+        user = User.query.filter(
+            (User.email == email) | (User.username == email)
+        ).first()
+        
+        if user and user.check_password(password):
+            # Create login session
+            session_token = LoginSession.create_session(
+                user.id,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+            
+            # Set session
+            session['user_id'] = user.id
+            session['username'] = user.username or user.display_name
+            
+            # Set cookie for persistent login
+            response = redirect(request.args.get('next') or url_for('index')) # Should redirect to new 'index' (now 'generate') or 'root'
+            response.set_cookie('session_token', session_token, max_age=30*24*3600)  # 30 days
+            
+            # Update last login
+            user.last_login = datetime.datetime.utcnow()
+            db.session.commit()
+            
+            flash('Welcome back!', 'success')
+            return response
+        else:
+            flash('Invalid email/username or password', 'error')
+    
+    return render_template('auth/login.html')
 
-@app.route("/", methods=["GET", "POST"])
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Registration page"""
+    if request.method == 'POST':
+        email = request.form.get('email')
+        username = request.form.get('username')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        # Validation
+        if not all([email, username, password, confirm_password]):
+            flash('Please fill in all fields', 'error')
+            return render_template('auth/register.html')
+        
+        if password != confirm_password:
+            flash('Passwords do not match', 'error')
+            return render_template('auth/register.html')
+        
+        if len(password) < 6:
+            flash('Password must be at least 6 characters', 'error')
+            return render_template('auth/register.html')
+        
+        if len(username) < 3:
+            flash('Username must be at least 3 characters', 'error')
+            return render_template('auth/register.html')
+        
+        # Check if user already exists
+        existing_user = User.query.filter(
+            (User.email == email) | (User.username == username)
+        ).first()
+        
+        if existing_user:
+            flash('Email or username already exists', 'error')
+            return render_template('auth/register.html')
+        
+        # Create new user
+        user = User(
+            email=email,
+            username=username,
+            display_name=username
+        )
+        user.set_password(password)
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        # Auto-login the user
+        session_token = LoginSession.create_session(
+            user.id,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent')
+        )
+        
+        session['user_id'] = user.id
+        session['username'] = user.username
+        
+        response = redirect(url_for('index')) # Should redirect to new 'index' (now 'generate') or 'root'
+        response.set_cookie('session_token', session_token, max_age=30*24*3600)
+        
+        flash('Account created successfully! Welcome!', 'success')
+        return response
+    
+    return render_template('auth/register.html')
+
+@app.route('/logout')
+def logout():
+    """Logout user"""
+    # Clear session
+    user_id = session.get('user_id')
+    session.clear()
+    
+    # Invalidate session token
+    session_token = request.cookies.get('session_token')
+    if session_token:
+        login_session = LoginSession.query.filter_by(session_token=session_token).first()
+        if login_session:
+            login_session.is_active = False
+            db.session.commit()
+    
+    response = redirect(url_for('login'))
+    response.set_cookie('session_token', '', expires=0)
+    
+    flash('You have been logged out', 'info')
+    return response
+
+@app.route('/profile')
+@login_required
+def profile():
+    """User profile page"""
+    user = get_current_user()
+    if not user: # Should be caught by @login_required, but as a safeguard
+        return redirect(url_for('login'))
+    
+    # Get user's recent generations
+    recent_generations = GenerationResultDB.query.filter_by(
+        user_id=user.id
+    ).order_by(GenerationResultDB.timestamp.desc()).limit(10).all()
+    
+    return render_template('auth/profile.html', user=user, generations=recent_generations)
+
+@app.route('/auth/spotify/callback')
+def spotify_callback():
+    """Handle Spotify OAuth callback"""
+    try:
+        code = request.args.get('code')
+        state = request.args.get('state')
+        error = request.args.get('error')
+        
+        if error:
+            flash(f'Spotify authorization failed: {error}', 'error')
+            return redirect(url_for('login'))
+        
+        if not code or not state:
+            flash('Missing authorization code or state', 'error')
+            return redirect(url_for('login'))
+        
+        # Verify state
+        if not SpotifyState.verify_and_use_state(state):
+            flash('Invalid or expired authorization state', 'error')
+            return redirect(url_for('login'))
+        
+        # Exchange code for access token
+        auth_header = base64.b64encode(
+            f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}".encode()
+        ).decode()
+        
+        headers = {
+            'Authorization': f'Basic {auth_header}',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+        
+        data = {
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': url_for('spotify_callback', _external=True) # Ensure this matches exactly what Spotify expects
+        }
+        
+        response = requests.post(
+            'https://accounts.spotify.com/api/token',
+            headers=headers,
+            data=data
+        )
+        
+        if response.status_code != 200:
+            flash(f'Failed to get Spotify access token. Status: {response.status_code}, Response: {response.text}', 'error')
+            return redirect(url_for('login'))
+        
+        token_data = response.json()
+        access_token = token_data['access_token']
+        refresh_token = token_data.get('refresh_token')
+        expires_in = token_data.get('expires_in', 3600)
+        
+        # Get user info from Spotify
+        user_info_headers = {'Authorization': f'Bearer {access_token}'}
+        user_response = requests.get('https://api.spotify.com/v1/me', headers=user_info_headers)
+        
+        if user_response.status_code != 200:
+            flash('Failed to get Spotify user info', 'error')
+            return redirect(url_for('login'))
+        
+        spotify_user_data = user_response.json()
+        spotify_id = spotify_user_data['id']
+        display_name = spotify_user_data.get('display_name', spotify_id)
+        email = spotify_user_data.get('email') # Email might not always be provided
+        
+        # Find or create user
+        user = User.query.filter_by(spotify_id=spotify_id).first()
+        
+        if not user:
+            # Check if user exists with same email, if email is provided by Spotify
+            if email:
+                user = User.query.filter_by(email=email).first()
+                if user: # User with this email exists, link Spotify ID
+                    user.spotify_id = spotify_id
+                    user.spotify_username = spotify_id # Or display_name
+            
+            if not user: # Still no user, create a new one
+                user = User(
+                    spotify_id=spotify_id,
+                    spotify_username=spotify_id, # Or display_name
+                    display_name=display_name,
+                    email=email # This might be None
+                )
+                db.session.add(user)
+        
+        # Update Spotify tokens and last login for the user
+        user.spotify_access_token = access_token
+        if refresh_token: # Spotify might not always return a new refresh token
+            user.spotify_refresh_token = refresh_token
+        user.spotify_token_expires = datetime.datetime.utcnow() + datetime.timedelta(seconds=expires_in)
+        user.last_login = datetime.datetime.utcnow()
+        if not user.display_name: # If display name was missing initially
+            user.display_name = display_name
+        if email and not user.email: # If email was missing initially
+             user.email = email
+
+        db.session.commit()
+        
+        # Create login session
+        session_token = LoginSession.create_session(
+            user.id,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent')
+        )
+        
+        session['user_id'] = user.id
+        session['username'] = user.display_name or user.spotify_username
+        
+        response = redirect(url_for('index')) # Should redirect to new 'index' (now 'generate') or 'root'
+        response.set_cookie('session_token', session_token, max_age=30*24*3600)
+        
+        flash(f'Welcome, {display_name}!', 'success')
+        return response
+        
+    except Exception as e:
+        import traceback
+        print(f"Spotify callback error: {e}\n{traceback.format_exc()}")
+        flash('An error occurred during Spotify login. Please try again.', 'error')
+        return redirect(url_for('login'))
+
+# Add this route before your existing index route
+@app.route("/")
+def root():
+    """Root route - redirect to login if not authenticated, otherwise to main app"""
+    user = get_current_user()
+    if user:
+        return redirect(url_for('index')) # This should point to the main app page, now 'generate'
+    else:
+        return redirect(url_for('login'))
+
+@app.route("/generate", methods=["GET", "POST"]) # Changed path from "/" to "/generate"
 @login_required
 def index():
     global initialized
