@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from functools import wraps
 import requests
 import base64
+import scipy as sp
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
 from sqlalchemy import text
