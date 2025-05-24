@@ -135,7 +135,8 @@
                                 <i class="fas fa-book d-block mb-1"></i>
                                 My Courses
                             </a>
-                        </div>                        <div class="col-md-3 mb-2">
+                        </div>
+                        <div class="col-md-3 mb-2">
                             <a href="{{ get_url_for('logout') }}" class="btn btn-outline-danger w-100">
                                 <i class="fas fa-sign-out-alt d-block mb-1"></i>
                                 Logout
@@ -144,6 +145,22 @@
                     </div>
                 </div>
             </div>
+
+            {% if current_user.email == 'bentakaki7@gmail.com' %}
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Admin Actions</h5>
+                </div>
+                <div class="card-body">
+                    <p>These actions are irreversible and will affect the database.</p>
+                    <form method="POST" action="{{ get_url_for('reset_skillstown_tables_route') }}" onsubmit="return confirm('Are you sure you want to reset the SkillsTown tables? This action cannot be undone.');">
+                        <button type="submit" class="btn btn-danger w-100">
+                            <i class="fas fa-trash-alt me-1"></i>Reset SkillsTown Tables
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
