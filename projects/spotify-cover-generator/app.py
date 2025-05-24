@@ -11,6 +11,8 @@ import requests
 import base64
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
+from sqlalchemy import text
+
 
 # Make sure the current directory is in the path for imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -266,7 +268,7 @@ class GenerationResultDB(db.Model):
 initialized = False
 
 def initialize_app():
-    """Initialize the application's dependencies with robust table creation"""
+    """Initialize the application's dependencies with SQLAlchemy 2.0+ compatibility"""
     global initialized
     
     print("🔧 Initializing Spotify Cover Generator...")
@@ -278,14 +280,15 @@ def initialize_app():
     except Exception as e:
         print(f"⚠️ Directory creation warning: {e}")
     
-    # Database setup with detailed logging
+    # Database setup with SQLAlchemy 2.0+ syntax
     try:
         with app.app_context():
             print("📊 Setting up database...")
             
-            # Test database connection first
+            # Test database connection with SQLAlchemy 2.0+ syntax
             try:
-                db.engine.execute('SELECT 1')
+                with db.engine.connect() as connection:
+                    connection.execute(text('SELECT 1'))
                 print("✓ Database connection successful")
             except Exception as e:
                 print(f"❌ Database connection failed: {e}")
@@ -321,7 +324,7 @@ def initialize_app():
             if missing_tables:
                 print(f"❌ Still missing tables: {', '.join(missing_tables)}")
                 
-                # Try manual table creation
+                # Try manual table creation with SQLAlchemy 2.0+ syntax
                 try:
                     create_tables_manually()
                     # Check again
@@ -393,7 +396,7 @@ def initialize_app():
     return initialized
 
 def create_tables_manually():
-    """Manually create tables using raw SQL if SQLAlchemy fails"""
+    """Manually create tables using SQLAlchemy 2.0+ compatible syntax"""
     print("🔨 Attempting manual table creation...")
     
     sql_commands = [
@@ -427,8 +430,7 @@ def create_tables_manually():
             expires_at TIMESTAMP NOT NULL,
             is_active BOOLEAN DEFAULT TRUE,
             ip_address VARCHAR(45),
-            user_agent VARCHAR(500),
-            FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE CASCADE
+            user_agent VARCHAR(500)
         );
         """,
         
@@ -453,13 +455,32 @@ def create_tables_manually():
             ) THEN
                 ALTER TABLE spotify_generation_results 
                 ADD COLUMN user_id INTEGER;
-                
-                -- Add foreign key if table exists
-                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'spotify_users') THEN
-                    ALTER TABLE spotify_generation_results 
-                    ADD CONSTRAINT fk_user_id 
-                    FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE SET NULL;
-                END IF;
+            END IF;
+        END $$;
+        """,
+        
+        # Add foreign keys after tables exist
+        """
+        DO $$
+        BEGIN
+            -- Add foreign key for login_sessions if it doesn't exist
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.table_constraints 
+                WHERE constraint_name = 'fk_login_sessions_user_id'
+            ) THEN
+                ALTER TABLE spotify_login_sessions 
+                ADD CONSTRAINT fk_login_sessions_user_id 
+                FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE CASCADE;
+            END IF;
+            
+            -- Add foreign key for generation_results if it doesn't exist
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.table_constraints 
+                WHERE constraint_name = 'fk_generation_results_user_id'
+            ) THEN
+                ALTER TABLE spotify_generation_results 
+                ADD CONSTRAINT fk_generation_results_user_id 
+                FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE SET NULL;
             END IF;
         END $$;
         """,
@@ -474,18 +495,21 @@ def create_tables_manually():
         """
     ]
     
-    for i, sql in enumerate(sql_commands):
-        try:
-            db.engine.execute(sql)
-            print(f"✓ SQL command {i+1} executed successfully")
-        except Exception as e:
-            print(f"❌ SQL command {i+1} failed: {e}")
-            raise
+    # Use SQLAlchemy 2.0+ syntax
+    with db.engine.connect() as connection:
+        for i, sql in enumerate(sql_commands):
+            try:
+                connection.execute(text(sql))
+                connection.commit()
+                print(f"✓ SQL command {i+1} executed successfully")
+            except Exception as e:
+                print(f"❌ SQL command {i+1} failed: {e}")
+                raise
 
 # Also add this route to manually trigger table creation for debugging
 @app.route("/admin/create-tables")
 def admin_create_tables():
-    """Admin route to manually create tables - REMOVE IN PRODUCTION"""
+    """Admin route to manually create tables - SQLAlchemy 2.0+ compatible"""
     try:
         with app.app_context():
             print("🔧 Admin: Creating tables...")
@@ -513,10 +537,11 @@ def admin_create_tables():
 
 # Add this near the top of your file, after the imports
 def ensure_tables_exist():
-    """Ensure tables exist before any database operation"""
+    """Ensure tables exist before any database operation - SQLAlchemy 2.0+ compatible"""
     try:
         # Quick check if a critical table exists
-        db.engine.execute("SELECT 1 FROM spotify_oauth_states LIMIT 1")
+        with db.engine.connect() as connection:
+            connection.execute(text("SELECT 1 FROM spotify_oauth_states LIMIT 1"))
     except:
         print("⚠️ Tables missing, attempting to create...")
         try:
