@@ -598,7 +598,7 @@ def extract_playlist_id(playlist_url):
         return playlist_url.split("playlist/")[-1].split("?")[0].split("/")[0]
     return None
 
-# Authentication Routes
+# Authentication Routes - KEEP ONLY THESE VERSIONS
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -701,27 +701,10 @@ def logout():
             db.session.commit()
     
     session.clear()
-    
     response = redirect(url_for('login'))
     response.set_cookie('session_token', '', expires=0)
-    
     flash('You have been logged out', 'info')
     return response
-
-@app.route('/login/spotify')
-def spotify_login():
-    state = SpotifyState.create_state()
-    
-    auth_url = (
-        "https://accounts.spotify.com/authorize"
-        f"?client_id={SPOTIFY_CLIENT_ID}"
-        "&response_type=code"
-        f"&redirect_uri={request.url_root}auth/spotify/callback"
-        "&scope=playlist-modify-public playlist-modify-private ugc-image-upload user-read-private user-read-email"
-        f"&state={state}"
-    )
-    
-    return redirect(auth_url)
 
 @app.route('/auth/spotify/callback')
 def spotify_callback():
