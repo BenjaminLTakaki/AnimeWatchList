@@ -184,5 +184,8 @@ def profile():
     guf = current_app.config['AUTH_GET_URL_FOR']
     gsc = current_app.config['AUTH_GET_STATUS_COUNTS']
     # ... existing profile logic using gsc if needed ...
-    status_counts = gsc(current_user.id) # Example usage of gsc
-    return render_template('profile.html', title='Profile', status_counts=status_counts, get_url_for=guf) # Use guf
+    skillstown_stats = gsc(current_user.id) # Example usage of gsc. Renamed for clarity if it's skillstown specific
+    # If gsc returns a dict like {'total': x, 'enrolled': y, ...} then pass it as 'stats'
+    # Or, if you prefer to keep skillstown_stats, update the template to use skillstown_stats instead of stats.
+    # Assuming gsc is the function that returns the dictionary expected as 'stats' by the template:
+    return render_template('profile.html', title='Profile', stats=skillstown_stats, get_url_for=guf) # MODIFIED: status_counts to stats
