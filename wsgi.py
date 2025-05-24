@@ -3,7 +3,7 @@ import sys
 import datetime
 from flask import Flask, send_from_directory, redirect, request
 from dotenv import load_dotenv
-from flask_migrate import Migrate  # ADDED
+from flask_migrate import Migrate
 
 # Load environment variables
 load_dotenv()
@@ -33,11 +33,6 @@ try:
     
     from skillstown.app import create_app
     skillstown_app = create_app('production')
-    # db instance is created within create_app and init_auth, need to access it
-    # However, Flask-Migrate should be initialized where both app and db are available.
-    # It's already initialized in skillstown.app.create_app
-    # For wsgi.py, if we need to run flask db commands, we might need a way to access the db instance.
-    # For now, assuming the initialization in skillstown.app.create_app is sufficient for Render's context.
     print("SkillsTown app imported successfully")
 except Exception as e:
     skillstown_error = str(e)
@@ -56,8 +51,8 @@ sys.path.insert(0, animewatchlist_path)
 
 # Import the AnimeWatchList app with error handling
 try:
-    from projects.animewatchlist.app import app as animewatchlist_app, db as animewatchlist_db  # MODIFIED
-    Migrate(animewatchlist_app, animewatchlist_db)  # Initialize Flask-Migrate for AnimeWatchList
+    from projects.animewatchlist.app import app as animewatchlist_app, db as animewatchlist_db
+    Migrate(animewatchlist_app, animewatchlist_db)
     print("AnimeWatchList app imported successfully")
     has_animewatchlist_app = True
 except Exception as e:
@@ -69,27 +64,48 @@ except Exception as e:
     def animewatchlist_index():
         return "AnimeWatchList is currently unavailable. Database connection issues. Please check your PostgreSQL setup."
     
-    has_animewatchlist_app = True  # Keep as True so routing still works
+    has_animewatchlist_app = True
 
 # Spotify Cover Generator app setup
 spotify_path = os.path.join(project_root, 'projects/spotify-cover-generator')
 
-# Import Spotify app - add its path first to avoid config conflicts
+# Import Spotify app - FIXED PATH HANDLING
 try:
-    # Clear the conflicting paths
-    original_sys_path = sys.path.copy()
-    sys.path = [p for p in sys.path if 'skillstown' not in p and 'animewatchlist' not in p]
-    sys.path.insert(0, spotify_path)
+    print(f"Setting up Spotify app from path: {spotify_path}")
     
-    # Keep the modified path for the app import and all subsequent imports
-    # Don't restore it until the end of the wsgi.py file
-    from app import app as spotify_app
-    print("Spotify app imported successfully")
-    has_spotify_app = True
-except ImportError as e:
-    print(f"Could not import Spotify app: {e}")
+    # Store original sys.path to restore later
+    original_sys_path = sys.path.copy()
+    
+    # Add the spotify project directory to the path FIRST
+    # This ensures all imports within the spotify app work correctly
+    if spotify_path not in sys.path:
+        sys.path.insert(0, spotify_path)
+    
+    print(f"Added Spotify path to sys.path: {spotify_path}")
+    print(f"Current working directory: {os.getcwd()}")
+    print(f"Spotify directory contents: {os.listdir(spotify_path) if os.path.exists(spotify_path) else 'Directory not found'}")
+    
+    # Change the working directory temporarily for the import
+    old_cwd = os.getcwd()
+    os.chdir(spotify_path)
+    
+    try:
+        # Now import the app - this should work because we're in the right directory
+        # and the path is set correctly
+        from app import app as spotify_app
+        print("✅ Spotify app imported successfully")
+        has_spotify_app = True
+    finally:
+        # Always restore the working directory
+        os.chdir(old_cwd)
+        
+except Exception as e:
+    print(f"❌ Could not import Spotify app: {e}")
+    print(f"Error type: {type(e).__name__}")
+    import traceback
+    print(f"Full traceback: {traceback.format_exc()}")
     has_spotify_app = False
-    # Only restore the path if the import failed
+    # Restore the original path if import failed
     sys.path = original_sys_path
 
 # Configure context processors
@@ -165,7 +181,6 @@ def skillstown_static(filename):
         return send_from_directory(SKILLSTOWN_APP_STATIC_DIR, filename)
     else:
         print(f"SkillsTown static file not found: {filename}")
-        # Fallback: check if the file exists in the root static folder
         if os.path.exists(os.path.join('static', filename)):
             return send_from_directory('static', filename)
         return f"Static file {filename} not found", 404
@@ -224,7 +239,13 @@ class AppDispatcher:
             script_name = '/spotify'
             environ['SCRIPT_NAME'] = script_name
             environ['PATH_INFO'] = path_info[len(script_name):]
-            return spotify_app(environ, start_response)
+            # IMPORTANT: Set the working directory for Spotify app requests
+            old_cwd = os.getcwd()
+            try:
+                os.chdir(spotify_path)
+                return spotify_app(environ, start_response)
+            finally:
+                os.chdir(old_cwd)
             
         # Everything else goes to the main app
         return main_app(environ, start_response)
@@ -234,9 +255,4 @@ application = AppDispatcher(main_app)
 
 if __name__ == "__main__":
     from werkzeug.serving import run_simple
-    # Set the hostname and port for local development
     run_simple('localhost', 5000, application, use_reloader=True)
-
-# Restore the original sys.path only after all apps are loaded and the WSGI application is configured
-if has_spotify_app:
-    sys.path = original_sys_path

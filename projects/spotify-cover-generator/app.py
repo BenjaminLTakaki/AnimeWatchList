@@ -29,6 +29,15 @@ if parent_dir not in sys.path:
 print(f"🔍 Current directory: {current_dir}")
 print(f"🔍 Python path: {sys.path[:3]}...")  # Show first 3 paths
 
+# Ensure all required modules can be imported by adding the current directory to sys.path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+print(f"🔍 Current directory: {current_dir}")
+print(f"🔍 Directory contents: {os.listdir(current_dir)}")
+print(f"🔍 Python path includes current dir: {current_dir in sys.path}")
+
 # Import config first (this should work)
 try:
     from config import BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY, SPOTIFY_DB_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
@@ -472,7 +481,7 @@ def initialize_app():
         print(f"❌ Database setup failed: {e}")
         return False
     
-    # Import modules with better error handling and absolute imports
+    # Import modules with better error handling - TRY RELATIVE IMPORTS FIRST
     print("📦 Importing modules...")
     
     # Global variables to track what's available
@@ -482,46 +491,59 @@ def initialize_app():
     utils_available = False
     generator_available = False
     
-    # Try importing spotify_client
+    # Get the current working directory for imports
+    original_cwd = os.getcwd()
+    # current_dir for os.chdir should be the script's directory, defined globally earlier
+    module_level_current_dir = os.path.dirname(os.path.abspath(__file__))
+
     try:
-        import spotify_client
-        print("✓ spotify_client imported")
-        spotify_client_available = True
-    except ImportError as e:
-        print(f"⚠️ spotify_client import failed: {e}")
+        # Change to the spotify app directory for imports
+        os.chdir(module_level_current_dir)
         
-    # Try importing models
-    try:
-        import models
-        print("✓ models imported")
-        models_available = True
-    except ImportError as e:
-        print(f"⚠️ models import failed: {e}")
+        # Try importing spotify_client
+        try:
+            import spotify_client
+            print("✓ spotify_client imported")
+            spotify_client_available = True
+        except ImportError as e:
+            print(f"⚠️ spotify_client import failed: {e}")
+            
+        # Try importing models
+        try:
+            import models
+            print("✓ models imported")
+            models_available = True
+        except ImportError as e:
+            print(f"⚠️ models import failed: {e}")
+            
+        # Try importing utils
+        try:
+            import utils
+            print("✓ utils imported")
+            utils_available = True
+        except ImportError as e:
+            print(f"⚠️ utils import failed: {e}")
         
-    # Try importing utils
-    try:
-        import utils
-        print("✓ utils imported")
-        utils_available = True
-    except ImportError as e:
-        print(f"⚠️ utils import failed: {e}")
-    
-    # Try importing generator
-    try:
-        import generator
-        print("✓ generator imported")
-        generator_available = True
-    except ImportError as e:
-        print(f"⚠️ generator import failed: {e}")
-    
-    # Try importing other required modules
-    try:
-        import title_generator
-        import image_generator
-        import chart_generator
-        print("✓ Additional generation modules imported")
-    except ImportError as e:
-        print(f"⚠️ Some generation modules unavailable: {e}")
+        # Try importing generator
+        try:
+            import generator
+            print("✓ generator imported")
+            generator_available = True
+        except ImportError as e:
+            print(f"⚠️ generator import failed: {e}")
+        
+        # Try importing other required modules
+        try:
+            import title_generator
+            import image_generator
+            import chart_generator
+            print("✓ Additional generation modules imported")
+        except ImportError as e:
+            print(f"⚠️ Some generation modules unavailable: {e}")
+            
+    finally:
+        # Always restore the original working directory
+        os.chdir(original_cwd)
     
     print("✓ Module imports completed (with fallbacks if needed)")
     
@@ -958,7 +980,6 @@ def spotify_callback():
                 if user: # User with this email exists, link Spotify ID
                     user.spotify_id = spotify_id
                     user.spotify_username = spotify_id # Or display_name
-            
             if not user: # Still no user, create a new one
                 user = User(
                     spotify_id=spotify_id,
@@ -1217,7 +1238,7 @@ def serve_image(filename):
 
 @app.route("/status")
 def status():
-    from spotify_client import sp
+    from spotify_client import spsssssssssad
     from utils import get_available_loras
     
     return jsonify({

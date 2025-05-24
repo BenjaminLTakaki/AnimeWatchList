@@ -1,7 +1,12 @@
 flask==2.3.3
+flask-sqlalchemy==3.0.5
+flask-migrate==4.0.5
 spotipy==2.23.0
 matplotlib==3.8.0
 numpy==1.26.0
 pillow==10.1.0
 python-dotenv==1.0.0
 requests==2.31.0
+werkzeug==2.3.7
+sqlalchemy==2.0.21
+psycopg2-binary==2.9.7
