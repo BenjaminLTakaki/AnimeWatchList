@@ -81,15 +81,16 @@ try:
     sys.path = [p for p in sys.path if 'skillstown' not in p and 'animewatchlist' not in p]
     sys.path.insert(0, spotify_path)
     
+    # Keep the modified path for the app import and all subsequent imports
+    # Don't restore it until the end of the wsgi.py file
     from app import app as spotify_app
     print("Spotify app imported successfully")
     has_spotify_app = True
-    
-    # Restore original path
-    sys.path = original_sys_path
 except ImportError as e:
     print(f"Could not import Spotify app: {e}")
     has_spotify_app = False
+    # Only restore the path if the import failed
+    sys.path = original_sys_path
 
 # Configure context processors
 @skillstown_app.context_processor
@@ -235,3 +236,7 @@ if __name__ == "__main__":
     from werkzeug.serving import run_simple
     # Set the hostname and port for local development
     run_simple('localhost', 5000, application, use_reloader=True)
+
+# Restore the original sys.path only after all apps are loaded and the WSGI application is configured
+if has_spotify_app:
+    sys.path = original_sys_path

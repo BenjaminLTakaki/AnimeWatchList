@@ -1,8 +1,14 @@
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
 from collections import Counter
-from models import PlaylistData, GenreAnalysis
-from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
+try:
+    # First try importing with absolute module paths (for production)
+    from projects.spotify_cover_generator.models import PlaylistData, GenreAnalysis
+    from projects.spotify_cover_generator.config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
+except ImportError:
+    # Fallback to relative imports (for local development)
+    from models import PlaylistData, GenreAnalysis
+    from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
 
 # Global Spotify client
 sp = None

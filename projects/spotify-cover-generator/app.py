@@ -8,7 +8,12 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 # Import app modules
-from config import BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY, SPOTIFY_DB_URL
+try:
+    # First try importing with absolute module paths (for production)
+    from projects.spotify_cover_generator.config import BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY, SPOTIFY_DB_URL
+except ImportError:
+    # Fallback to relative imports (for local development)
+    from config import BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY, SPOTIFY_DB_URL
 from contextlib import contextmanager
 
 # Initialize Flask app first
@@ -78,15 +83,21 @@ def initialize_app():
     except Exception as e:
         print(f"Error creating database tables: {e}")
         return False
-        
-    # Make sure necessary directories exist
+          # Make sure necessary directories exist
     os.makedirs(COVERS_DIR, exist_ok=True)
     
     # Now import modules that might need the database to be configured first
     # Import here to avoid circular imports with db
-    from spotify_client import initialize_spotify
-    from models import PlaylistData, GenreAnalysis, LoraModel
-    from utils import generate_random_string, get_available_loras
+    try:
+        # First try importing with absolute module paths (for production)
+        from projects.spotify_cover_generator.spotify_client import initialize_spotify
+        from projects.spotify_cover_generator.models import PlaylistData, GenreAnalysis, LoraModel
+        from projects.spotify_cover_generator.utils import generate_random_string, get_available_loras
+    except ImportError:
+        # Fallback to relative imports (for local development)
+        from spotify_client import initialize_spotify
+        from models import PlaylistData, GenreAnalysis, LoraModel
+        from utils import generate_random_string, get_available_loras
     
     # Initialize Spotify client
     spotify_initialized = initialize_spotify()
