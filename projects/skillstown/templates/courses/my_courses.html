@@ -52,11 +52,10 @@
             <!-- Progress Bar -->
             {% if stats.total > 0 %}
             <div class="card mb-4">
-                <div class="card-body">
-                    <h6>Overall Progress</h6>
+                <div class="card-body">                    <h6>Overall Progress</h6>
                     <div class="progress">
                         <div class="progress-bar bg-success" role="progressbar" 
-                             style="--width: {{ stats.completion_percentage }}%">
+                             style="width: {{ stats.completion_percentage }}%">
                             {{ "%.1f"|format(stats.completion_percentage) }}%
                         </div>
                     </div>
