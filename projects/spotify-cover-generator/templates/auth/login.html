@@ -124,7 +124,7 @@
         
         <!-- Spotify Login -->
         <a href="{{ url_for('spotify_login') }}" class="spotify-btn">
-            <img src="projects\spotify-cover-generator\static\images\Spotify_Primary_Logo_RGB_Green.png" alt="Spotify Logo">  Continue with Spotify
+            <img src="{{ url_for('static', filename='images/Spotify_Primary_Logo_RGB_Green.png') }}" alt="Spotify Logo">  Continue with Spotify
         </a>
         
         <div class="divider">
