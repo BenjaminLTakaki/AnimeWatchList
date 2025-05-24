@@ -374,3 +374,130 @@ projects/skillstown/test_files/
 
 .env
 
+# Python specific additions
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+VENV/
+*/venv/
+*/env/
+*/.venv/
+*/ENV/
+*/VENV/
+*.egg-info/
+pip-wheel-metadata/
+# dist/ and build/ are common for package building outputs
+dist/
+build/
+*.wheel # Python wheel packages
+*.tar.gz # Python source archives
+
+# Flask / Web specific
+**/instance/ # General rule for Flask instance folders
+flask_session/ # For filesystem-based sessions
+
+# Project-specific (spotify-cover-generator)
+projects/spotify-cover-generator/generated_covers/
+projects/spotify-cover-generator/data/ # Assuming this contains large/generated/downloaded data not for VCS
+projects/spotify-cover-generator/loras/ # Assuming these are large LoRA model files not for VCS
+projects/spotify-cover-generator/instance/ # Explicitly ignore instance folder for this project
+
+# IDE specific (complementing existing Visual Studio entries)
+.idea/ # For JetBrains IDEs (IntelliJ, PyCharm, etc.)
+
+# OS generated files (complementing existing entries)
+.DS_Store # macOS specific
+Thumbs.db # Windows thumbnail cache
+._* # macOS resource fork files
+Desktop.ini # Windows folder customization files
+
+# Jupyter Notebook specific
+.ipynb_checkpoints/
+
+# Additional .env patterns (complementing the existing .env entry)
+.env.*
+!.env.example
+!.env.sample
+
+# Temporary / Backup files (complementing existing entries like ~$*, *~, *.tmp)
+*.bak
+*.swp
+
+# Add these lines to your .gitignore file
+
+# Spotify Cover Generator - Generated Files
+projects/spotify-cover-generator/generated_covers/
+projects/spotify-cover-generator/data/
+projects/spotify-cover-generator/loras/
+projects/spotify-cover-generator/__pycache__/
+projects/spotify-cover-generator/*.pyc
+projects/spotify-cover-generator/alembic.ini/
+projects/spotify-cover-generator/env.py/
+
+# Spotify API Cache
+projects/spotify-cover-generator/.spotify_cache
+
+# Migration files (if you don't want to version control them)
+# Uncomment the next line if you prefer to recreate migrations on each environment
+# projects/spotify-cover-generator/migrations/
+
+# Environment variables (should already be in your .gitignore but double-check)
+.env
+*.env
+
+# Database files (if using SQLite locally)
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+

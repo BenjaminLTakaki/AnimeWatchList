@@ -14,6 +14,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
 from sqlalchemy import text
 from collections import Counter
+from flask_migrate import Migrate
 
 # Get the directory where app.py is located
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -64,6 +65,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Initialize SQLAlchemy
 from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 # Database Models
 class User(db.Model):
@@ -280,19 +282,19 @@ class LoraModelDB(db.Model):
 class GenerationResultDB(db.Model):
     __tablename__ = 'spotify_generation_results'
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    output_path = db.Column(db.String(500), nullable=False)
-    item_name = db.Column(db.String(200))
+    title = db.Column(db.String(500), nullable=False)  # Increased from 200
+    output_path = db.Column(db.String(1000), nullable=False)  # Increased from 500
+    item_name = db.Column(db.String(500))  # Increased from 200
     genres = db.Column(db.JSON)
     all_genres = db.Column(db.JSON)
     style_elements = db.Column(db.JSON)
-    mood = db.Column(db.String(50))
+    mood = db.Column(db.String(500))  # Increased from 50 - THE MAIN FIX!
     energy_level = db.Column(db.String(50))
     timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
-    spotify_url = db.Column(db.String(500))
-    lora_name = db.Column(db.String(100))
+    spotify_url = db.Column(db.String(1000))  # Increased from 500
+    lora_name = db.Column(db.String(200))  # Increased from 100
     lora_type = db.Column(db.String(20))
-    lora_url = db.Column(db.String(500))
+    lora_url = db.Column(db.String(1000))  # Increased from 500
     user_id = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=True)
 
 # HELPER FUNCTIONS - ADD THESE HERE, BEFORE ANY ROUTES
