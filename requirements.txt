@@ -16,6 +16,7 @@ requests==2.31.0
 Jinja2>=3.0.0
 email-validator==2.1.0.post1
 numpy==1.26.0
+scipy
 spacy==3.5.0
 spotipy==2.23.0
 matplotlib==3.8.0
