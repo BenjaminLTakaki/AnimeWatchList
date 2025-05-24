@@ -7,6 +7,7 @@ import urllib.parse
 from pathlib import Path
 import os
 import requests
+from collections import Counter
 from config import DATA_DIR, LORA_DIR, COVERS_DIR
 
 def generate_random_string(size=10):
@@ -61,6 +62,53 @@ def save_generation_data(data, output_path=None):
         except Exception as file_error:
             print(f"Error saving data to file: {file_error}")
             return None
+
+def calculate_genre_percentages(genres_list):
+    """Calculate percentage distribution of genres"""
+    if not genres_list:
+        return []
+    
+    try:
+        # Attempt to use the more structured GenreAnalysis if available
+        from models import GenreAnalysis 
+        genre_analysis = GenreAnalysis.from_genre_list(genres_list)
+        return genre_analysis.get_percentages(max_genres=5)
+    except ImportError:
+        # Fallback if models.py or GenreAnalysis is not available
+        print("⚠️ models.GenreAnalysis not found, using fallback for calculate_genre_percentages.")
+        if not isinstance(genres_list, list): # Ensure it's a list
+            return []
+            
+        genre_counter = Counter(genres_list)
+        total_count = sum(genre_counter.values())
+        if total_count == 0:
+            return []
+            
+        sorted_genres = genre_counter.most_common(5)
+        
+        percentages = []
+        for genre, count in sorted_genres:
+            percentage = round((count / total_count) * 100)
+            percentages.append({
+                "name": genre,
+                "percentage": percentage,
+                "count": count  # Keep the count for potential display
+            })
+        return percentages
+
+def extract_playlist_id(playlist_url):
+    """Extract playlist ID from Spotify URL"""
+    if not playlist_url or "playlist/" not in playlist_url:
+        return None
+    try:
+        # Example: https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=...
+        #          -> 37i9dQZF1DXcBWIGoYBM5M
+        path_part = urllib.parse.urlparse(playlist_url).path
+        if "/playlist/" in path_part:
+            return path_part.split("/playlist/")[-1].split("/")[0]
+    except Exception as e:
+        print(f"Error parsing playlist URL '{playlist_url}': {e}")
+    return None
 
 def get_available_loras():
     """Get list of available LoRAs from database and file system."""

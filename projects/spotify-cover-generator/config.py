@@ -19,7 +19,19 @@ LORA_DIR.mkdir(exist_ok=True)
 # Spotify API - use environment variables from Render
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
-SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "http://localhost:8888/callback")
+
+# Dynamic redirect URI based on environment
+if os.getenv("RENDER"):
+    # Production on Render
+    SPOTIFY_REDIRECT_URI = "https://www.benjamintakaki.com/spotify/auth/spotify/callback"
+elif os.getenv("DEVELOPMENT"):
+    # Local development
+    SPOTIFY_REDIRECT_URI = "http://localhost:5000/auth/spotify/callback"
+else:
+    # Fallback - try to get from environment or use default
+    SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "https://www.benjamintakaki.com/spotify/auth/spotify/callback")
+
+print(f"🔗 Using Spotify redirect URI: {SPOTIFY_REDIRECT_URI}")
 
 # Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")

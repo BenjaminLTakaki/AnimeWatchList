@@ -273,7 +273,7 @@ class LoraModelDB(db.Model):
             path=self.path,
             url=self.url,
             trigger_words=self.trigger_words or [],
-            strength=self.strength
+           
         )
 
 class GenerationResultDB(db.Model):
@@ -1219,6 +1219,180 @@ def index():
             )
     else:
         return render_template("index.html", loras=loras, user=user)
+
+@app.route('/api/playlist/edit', methods=['POST'])
+@login_required
+def edit_playlist():
+    """Edit Spotify playlist title and description"""
+    try:
+        user = get_current_user()
+        if not user or not user.spotify_access_token:
+            return jsonify({"success": False, "error": "Spotify not connected"}), 401
+        
+        # Refresh token if needed
+        if not user.refresh_spotify_token_if_needed():
+            return jsonify({"success": False, "error": "Failed to refresh Spotify token"}), 401
+        
+        data = request.get_json()
+        playlist_id = data.get('playlist_id')
+        name = data.get('name')
+        description = data.get('description', '')
+        
+        if not playlist_id or not name:
+            return jsonify({"success": False, "error": "Missing playlist ID or name"}), 400
+        
+        # Update playlist using Spotify API
+        headers = {'Authorization': f'Bearer {user.spotify_access_token}'}
+        url = f'https://api.spotify.com/v1/playlists/{playlist_id}'
+        
+        payload = {
+            'name': name,
+            'description': description
+        }
+        
+        response = requests.put(url, headers=headers, json=payload)
+        
+        if response.status_code == 200:
+            return jsonify({"success": True, "message": "Playlist updated successfully"})
+        else:
+            error_msg = "Failed to update playlist"
+            if response.status_code == 403:
+                error_msg = "You don\'t have permission to edit this playlist"
+            elif response.status_code == 404:
+                error_msg = "Playlist not found"
+            
+            return jsonify({"success": False, "error": error_msg}), response.status_code
+    
+    except Exception as e:
+        print(f"Error editing playlist: {e}")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+@app.route('/api/playlist/cover', methods=['POST'])
+@login_required
+def update_playlist_cover():
+    """Update Spotify playlist cover image"""
+    try:
+        user = get_current_user()
+        if not user or not user.spotify_access_token:
+            return jsonify({"success": False, "error": "Spotify not connected"}), 401
+        
+        # Refresh token if needed
+        if not user.refresh_spotify_token_if_needed():
+            return jsonify({"success": False, "error": "Failed to refresh Spotify token"}), 401
+        
+        data = request.get_json()
+        playlist_id = data.get('playlist_id')
+        image_data = data.get('image_data')
+        
+        if not playlist_id or not image_data:
+            return jsonify({"success": False, "error": "Missing playlist ID or image data"}), 400
+        
+        # Extract base64 data from data URL
+        if image_data.startswith('data:image'):
+            # Remove data URL prefix
+            image_data = image_data.split(',')[1]
+        
+        # Update playlist cover using Spotify API
+        headers = {
+            'Authorization': f'Bearer {user.spotify_access_token}',
+            'Content-Type': 'image/jpeg'
+        }
+        url = f'https://api.spotify.com/v1/playlists/{playlist_id}/images'
+        
+        # Decode base64 image
+        import base64
+        image_bytes = base64.b64decode(image_data)
+        
+        response = requests.put(url, headers=headers, data=image_bytes)
+        
+        if response.status_code == 202:  # Spotify returns 202 for successful image upload
+            return jsonify({"success": True, "message": "Playlist cover updated successfully"})
+        else:
+            error_msg = "Failed to update playlist cover"
+            if response.status_code == 403:
+                error_msg = "You don\'t have permission to edit this playlist"
+            elif response.status_code == 404:
+                error_msg = "Playlist not found"
+            elif response.status_code == 413:
+                error_msg = "Image too large (max 256KB)"
+            
+            return jsonify({"success": False, "error": error_msg}), response.status_code
+    
+    except Exception as e:
+        print(f"Error updating playlist cover: {e}")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+@app.route('/api/regenerate', methods=['POST'])
+@login_required
+def regenerate_cover():
+    """Regenerate cover with same playlist"""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"success": False, "error": "User not authenticated"}), 401
+        
+        if not user.can_generate_today():
+            return jsonify({"success": False, "error": "Daily generation limit reached"}), 429
+        
+        data = request.get_json()
+        playlist_url = data.get('playlist_url')
+        mood = data.get('mood', '')
+        negative_prompt = data.get('negative_prompt', '')
+        lora_name = data.get('lora_name', '')
+        
+        if not playlist_url:
+            return jsonify({"success": False, "error": "Missing playlist URL"}), 400
+        
+        # Get LoRA if specified
+        lora_input = None
+        if lora_name and lora_name != "none":
+            try:
+                import utils
+                loras = utils.get_available_loras()
+                for lora_item in loras:
+                    if hasattr(lora_item, 'name') and lora_item.name == lora_name:
+                        lora_input = lora_item
+                        break
+            except Exception as e:
+                print(f"Error getting LoRA: {e}")
+        
+        # Generate new cover
+        try:
+            import generator
+            result = generator.generate_cover(
+                playlist_url, 
+                mood, 
+                lora_input, 
+                negative_prompt=negative_prompt, 
+                user_id=user.id
+            )
+            
+            if "error" in result:
+                return jsonify({"success": False, "error": result["error"]}), 400
+            
+            # Return all relevant data for the frontend to update
+            return jsonify({
+                "success": True, 
+                "message": "Cover regenerated successfully",
+                "title": result["title"],
+                "image_file": os.path.basename(result["output_path"]),
+                "image_data_base64": result.get("image_data_base64", ""),
+                "genres": ", ".join(result.get("genres", [])),
+                "mood": result.get("mood", ""),
+                "playlist_name": result.get("item_name", "Your Music"),
+                "found_genres": bool(result.get("genres", [])),
+                "lora_name": result.get("lora_name", ""),
+                "lora_type": result.get("lora_type", ""),
+                "lora_url": result.get("lora_url", "")
+            })
+            
+        except Exception as e:
+            print(f"Error generating cover: {e}")
+            return jsonify({"success": False, "error": "Failed to generate cover"}), 500
+    
+    except Exception as e:
+        print(f"Error in regenerate endpoint: {e}")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @app.route("/generated_covers/<path:filename>")
 def serve_image(filename):
