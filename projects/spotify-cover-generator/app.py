@@ -282,19 +282,19 @@ class LoraModelDB(db.Model):
 class GenerationResultDB(db.Model):
     __tablename__ = 'spotify_generation_results'
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(500), nullable=False)  # Increased from 200
-    output_path = db.Column(db.String(1000), nullable=False)  # Increased from 500
-    item_name = db.Column(db.String(500))  # Increased from 200
+    title = db.Column(db.String(500), nullable=False)  # Was 200
+    output_path = db.Column(db.String(1000), nullable=False)  # Was 500
+    item_name = db.Column(db.String(500))  # Was 200
     genres = db.Column(db.JSON)
     all_genres = db.Column(db.JSON)
     style_elements = db.Column(db.JSON)
-    mood = db.Column(db.String(500))  # Increased from 50 - THE MAIN FIX!
+    mood = db.Column(db.String(1000))  # Was 50 - THE MAIN FIX!
     energy_level = db.Column(db.String(50))
     timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
-    spotify_url = db.Column(db.String(1000))  # Increased from 500
-    lora_name = db.Column(db.String(200))  # Increased from 100
+    spotify_url = db.Column(db.String(1000))  # Was 500
+    lora_name = db.Column(db.String(200))  # Was 100
     lora_type = db.Column(db.String(20))
-    lora_url = db.Column(db.String(1000))  # Increased from 500
+    lora_url = db.Column(db.String(1000))  # Was 500
     user_id = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=True)
 
 # HELPER FUNCTIONS - ADD THESE HERE, BEFORE ANY ROUTES
@@ -712,7 +712,180 @@ def create_tables_manually():
                 print(f"❌ SQL command {i+1} failed: {e}")
                 raise
 
-# Also add this route to manually trigger table creation for debugging
+@app.route("/admin/nuclear-reset")
+def admin_nuclear_reset():
+    """NUCLEAR OPTION: Drop and recreate all Spotify tables"""
+    try:
+        with app.app_context():
+            print("💣 NUCLEAR RESET: Dropping all Spotify tables...")
+            
+            with db.engine.connect() as connection:
+                # Drop all Spotify-related tables in correct order (foreign keys first)
+                drop_commands = [
+                    "DROP TABLE IF EXISTS spotify_generation_results CASCADE;",
+                    "DROP TABLE IF EXISTS spotify_login_sessions CASCADE;", 
+                    "DROP TABLE IF EXISTS spotify_oauth_states CASCADE;",
+                    "DROP TABLE IF EXISTS spotify_lora_models CASCADE;",
+                    "DROP TABLE IF EXISTS spotify_users CASCADE;"
+                ]
+                
+                for sql in drop_commands:
+                    try:
+                        print(f"Executing: {sql}")
+                        connection.execute(text(sql))
+                    except Exception as e:
+                        print(f"⚠️ Drop command failed (table might not exist): {e}")
+                
+                connection.commit()
+                print("✓ All old tables dropped")
+            
+            # Now recreate with correct sizes
+            print("🔨 Creating new tables with correct column sizes...")
+            
+            # Use the manual creation function with updated sizes
+            create_tables_manually_with_correct_sizes()
+            
+            print("✅ Nuclear reset complete - all tables recreated!")
+            
+            return jsonify({
+                "success": True,
+                "message": "Nuclear reset complete! All tables recreated with correct sizes.",
+                "warning": "All existing data has been deleted!"
+            })
+            
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Nuclear reset error: {e}")
+        print(f"Full traceback: {error_details}")
+        
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "details": error_details
+        }), 500
+
+def create_tables_manually_with_correct_sizes():
+    """Create tables with the correct column sizes from the start"""
+    print("🔨 Creating tables with correct sizes...")
+    
+    sql_commands = [
+        # Users table
+        """
+        CREATE TABLE IF NOT EXISTS spotify_users (
+            id SERIAL PRIMARY KEY,
+            email VARCHAR(120) UNIQUE,
+            username VARCHAR(80) UNIQUE,
+            password_hash VARCHAR(200),
+            spotify_id VARCHAR(100) UNIQUE,
+            spotify_username VARCHAR(100),
+            spotify_access_token VARCHAR(500),
+            spotify_refresh_token VARCHAR(500),
+            spotify_token_expires TIMESTAMP,
+            display_name VARCHAR(100),
+            is_premium BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP,
+            is_active BOOLEAN DEFAULT TRUE
+        );
+        """,
+        
+        # Login sessions table
+        """
+        CREATE TABLE IF NOT EXISTS spotify_login_sessions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            session_token VARCHAR(100) UNIQUE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP NOT NULL,
+            is_active BOOLEAN DEFAULT TRUE,
+            ip_address VARCHAR(45),
+            user_agent VARCHAR(500)
+        );
+        """,
+        
+        # OAuth states table
+        """
+        CREATE TABLE IF NOT EXISTS spotify_oauth_states (
+            id SERIAL PRIMARY KEY,
+            state VARCHAR(100) UNIQUE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            used BOOLEAN DEFAULT FALSE
+        );
+        """,
+        
+        # LoRA models table
+        """
+        CREATE TABLE IF NOT EXISTS spotify_lora_models (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) UNIQUE NOT NULL,
+            source_type VARCHAR(20) DEFAULT 'local',
+            path VARCHAR(500) DEFAULT '',
+            url VARCHAR(1000) DEFAULT '',
+            trigger_words JSON DEFAULT '[]',
+            strength FLOAT DEFAULT 0.7
+        );
+        """,
+        
+        # Generation results table - WITH CORRECT SIZES FROM THE START!
+        """
+        CREATE TABLE IF NOT EXISTS spotify_generation_results (
+            id SERIAL PRIMARY KEY,
+            title VARCHAR(500) NOT NULL,
+            output_path VARCHAR(1000) NOT NULL,
+            item_name VARCHAR(500),
+            genres JSON,
+            all_genres JSON,
+            style_elements JSON,
+            mood VARCHAR(1000),
+            energy_level VARCHAR(50),
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            spotify_url VARCHAR(1000),
+            lora_name VARCHAR(200),
+            lora_type VARCHAR(20),
+            lora_url VARCHAR(1000),
+            user_id INTEGER
+        );
+        """,
+        
+        # Add foreign keys
+        """
+        ALTER TABLE spotify_login_sessions 
+        ADD CONSTRAINT fk_login_sessions_user_id 
+        FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE CASCADE;
+        """,
+        
+        """
+        ALTER TABLE spotify_generation_results 
+        ADD CONSTRAINT fk_generation_results_user_id 
+        FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE SET NULL;
+        """,
+        
+        # Create indexes
+        """
+        CREATE INDEX IF NOT EXISTS idx_users_email ON spotify_users(email);
+        CREATE INDEX IF NOT EXISTS idx_users_spotify_id ON spotify_users(spotify_id);
+        CREATE INDEX IF NOT EXISTS idx_sessions_token ON spotify_login_sessions(session_token);
+        CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON spotify_login_sessions(user_id);
+        CREATE INDEX IF NOT EXISTS idx_oauth_state ON spotify_oauth_states(state);
+        CREATE INDEX IF NOT EXISTS idx_generation_user_id ON spotify_generation_results(user_id);
+        """
+    ]
+    
+    with db.engine.connect() as connection:
+        for i, sql in enumerate(sql_commands):
+            try:
+                connection.execute(text(sql))
+                print(f"✓ SQL command {i+1} executed successfully")
+            except Exception as e:
+                print(f"❌ SQL command {i+1} failed: {e}")
+                # For foreign keys and indexes, failures are often OK (already exist)
+                if "foreign key" not in str(e).lower() and "index" not in str(e).lower():
+                    raise
+        
+        connection.commit()
+        print("✓ All tables created successfully")
+
 @app.route("/admin/create-tables")
 def admin_create_tables():
     """Admin route to manually create tables - SQLAlchemy 2.0+ compatible"""
