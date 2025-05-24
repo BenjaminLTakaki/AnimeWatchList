@@ -105,8 +105,7 @@ def create_app(config_name=None):  # MODIFIED
         url = db.Column(db.String(500))
         provider = db.Column(db.String(100), default='SkillsTown')
         skills_taught = db.Column(db.Text)  # JSON string of skills
-        difficulty_level = db.Column(db.String(20))  # Beginner, Intermediate, Advanced
-        duration = db.Column(db.String(50))
+        difficulty_level = db.Column(db.String(20))  # Beginner, Intermediate, Advanced        duration = db.Column(db.String(50))
         keywords = db.Column(db.Text)  # For search functionality
         created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 
@@ -118,8 +117,7 @@ def create_app(config_name=None):  # MODIFIED
         course_name = db.Column(db.String(255), nullable=False)
         status = db.Column(db.String(50), default='enrolled')  # enrolled, in_progress, completed
         created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-        
-        # Define relationship
+          # Define relationship
         user = db.relationship('User', backref='skillstown_courses')
         
         __table_args__ = (
