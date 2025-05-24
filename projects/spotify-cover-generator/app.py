@@ -266,46 +266,103 @@ class GenerationResultDB(db.Model):
 initialized = False
 
 def initialize_app():
-    """Initialize the application's dependencies"""
+    """Initialize the application's dependencies with robust table creation"""
     global initialized
     
-    # Create tables if they don't exist - IMPORTANT for Render
+    print("🔧 Initializing Spotify Cover Generator...")
+    
+    # Make sure necessary directories exist first
+    try:
+        os.makedirs(COVERS_DIR, exist_ok=True)
+        print("✓ Created directories")
+    except Exception as e:
+        print(f"⚠️ Directory creation warning: {e}")
+    
+    # Database setup with detailed logging
     try:
         with app.app_context():
-            db.create_all()
-            print("✓ Database tables created/verified successfully")
+            print("📊 Setting up database...")
             
-            # Verify critical tables exist
+            # Test database connection first
+            try:
+                db.engine.execute('SELECT 1')
+                print("✓ Database connection successful")
+            except Exception as e:
+                print(f"❌ Database connection failed: {e}")
+                return False
+            
+            # Check what tables currently exist
             inspector = db.inspect(db.engine)
-            tables = inspector.get_table_names()
-            required_tables = ['spotify_users', 'spotify_login_sessions', 'spotify_oauth_states']
+            existing_tables = inspector.get_table_names()
+            print(f"📋 Existing tables: {existing_tables}")
             
-            missing_tables = [t for t in required_tables if t not in tables]
-            if missing_tables:
-                print(f"⚠️ Missing tables: {', '.join(missing_tables)}")
+            # Force create all tables
+            try:
                 db.create_all()
+                print("✓ db.create_all() executed")
+            except Exception as e:
+                print(f"❌ db.create_all() failed: {e}")
+                return False
+            
+            # Verify tables were created
+            new_tables = inspector.get_table_names()
+            print(f"📋 Tables after creation: {new_tables}")
+            
+            # Check for required tables
+            required_tables = [
+                'spotify_users', 
+                'spotify_login_sessions', 
+                'spotify_oauth_states',
+                'spotify_generation_results',
+                'spotify_lora_models'
+            ]
+            
+            missing_tables = [t for t in required_tables if t not in new_tables]
+            if missing_tables:
+                print(f"❌ Still missing tables: {', '.join(missing_tables)}")
+                
+                # Try manual table creation
+                try:
+                    create_tables_manually()
+                    # Check again
+                    final_tables = inspector.get_table_names()
+                    final_missing = [t for t in required_tables if t not in final_tables]
+                    if final_missing:
+                        print(f"❌ Manual creation also failed for: {', '.join(final_missing)}")
+                        return False
+                    else:
+                        print("✓ Manual table creation successful")
+                except Exception as e:
+                    print(f"❌ Manual table creation failed: {e}")
+                    return False
             else:
-                print("✓ All authentication tables present")
+                print("✓ All required tables present")
                 
     except Exception as e:
-        print(f"❌ Error with database setup: {e}")
-    
-    # Make sure necessary directories exist
-    os.makedirs(COVERS_DIR, exist_ok=True)
+        print(f"❌ Database setup failed: {e}")
+        return False
     
     # Import modules after database setup
     try:
+        print("📦 Importing modules...")
         from spotify_client import initialize_spotify
         from models import PlaylistData, GenreAnalysis, LoraModel
         from utils import generate_random_string, get_available_loras
+        print("✓ Modules imported successfully")
     except ImportError as e:
-        print(f"Error importing modules: {e}")
+        print(f"❌ Module import failed: {e}")
         return False
     
     # Initialize Spotify client
+    print("🎵 Initializing Spotify client...")
     spotify_initialized = initialize_spotify()
+    if spotify_initialized:
+        print("✓ Spotify client initialized")
+    else:
+        print("❌ Spotify client failed")
     
-    # Check all required environment variables
+    # Check environment variables
+    print("🔑 Checking environment variables...")
     from config import GEMINI_API_KEY, STABILITY_API_KEY
     env_vars_present = all([
         SPOTIFY_CLIENT_ID, 
@@ -322,10 +379,179 @@ def initialize_app():
             missing.append("Gemini API key")
         if not STABILITY_API_KEY:
             missing.append("Stable Diffusion API key")
-        print(f"⚠️ Missing environment variables: {', '.join(missing)}")
+        print(f"❌ Missing environment variables: {', '.join(missing)}")
+    else:
+        print("✓ All environment variables present")
     
     initialized = spotify_initialized and env_vars_present
+    
+    if initialized:
+        print("🎉 Application initialized successfully!")
+    else:
+        print("⚠️ Application initialization completed with issues")
+    
     return initialized
+
+def create_tables_manually():
+    """Manually create tables using raw SQL if SQLAlchemy fails"""
+    print("🔨 Attempting manual table creation...")
+    
+    sql_commands = [
+        # Users table
+        """
+        CREATE TABLE IF NOT EXISTS spotify_users (
+            id SERIAL PRIMARY KEY,
+            email VARCHAR(120) UNIQUE,
+            username VARCHAR(80) UNIQUE,
+            password_hash VARCHAR(200),
+            spotify_id VARCHAR(100) UNIQUE,
+            spotify_username VARCHAR(100),
+            spotify_access_token VARCHAR(500),
+            spotify_refresh_token VARCHAR(500),
+            spotify_token_expires TIMESTAMP,
+            display_name VARCHAR(100),
+            is_premium BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP,
+            is_active BOOLEAN DEFAULT TRUE
+        );
+        """,
+        
+        # Login sessions table
+        """
+        CREATE TABLE IF NOT EXISTS spotify_login_sessions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            session_token VARCHAR(100) UNIQUE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP NOT NULL,
+            is_active BOOLEAN DEFAULT TRUE,
+            ip_address VARCHAR(45),
+            user_agent VARCHAR(500),
+            FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE CASCADE
+        );
+        """,
+        
+        # OAuth states table
+        """
+        CREATE TABLE IF NOT EXISTS spotify_oauth_states (
+            id SERIAL PRIMARY KEY,
+            state VARCHAR(100) UNIQUE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            used BOOLEAN DEFAULT FALSE
+        );
+        """,
+        
+        # Update generation results table
+        """
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'spotify_generation_results' 
+                AND column_name = 'user_id'
+            ) THEN
+                ALTER TABLE spotify_generation_results 
+                ADD COLUMN user_id INTEGER;
+                
+                -- Add foreign key if table exists
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'spotify_users') THEN
+                    ALTER TABLE spotify_generation_results 
+                    ADD CONSTRAINT fk_user_id 
+                    FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE SET NULL;
+                END IF;
+            END IF;
+        END $$;
+        """,
+        
+        # Create indexes
+        """
+        CREATE INDEX IF NOT EXISTS idx_users_email ON spotify_users(email);
+        CREATE INDEX IF NOT EXISTS idx_users_spotify_id ON spotify_users(spotify_id);
+        CREATE INDEX IF NOT EXISTS idx_sessions_token ON spotify_login_sessions(session_token);
+        CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON spotify_login_sessions(user_id);
+        CREATE INDEX IF NOT EXISTS idx_oauth_state ON spotify_oauth_states(state);
+        """
+    ]
+    
+    for i, sql in enumerate(sql_commands):
+        try:
+            db.engine.execute(sql)
+            print(f"✓ SQL command {i+1} executed successfully")
+        except Exception as e:
+            print(f"❌ SQL command {i+1} failed: {e}")
+            raise
+
+# Also add this route to manually trigger table creation for debugging
+@app.route("/admin/create-tables")
+def admin_create_tables():
+    """Admin route to manually create tables - REMOVE IN PRODUCTION"""
+    try:
+        with app.app_context():
+            print("🔧 Admin: Creating tables...")
+            
+            # Try SQLAlchemy first
+            db.create_all()
+            
+            # Try manual creation
+            create_tables_manually()
+            
+            # Verify
+            inspector = db.inspect(db.engine)
+            tables = inspector.get_table_names()
+            
+            return jsonify({
+                "success": True,
+                "message": "Tables created successfully",
+                "tables": tables
+            })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+# Add this near the top of your file, after the imports
+def ensure_tables_exist():
+    """Ensure tables exist before any database operation"""
+    try:
+        # Quick check if a critical table exists
+        db.engine.execute("SELECT 1 FROM spotify_oauth_states LIMIT 1")
+    except:
+        print("⚠️ Tables missing, attempting to create...")
+        try:
+            with app.app_context():
+                db.create_all()
+                create_tables_manually()
+                print("✓ Tables created on-demand")
+        except Exception as e:
+            print(f"❌ On-demand table creation failed: {e}")
+            raise
+
+# Update your spotify_login route to ensure tables exist
+@app.route('/login/spotify')
+def spotify_login():
+    """Redirect to Spotify OAuth with table verification"""
+    try:
+        # Ensure tables exist before creating state
+        ensure_tables_exist()
+        
+        state = SpotifyState.create_state()
+        
+        auth_url = (
+            "https://accounts.spotify.com/authorize"
+            f"?client_id={SPOTIFY_CLIENT_ID}"
+            "&response_type=code"
+            f"&redirect_uri={request.url_root}auth/spotify/callback"
+            "&scope=playlist-modify-public playlist-modify-private ugc-image-upload user-read-private user-read-email"
+            f"&state={state}"
+        )
+        
+        return redirect(auth_url)
+    except Exception as e:
+        print(f"❌ Spotify login error: {e}")
+        flash('Database setup error. Please try again.', 'error')
+        return redirect(url_for('login'))
 
 # Authentication helpers
 def login_required(f):
