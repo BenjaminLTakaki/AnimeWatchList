@@ -12,15 +12,36 @@ import base64
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
 from sqlalchemy import text
-from collections import Counter # Added import
+from collections import Counter
 
-# Make sure the current directory is in the path for imports
+# Get the directory where app.py is located
 current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Add the current directory to Python path if it's not already there
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
-# Import app modules
-from config import BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY, SPOTIFY_DB_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
+# Also add the parent directory in case modules are there
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+print(f"🔍 Current directory: {current_dir}")
+print(f"🔍 Python path: {sys.path[:3]}...")  # Show first 3 paths
+
+# Import config first (this should work)
+try:
+    from config import BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY, SPOTIFY_DB_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
+    print("✓ Config imported successfully")
+except ImportError as e:
+    print(f"❌ Config import failed: {e}")
+    # Fallback - define minimal config
+    BASE_DIR = Path(current_dir)
+    COVERS_DIR = BASE_DIR / "generated_covers"
+    FLASK_SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'dev-key')
+    SPOTIFY_DB_URL = os.environ.get('DATABASE_URL', 'postgresql://localhost/test')
+    SPOTIFY_CLIENT_ID = os.environ.get('SPOTIFY_CLIENT_ID')
+    SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET')
 
 # Initialize Flask app first
 app = Flask(__name__, template_folder=str(BASE_DIR / "templates"), static_folder=str(BASE_DIR / "static"))
@@ -397,7 +418,7 @@ def initialize_app():
     except Exception as e:
         print(f"⚠️ Directory creation warning: {e}")
     
-    # Database setup (your existing database code works fine now)
+    # Database setup (keep your existing database code)
     try:
         with app.app_context():
             print("📊 Setting up database...")
@@ -432,9 +453,8 @@ def initialize_app():
             missing_tables = [t for t in required_tables if t not in new_tables]
             if missing_tables:
                 print(f"❌ Still missing tables: {', '.join(missing_tables)}")
-                # Attempt manual creation if db.create_all() didn't get them all
                 try:
-                    create_tables_manually() # Assuming you have this function defined elsewhere
+                    create_tables_manually()
                     final_tables = inspector.get_table_names()
                     final_missing = [t for t in required_tables if t not in final_tables]
                     if final_missing:
@@ -444,7 +464,7 @@ def initialize_app():
                         print("✓ Manual table creation successful for missing tables")
                 except Exception as e_manual:
                     print(f"❌ Manual table creation attempt failed: {e_manual}")
-                    return False # Stop if manual creation also fails
+                    return False
             else:
                 print("✓ All required tables present")
                 
@@ -452,59 +472,81 @@ def initialize_app():
         print(f"❌ Database setup failed: {e}")
         return False
     
-    # Import modules with better error handling
-    try:
-        print("📦 Importing modules...")
-        
-        # Try importing required modules with proper error handling
-        try:
-            from spotify_client import initialize_spotify
-            print("✓ spotify_client imported")
-        except ImportError as e:
-            print(f"⚠️ spotify_client import failed: {e}")
-            print("⚠️ Continuing without Spotify client - will handle this gracefully")
-            initialize_spotify = lambda: False  # Dummy function
-        
-        try:
-            from models import PlaylistData, GenreAnalysis, LoraModel
-            print("✓ models imported")
-        except ImportError as e:
-            print(f"⚠️ models import failed: {e}")
-            print("⚠️ Continuing without models - basic functionality only")
-            # Define dummy classes or skip features if models are critical and missing
-            
-        try:
-            from utils import generate_random_string, get_available_loras, extract_playlist_id, calculate_genre_percentages # Added missing imports
-            print("✓ utils imported")
-        except ImportError as e:
-            print(f"⚠️ utils import failed: {e}")
-            print("⚠️ Continuing without utils - limited functionality")
-            get_available_loras = lambda: []  # Dummy function
-            extract_playlist_id = lambda url: None # Dummy function
-            calculate_genre_percentages = lambda genres: [] # Dummy function
-            
-        print("✓ Module imports completed (with fallbacks if needed)")
-        
-    except Exception as e:
-        print(f"❌ Critical import failure: {e}")
-        return False
+    # Import modules with better error handling and absolute imports
+    print("📦 Importing modules...")
     
-    # Initialize Spotify client
-    print("🎵 Initializing Spotify client...")
+    # Global variables to track what's available
+    global spotify_client_available, models_available, utils_available, generator_available
+    spotify_client_available = False
+    models_available = False
+    utils_available = False
+    generator_available = False
+    
+    # Try importing spotify_client
     try:
-        spotify_initialized = initialize_spotify()
-        if spotify_initialized:
-            print("✓ Spotify client initialized")
-        else:
-            print("⚠️ Spotify client initialization failed - continuing anyway")
-            spotify_initialized = False  # Continue even if Spotify fails
-    except Exception as e:
-        print(f"⚠️ Spotify initialization error: {e} - continuing anyway")
-        spotify_initialized = False
+        import spotify_client
+        print("✓ spotify_client imported")
+        spotify_client_available = True
+    except ImportError as e:
+        print(f"⚠️ spotify_client import failed: {e}")
+        
+    # Try importing models
+    try:
+        import models
+        print("✓ models imported")
+        models_available = True
+    except ImportError as e:
+        print(f"⚠️ models import failed: {e}")
+        
+    # Try importing utils
+    try:
+        import utils
+        print("✓ utils imported")
+        utils_available = True
+    except ImportError as e:
+        print(f"⚠️ utils import failed: {e}")
+    
+    # Try importing generator
+    try:
+        import generator
+        print("✓ generator imported")
+        generator_available = True
+    except ImportError as e:
+        print(f"⚠️ generator import failed: {e}")
+    
+    # Try importing other required modules
+    try:
+        import title_generator
+        import image_generator
+        import chart_generator
+        print("✓ Additional generation modules imported")
+    except ImportError as e:
+        print(f"⚠️ Some generation modules unavailable: {e}")
+    
+    print("✓ Module imports completed (with fallbacks if needed)")
+    
+    # Initialize Spotify client if available
+    if spotify_client_available:
+        print("🎵 Initializing Spotify client...")
+        try:
+            spotify_initialized = spotify_client.initialize_spotify()
+            if spotify_initialized:
+                print("✓ Spotify client initialized")
+            else:
+                print("⚠️ Spotify client initialization failed - continuing with limited functionality")
+        except Exception as e:
+            print(f"⚠️ Spotify initialization error: {e}")
+    else:
+        print("⚠️ Spotify client not available - skipping initialization")
     
     # Check environment variables
     print("🔑 Checking environment variables...")
-    from config import GEMINI_API_KEY, STABILITY_API_KEY # Ensure these are imported
+    try:
+        from config import GEMINI_API_KEY, STABILITY_API_KEY
+    except ImportError:
+        GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+        STABILITY_API_KEY = os.environ.get('STABILITY_API_KEY')
+    
     env_vars_present = all([
         SPOTIFY_CLIENT_ID, 
         SPOTIFY_CLIENT_SECRET, 
@@ -524,13 +566,13 @@ def initialize_app():
     else:
         print("✓ All environment variables present")
     
-    # Be more lenient with initialization - allow partial success
-    initialized = env_vars_present  # Don't require Spotify client for basic functionality
+    # Set initialization status based on what we have
+    initialized = env_vars_present and (spotify_client_available or models_available)
     
     if initialized:
         print("🎉 Application initialized successfully!")
     else:
-        print("⚠️ Application initialization completed with issues")
+        print("⚠️ Application initialization completed with limited functionality")
     
     return initialized
 
@@ -971,26 +1013,20 @@ def root():
     else:
         return redirect(url_for('login'))
 
-@app.route("/generate", methods=["GET", "POST"]) # Changed path from "/" to "/generate"
+@app.route("/generate", methods=["GET", "POST"])
 @login_required
 def index():
     global initialized
     
-    user = get_current_user() # get_current_user should be defined
-    if not user: # Should be handled by @login_required, but good for safety
+    user = get_current_user()
+    if not user:
         return redirect(url_for('login'))
     
     if request.method == "POST" and not user.can_generate_today():
-        # Ensure get_available_loras is available or has a fallback
-        try:
-            from utils import get_available_loras
-            loras_fallback = get_available_loras()
-        except ImportError:
-            loras_fallback = []
         return render_template(
             "index.html",
             error=f"Daily generation limit reached ({user.get_daily_generation_limit()} per day). Try again tomorrow!",
-            loras=loras_fallback, # Provide loras even in error case
+            loras=[],
             user=user
         )
     
@@ -999,46 +1035,47 @@ def index():
             print("Application initialized successfully from index route")
         else:
             print("Failed to initialize application from index route")
-            # Ensure get_available_loras is available or has a fallback
-            try:
-                from utils import get_available_loras
-                loras_fallback_init = get_available_loras()
-            except ImportError:
-                loras_fallback_init = []
             return render_template(
                 "index.html", 
                 error="Application is still initializing or encountered an issue. Please try again in a moment.",
-                loras=loras_fallback_init, # Provide loras
+                loras=[],
                 user=user
             )
     
-    # Import modules with fallback handling
+    # Get available loras with fallback
+    loras = []
     try:
-        from utils import get_available_loras, extract_playlist_id, calculate_genre_percentages # ensure all needed utils are here
-        loras = get_available_loras()
-    except ImportError:
-        print("⚠️ Could not import get_available_loras from utils in index, using empty list")
-        loras = []
-        # Define dummy functions if these are critical and utils failed to import earlier
-        if 'extract_playlist_id' not in globals():
-            extract_playlist_id = lambda url: None
-        if 'calculate_genre_percentages' not in globals():
-            calculate_genre_percentages = lambda genres: []
+        if 'utils_available' in globals() and utils_available:
+            import utils
+            loras = utils.get_available_loras()
+        else:
+            print("⚠️ Utils not available - using empty LoRA list")
+    except Exception as e:
+        print(f"⚠️ Error getting LoRAs: {e}")
 
     if request.method == "POST":
         try:
-            # Check if required modules are available
-            try:
-                from generator import generate_cover
-                from chart_generator import generate_genre_chart
-            except ImportError as e:
-                print(f"⚠️ Core generation modules not available: {e}")
-                return render_template(
-                    "index.html",
-                    error="Core generation modules are not available. Please contact support or try again later.",
-                    loras=loras,
-                    user=user
-                )
+            # Check if core generation modules are available
+            generation_available = (
+                'generator_available' in globals() and generator_available and
+                'spotify_client_available' in globals() and spotify_client_available
+            )
+            
+            if not generation_available:
+                # Try to import them again
+                try:
+                    import generator
+                    import spotify_client
+                    generation_available = True
+                    print("✓ Generation modules imported on demand")
+                except ImportError as e:
+                    print(f"⚠️ Core generation modules not available: {e}")
+                    return render_template(
+                        "index.html",
+                        error="Core generation modules are not available. The system is still starting up - please try again in a moment.",
+                        loras=loras,
+                        user=user
+                    )
             
             playlist_url = request.form.get("playlist_url")
             user_mood = request.form.get("mood", "").strip()
@@ -1047,7 +1084,7 @@ def index():
             
             lora_input = None
             if lora_name and lora_name != "none":
-                for lora_item in loras: # Iterate through lora_item from get_available_loras()
+                for lora_item in loras:
                     if hasattr(lora_item, 'name') and lora_item.name == lora_name:
                         lora_input = lora_item
                         break
@@ -1060,9 +1097,10 @@ def index():
                     user=user
                 )
             
-            # Ensure user_id is passed if your generate_cover expects it
-            result = generate_cover(playlist_url, user_mood, lora_input, 
-                                  negative_prompt=negative_prompt, user_id=user.id) 
+            # Generate the cover
+            import generator
+            result = generator.generate_cover(playlist_url, user_mood, lora_input, 
+                                            negative_prompt=negative_prompt, user_id=user.id) 
             
             if "error" in result:
                 return render_template(
@@ -1074,25 +1112,38 @@ def index():
             
             img_filename = os.path.basename(result["output_path"])
             
-            # Ensure chart_generator and calculate_genre_percentages are available
+            # Generate charts with fallback
             genres_chart_data = None
             genre_percentages_data = []
+            
             try:
-                from chart_generator import generate_genre_chart
-                genres_chart_data = generate_genre_chart(result.get("all_genres", []))
+                import chart_generator
+                genres_chart_data = chart_generator.generate_genre_chart(result.get("all_genres", []))
             except ImportError:
                 print("⚠️ chart_generator not available, skipping genre chart.")
-            except Exception as e_chart:
-                print(f"⚠️ Error generating genre chart: {e_chart}")
+            except Exception as e:
+                print(f"⚠️ Error generating genre chart: {e}")
 
             try:
-                # calculate_genre_percentages should be imported from utils
-                genre_percentages_data = calculate_genre_percentages(result.get("all_genres", []))
-            except NameError: # If utils failed to import it
-                 print("⚠️ calculate_genre_percentages not available, skipping percentages.")
-            except Exception as e_percent:
-                print(f"⚠️ Error calculating genre percentages: {e_percent}")
+                if 'utils_available' in globals() and utils_available:
+                    import utils
+                    genre_percentages_data = utils.calculate_genre_percentages(result.get("all_genres", []))
+                else:
+                    # Fallback calculation
+                    genre_percentages_data = calculate_genre_percentages(result.get("all_genres", []))
+            except Exception as e:
+                print(f"⚠️ Error calculating genre percentages: {e}")
 
+            # Extract playlist ID with fallback
+            playlist_id = None
+            try:
+                if 'utils_available' in globals() and utils_available:
+                    import utils
+                    playlist_id = utils.extract_playlist_id(playlist_url) if playlist_url and "playlist/" in playlist_url else None
+                else:
+                    playlist_id = extract_playlist_id(playlist_url) if playlist_url and "playlist/" in playlist_url else None
+            except Exception as e:
+                print(f"⚠️ Error extracting playlist ID: {e}")
             
             display_data = {
                 "title": result["title"],
@@ -1102,8 +1153,8 @@ def index():
                 "mood": result.get("mood", ""),
                 "playlist_name": result.get("item_name", "Your Music"),
                 "found_genres": bool(result.get("genres", [])),
-                "genres_chart": genres_chart_data, # Use the potentially None value
-                "genre_percentages": genre_percentages_data, # Use the potentially empty list
+                "genres_chart": genres_chart_data,
+                "genre_percentages": genre_percentages_data,
                 "playlist_url": playlist_url,
                 "user_mood": user_mood,
                 "negative_prompt": negative_prompt,
@@ -1111,15 +1162,15 @@ def index():
                 "lora_type": result.get("lora_type", ""),
                 "lora_url": result.get("lora_url", ""),
                 "user": user,
-                "can_edit_playlist": bool(user.spotify_access_token and user.refresh_spotify_token_if_needed()), # Check token validity
-                "playlist_id": extract_playlist_id(playlist_url) if playlist_url and "playlist/" in playlist_url else None
+                "can_edit_playlist": bool(user.spotify_access_token and user.refresh_spotify_token_if_needed()),
+                "playlist_id": playlist_id
             }
             
             # Record generation if successful
             try:
                 new_generation = GenerationResultDB(
                     title=result["title"],
-                    output_path=result["output_path"], # Store relative path or full, ensure consistency
+                    output_path=result["output_path"],
                     item_name=result.get("item_name"),
                     genres=result.get("genres"),
                     all_genres=result.get("all_genres"),
@@ -1130,22 +1181,22 @@ def index():
                 )
                 db.session.add(new_generation)
                 db.session.commit()
-            except Exception as e_db_save:
-                print(f"⚠️ Error saving generation result to DB: {e_db_save}")
-                # Decide if this is critical enough to show an error to the user
+            except Exception as e:
+                print(f"⚠️ Error saving generation result to DB: {e}")
 
             return render_template("result.html", **display_data)
+            
         except Exception as e:
-            print(f"❌ Server error processing request in POST: {e}")
+            print(f"❌ Server error processing request: {e}")
             import traceback
             traceback.print_exc()
             return render_template(
                 "index.html", 
                 error=f"An unexpected error occurred: {str(e)}. Please try again.",
-                loras=loras, # Ensure loras is passed
+                loras=loras,
                 user=user
             )
-    else: # GET request
+    else:
         return render_template("index.html", loras=loras, user=user)
 
 @app.route("/generated_covers/<path:filename>")
