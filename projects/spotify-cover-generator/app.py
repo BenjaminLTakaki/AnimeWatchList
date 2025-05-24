@@ -11,8 +11,8 @@ import requests
 import base64
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
-from sqlalchemy import text # Ensure this is at the top with other imports
-
+from sqlalchemy import text
+from collections import Counter # Added import
 
 # Make sure the current directory is in the path for imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -263,6 +263,123 @@ class GenerationResultDB(db.Model):
     lora_type = db.Column(db.String(20))
     lora_url = db.Column(db.String(500))
     user_id = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=True)
+
+# HELPER FUNCTIONS - ADD THESE HERE, BEFORE ANY ROUTES
+def login_required(f):
+    """Decorator to require login for routes"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            session_token = request.cookies.get('session_token')
+            if session_token:
+                user = LoginSession.get_user_from_session(session_token)
+                if user:
+                    session['user_id'] = user.id
+                    session['username'] = user.username or user.display_name
+                else:
+                    flash("Your session has expired. Please log in again.", "info")
+                    return redirect(url_for('login'))
+            else:
+                flash("Please log in to access this page.", "info")
+                return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def get_current_user():
+    """Get current logged in user"""
+    if 'user_id' not in session:
+        session_token = request.cookies.get('session_token')
+        if session_token:
+            user = LoginSession.get_user_from_session(session_token)
+            if user:
+                session['user_id'] = user.id
+                # Optionally, store more user info in session if frequently accessed
+                # session['username'] = user.username or user.display_name 
+                return user
+        return None
+    
+    # Optimization: Check if user object is already cached in session or g
+    # For now, simple DB query
+    try:
+        return User.query.get(session['user_id'])
+    except Exception as e:
+        print(f"Error fetching user by ID from session: {e}")
+        # Clear potentially invalid session user_id
+        session.pop('user_id', None)
+        session.pop('username', None)
+        return None
+
+def calculate_genre_percentages(genres_list):
+    """Calculate percentage distribution of genres"""
+    if not genres_list:
+        return []
+    
+    try:
+        # Attempt to use the more structured GenreAnalysis if available
+        from models import GenreAnalysis 
+        genre_analysis = GenreAnalysis.from_genre_list(genres_list)
+        return genre_analysis.get_percentages(max_genres=5)
+    except ImportError:
+        # Fallback if models.py or GenreAnalysis is not available
+        print("⚠️ models.GenreAnalysis not found, using fallback for calculate_genre_percentages.")
+        if not isinstance(genres_list, list): # Ensure it's a list
+            return []
+            
+        genre_counter = Counter(genres_list)
+        total_count = sum(genre_counter.values())
+        if total_count == 0:
+            return []
+            
+        sorted_genres = genre_counter.most_common(5)
+        
+        percentages = []
+        for genre, count in sorted_genres:
+            percentage = round((count / total_count) * 100)
+            percentages.append({
+                "name": genre,
+                "percentage": percentage,
+                "count": count  # Keep the count for potential display
+            })
+        return percentages
+
+def extract_playlist_id(playlist_url):
+    """Extract playlist ID from Spotify URL"""
+    if not playlist_url or "playlist/" not in playlist_url:
+        return None
+    try:
+        # Example: https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=...
+        #          -> 37i9dQZF1DXcBWIGoYBM5M
+        path_part = urlparse(playlist_url).path
+        if "/playlist/" in path_part:
+            return path_part.split("/playlist/")[-1].split("/")[0]
+    except Exception as e:
+        print(f"Error parsing playlist URL '{playlist_url}': {e}")
+    return None
+
+def ensure_tables_exist():
+    """Ensure tables exist before any database operation.
+       Uses app_context for database operations.
+    """
+    try:
+        with app.app_context(): # Ensure operations are within app context
+            # Quick check if a critical table exists
+            with db.engine.connect() as connection:
+                connection.execute(text("SELECT 1 FROM spotify_oauth_states LIMIT 1"))
+        # print("✓ Tables appear to exist.") # Optional: for debugging
+    except Exception: # Broad exception because specific DB errors can vary
+        print("⚠️ Tables missing or DB connection issue, attempting to create...")
+        try:
+            with app.app_context(): # Ensure db.create_all() is in app context
+                db.create_all()
+                # If you have a manual creation script and want to run it here:
+                # create_tables_manually() 
+                print("✓ Tables created/verified on-demand.")
+        except Exception as e_create:
+            print(f"❌ On-demand table creation failed: {e_create}")
+            # Depending on the application, you might want to raise this
+            # or handle it more gracefully, e.g., by preventing app startup.
+            # For now, just printing the error.
+            # raise # Uncomment to make table creation failure critical
 
 # Global initialization flag
 initialized = False
@@ -556,24 +673,6 @@ def admin_create_tables():
             "success": False,
             "error": str(e)
         }), 500
-
-# Add this near the top of your file, after the imports
-def ensure_tables_exist():
-    """Ensure tables exist before any database operation - SQLAlchemy 2.0+ compatible"""
-    try:
-        # Quick check if a critical table exists
-        with db.engine.connect() as connection:
-            connection.execute(text("SELECT 1 FROM spotify_oauth_states LIMIT 1"))
-    except:
-        print("⚠️ Tables missing, attempting to create...")
-        try:
-            with app.app_context():
-                db.create_all()
-                create_tables_manually()
-                print("✓ Tables created on-demand")
-        except Exception as e:
-            print(f"❌ On-demand table creation failed: {e}")
-            raise
 
 # Update your spotify_login route to ensure tables exist
 @app.route('/login/spotify')
