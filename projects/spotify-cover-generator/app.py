@@ -67,11 +67,11 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Add rate limiter (optional - for additional protection)
 limiter = Limiter(
-    app,
     key_func=get_remote_address,
-    default_limits=["100 per hour"],  # General rate limit
-    storage_uri="memory://"  # Use Redis in production: "redis://localhost:6379"
+    default_limits=["100 per hour"],  
+    storage_uri="memory://"  
 )
+limiter.init_app(app)
 
 # Initialize SQLAlchemy
 from flask_sqlalchemy import SQLAlchemy
