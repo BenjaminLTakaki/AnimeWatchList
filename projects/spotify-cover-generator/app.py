@@ -1145,7 +1145,7 @@ def edit_playlist():
         print(f"Error editing playlist: {e}")
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
-@app.route('/api/playlist/cover', methods=['POST'])
+@app.route('/api/playlist/cover', methods=['POST']) 
 @login_required
 def update_playlist_cover():
     """Update Spotify playlist cover image"""
@@ -1407,8 +1407,240 @@ def system_status():
             'error': str(e)
         }), 500
 
-# Login route
-# ... (keep existing login, logout, profile, spotify_login, spotify_callback, etc. routes) ...
+# Authentication Routes
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login route - handle both form login and Spotify OAuth"""
+    if request.method == 'POST':
+        # Handle form-based login (if you have username/password)
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if username and password:
+            user = User.query.filter_by(username=username).first()
+            if user and check_password_hash(user.password_hash, password):
+                # Create session
+                session_token = secrets.token_urlsafe(32)
+                login_session = LoginSession(
+                    user_id=user.id,
+                    session_token=session_token,
+                    expires_at=datetime.datetime.utcnow() + timedelta(days=30),
+                    ip_address=request.remote_addr,
+                    user_agent=request.headers.get('User-Agent', '')
+                )
+                db.session.add(login_session)
+                user.last_login = datetime.datetime.utcnow()
+                db.session.commit()
+                
+                session['user_session'] = session_token
+                flash('Logged in successfully!', 'success')
+                return redirect(url_for('generate'))
+            else:
+                flash('Invalid username or password', 'error')
+        else:
+            flash('Please enter both username and password', 'error')
+    
+    # For GET requests or failed login, show login page
+    return render_template('login.html', user_info=get_current_user_or_guest())
+
+@app.route('/logout')
+def logout():
+    """Logout route"""
+    if 'user_session' in session:
+        # Mark session as inactive
+        session_token = session['user_session']
+        login_session = LoginSession.query.filter_by(session_token=session_token).first()
+        if login_session:
+            login_session.is_active = False
+            db.session.commit()
+        
+        session.pop('user_session', None)
+    
+    # Clear guest session data as well
+    session.pop('guest_session_id', None)
+    session.pop('guest_created', None) 
+    session.pop('guest_generations_today', None)
+    session.pop('guest_last_generation', None)
+    
+    flash('You have been logged out', 'info')
+    return redirect(url_for('login'))
+
+@app.route('/profile')
+@login_required
+def profile():
+    """User profile page"""
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('login'))
+    
+    # Get user statistics
+    total_generations = GenerationResultDB.query.filter_by(user_id=user.id).count()
+    generations_today = user.get_generations_today()
+    daily_limit = user.get_daily_generation_limit()
+    
+    # Get recent generations
+    recent_generations = (GenerationResultDB.query
+                         .filter_by(user_id=user.id)
+                         .order_by(GenerationResultDB.created_at.desc())
+                         .limit(10)
+                         .all())
+    
+    profile_data = {
+        'user': user,
+        'total_generations': total_generations,
+        'generations_today': generations_today,
+        'daily_limit': daily_limit,
+        'can_generate': user.can_generate_today(),
+        'recent_generations': recent_generations,
+        'spotify_connected': bool(user.spotify_access_token),
+        'is_premium': user.is_premium_user()
+    }
+    
+    return render_template('profile.html', **profile_data, user_info=get_current_user_or_guest())
+
+@app.route('/spotify-login')
+def spotify_login():
+    """Initiate Spotify OAuth flow"""
+    if not SPOTIFY_CLIENT_ID:
+        flash('Spotify integration is not configured', 'error')
+        return redirect(url_for('generate'))
+    
+    # Generate state for CSRF protection
+    state = secrets.token_urlsafe(32)
+    oauth_state = OAuthState(state=state)
+    db.session.add(oauth_state)
+    db.session.commit()
+    
+    # Spotify OAuth parameters
+    scope = 'playlist-read-private playlist-modify-public playlist-modify-private ugc-image-upload'
+    redirect_uri = request.url_root.rstrip('/') + url_for('spotify_callback')
+    
+    auth_url = (
+        'https://accounts.spotify.com/authorize?'
+        f'client_id={SPOTIFY_CLIENT_ID}&'
+        f'response_type=code&'
+        f'redirect_uri={redirect_uri}&'
+        f'scope={scope}&'
+        f'state={state}'
+    )
+    
+    return redirect(auth_url)
+
+@app.route('/spotify-callback')
+def spotify_callback():
+    """Handle Spotify OAuth callback"""
+    try:
+        code = request.args.get('code')
+        state = request.args.get('state')
+        error = request.args.get('error')
+        
+        if error:
+            flash(f'Spotify authorization failed: {error}', 'error')
+            return redirect(url_for('generate'))
+        
+        if not code or not state:
+            flash('Invalid Spotify callback', 'error')
+            return redirect(url_for('generate'))
+        
+        # Verify state
+        oauth_state = OAuthState.query.filter_by(state=state, used=False).first()
+        if not oauth_state:
+            flash('Invalid state parameter', 'error')
+            return redirect(url_for('generate'))
+        
+        # Mark state as used
+        oauth_state.used = True
+        db.session.commit()
+        
+        # Exchange code for tokens
+        redirect_uri = request.url_root.rstrip('/') + url_for('spotify_callback')
+        token_data = {
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': redirect_uri,
+            'client_id': SPOTIFY_CLIENT_ID,
+            'client_secret': SPOTIFY_CLIENT_SECRET
+        }
+        
+        response = requests.post('https://accounts.spotify.com/api/token', data=token_data)
+        
+        if response.status_code != 200:
+            flash('Failed to get Spotify tokens', 'error')
+            return redirect(url_for('generate'))
+        
+        tokens = response.json()
+        access_token = tokens['access_token']
+        refresh_token = tokens.get('refresh_token')
+        expires_in = tokens.get('expires_in', 3600)
+        
+        # Get user info from Spotify
+        headers = {'Authorization': f'Bearer {access_token}'}
+        user_response = requests.get('https://api.spotify.com/v1/me', headers=headers)
+        
+        if user_response.status_code != 200:
+            flash('Failed to get Spotify user info', 'error')
+            return redirect(url_for('generate'))
+        
+        spotify_user = user_response.json()
+        spotify_id = spotify_user['id']
+        
+        # Find or create user
+        user = User.query.filter_by(spotify_id=spotify_id).first()
+        
+        if not user:
+            # Create new user
+            user = User(
+                spotify_id=spotify_id,
+                spotify_username=spotify_user.get('id'),
+                display_name=spotify_user.get('display_name', spotify_user.get('id')),
+                email=spotify_user.get('email'),
+                is_premium=spotify_user.get('product') == 'premium'
+            )
+            db.session.add(user)
+        else:
+            # Update existing user
+            user.display_name = spotify_user.get('display_name', spotify_user.get('id'))
+            user.email = spotify_user.get('email')
+            user.is_premium = spotify_user.get('product') == 'premium'
+        
+        # Update tokens
+        user.spotify_access_token = access_token
+        user.spotify_refresh_token = refresh_token
+        user.spotify_token_expires = datetime.datetime.utcnow() + timedelta(seconds=expires_in)
+        user.last_login = datetime.datetime.utcnow()
+        
+        db.session.commit()
+        
+        # Create login session
+        session_token = secrets.token_urlsafe(32)
+        login_session = LoginSession(
+            user_id=user.id,
+            session_token=session_token,
+            expires_at=datetime.datetime.utcnow() + timedelta(days=30),
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
+        db.session.add(login_session)
+        db.session.commit()
+        
+        session['user_session'] = session_token
+        flash('Successfully connected to Spotify!', 'success')
+        
+        # Track conversion if they were a guest
+        track_guest_conversion()
+        
+        return redirect(url_for('generate'))
+        
+    except Exception as e:
+        print(f"Error in Spotify callback: {e}")
+        flash('An error occurred during Spotify authorization', 'error')
+        return redirect(url_for('generate'))
+
+# Fix the result template reference to 'index'
+@app.route('/index')
+def index():
+    """Redirect /index to /generate for backward compatibility"""
+    return redirect(url_for('generate'))
 
 if __name__ == '__main__':
     # For Render deployment

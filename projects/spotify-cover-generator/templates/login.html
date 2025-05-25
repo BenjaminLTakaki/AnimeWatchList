@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Spotify Cover Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 Spotify Cover Generator</h1>
+            <p>Login to your account</p>
+        </div>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="login-container">
+            <!-- Spotify Login (Primary) -->
+            <div class="spotify-login-section">
+                <h2>🎵 Continue with Spotify</h2>
+                <p>Connect your Spotify account to generate custom playlist covers</p>
+                <a href="{{ url_for('spotify_login') }}" class="spotify-login-btn">
+                    <img src="{{ url_for('static', filename='images/Spotify_Primary_Logo_RGB_Green.png') }}" alt="Spotify Logo" class="spotify-logo">
+                    Connect with Spotify
+                </a>
+                <p class="spotify-note">✓ Generate unlimited covers<br>✓ Edit your playlists directly<br>✓ Access premium features</p>
+            </div>
+
+            <!-- Divider -->
+            <div class="login-divider">
+                <span>or</span>
+            </div>
+
+            <!-- Traditional Login Form (if implemented) -->
+            <div class="traditional-login-section">
+                <h2>Username Login</h2>
+                <form method="POST" class="login-form">
+                    <div class="form-group">
+                        <label for="username">Username:</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password:</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="button primary">Login</button>
+                </form>
+                
+                <div class="auth-links">
+                    <p>Don't have an account? <a href="{{ url_for('register') }}">Sign up here</a></p>
+                </div>
+            </div>
+
+            <!-- Guest Access -->
+            <div class="guest-section">
+                <h3>Try as Guest</h3>
+                <p>Get 1 free generation per day without signing up</p>
+                <a href="{{ url_for('generate') }}" class="button secondary">Continue as Guest</a>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .login-container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .spotify-login-section {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px;
+            background: #1a1a1a;
+            border-radius: 15px;
+            border: 2px solid #1DB954;
+        }
+
+        .spotify-login-btn {
+            display: inline-flex;
+            align-items: center;
+            background: #1DB954;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        .spotify-login-btn:hover {
+            background: #1ed760;
+        }
+
+        .spotify-logo {
+            width: 24px;
+            height: 24px;
+            margin-right: 10px;
+        }
+
+        .spotify-note {
+            margin-top: 15px;
+            color: #ccc;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .login-divider {
+            text-align: center;
+            margin: 30px 0;
+            position: relative;
+        }
+
+        .login-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #333;
+            z-index: 1;
+        }
+
+        .login-divider span {
+            background: #000;
+            padding: 0 20px;
+            color: #ccc;
+            position: relative;
+            z-index: 2;
+        }
+
+        .traditional-login-section {
+            background: #1a1a1a;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .login-form .form-group {
+            margin-bottom: 20px;
+        }
+
+        .login-form label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ccc;
+        }
+
+        .login-form input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #000;
+            color: white;
+            font-size: 16px;
+        }
+
+        .login-form input:focus {
+            outline: none;
+            border-color: #1DB954;
+        }
+
+        .auth-links {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .auth-links a {
+            color: #1DB954;
+            text-decoration: none;
+        }
+
+        .auth-links a:hover {
+            text-decoration: underline;
+        }
+
+        .guest-section {
+            text-align: center;
+            padding: 20px;
+            background: #111;
+            border-radius: 10px;
+        }
+
+        .flash-message {
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .flash-message.success {
+            background: #1DB954;
+            color: white;
+        }
+
+        .flash-message.error {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .flash-message.info {
+            background: #3498db;
+            color: white;
+        }
+    </style>
+</body>
+</html>
