@@ -1620,7 +1620,8 @@ def spotify_login():
     if not SPOTIFY_CLIENT_ID:
         flash('Spotify integration is not configured', 'error')
         return redirect(url_for('generate'))
-      # Generate state for CSRF protection
+    
+    # Generate state for CSRF protection
     state = secrets.token_urlsafe(32)
     oauth_state = SpotifyState(state=state)
     db.session.add(oauth_state)
@@ -1628,7 +1629,10 @@ def spotify_login():
     
     # Spotify OAuth parameters
     scope = 'playlist-read-private playlist-modify-public playlist-modify-private ugc-image-upload'
-    redirect_uri = request.url_root.rstrip('/') + url_for('spotify_callback')
+    
+    # FIXED: Use absolute URL construction to avoid path duplication
+    base_url = request.url_root.rstrip('/')  # Remove trailing slash
+    redirect_uri = f"{base_url}/spotify/spotify-callback"  # Construct absolute URL
     
     auth_url = (
         'https://accounts.spotify.com/authorize?'
@@ -1656,7 +1660,8 @@ def spotify_callback():
         if not code or not state:
             flash('Invalid Spotify callback', 'error')
             return redirect(url_for('generate'))
-          # Verify state
+        
+        # Verify state
         oauth_state = SpotifyState.query.filter_by(state=state, used=False).first()
         if not oauth_state:
             flash('Invalid state parameter', 'error')
@@ -1667,7 +1672,10 @@ def spotify_callback():
         db.session.commit()
         
         # Exchange code for tokens
-        redirect_uri = request.url_root.rstrip('/') + url_for('spotify_callback')
+        # FIXED: Use same absolute URL construction for consistency
+        base_url = request.url_root.rstrip('/')
+        redirect_uri = f"{base_url}/spotify/spotify-callback"
+        
         token_data = {
             'grant_type': 'authorization_code',
             'code': code,
