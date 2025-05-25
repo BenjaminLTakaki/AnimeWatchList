@@ -2,7 +2,8 @@ import os
 import sys
 import random
 import json
-from datetime import datetime, timedelta
+import datetime
+from datetime import timedelta
 from flask import Flask, request, render_template, send_from_directory, jsonify, session, redirect, url_for, flash
 from pathlib import Path
 from urllib.parse import urlparse
@@ -138,7 +139,7 @@ class User(db.Model):
             return False
             
         if (self.spotify_token_expires and 
-            self.spotify_token_expires <= datetime.datetime.utcnow() + datetime.timedelta(minutes=5)):
+            self.spotify_token_expires <= datetime.datetime.utcnow() + timedelta(minutes=5)):
             return self._refresh_spotify_token()
         
         return True
@@ -171,7 +172,7 @@ class User(db.Model):
             if response.status_code == 200:
                 token_data = response.json()
                 self.spotify_access_token = token_data['access_token']
-                self.spotify_token_expires = datetime.datetime.utcnow() + datetime.timedelta(
+                self.spotify_token_expires = datetime.datetime.utcnow() + timedelta(
                     seconds=token_data['expires_in']
                 )
                 
@@ -215,7 +216,7 @@ class LoginSession(db.Model):
     @staticmethod
     def create_session(user_id, ip_address=None, user_agent=None):
         session_token = secrets.token_urlsafe(32)
-        expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=30)
+        expires_at = datetime.datetime.utcnow() + timedelta(days=30)
         
         session = LoginSession(
             user_id=user_id,
@@ -263,7 +264,7 @@ class SpotifyState(db.Model):
     @staticmethod
     def verify_and_use_state(state):
         oauth_state = SpotifyState.query.filter_by(state=state, used=False).first()
-        if oauth_state and oauth_state.created_at > datetime.datetime.utcnow() - datetime.timedelta(minutes=10):
+        if oauth_state and oauth_state.created_at > datetime.datetime.utcnow() - timedelta(minutes=10):
             oauth_state.used = True
             db.session.commit()
             return True
@@ -727,7 +728,7 @@ def get_or_create_guest_session():
     """Get or create a guest session for anonymous users"""
     if 'guest_session_id' not in session:
         session['guest_session_id'] = str(uuid.uuid4())
-        session['guest_created'] = datetime.utcnow().isoformat()
+        session['guest_created'] = datetime.datetime.utcnow().isoformat()
         session['guest_generations_today'] = 0
         session['guest_last_generation'] = None
     return session['guest_session_id']
@@ -739,8 +740,8 @@ def get_guest_generations_today():
     
     # Check if it's a new day
     if 'guest_last_generation' in session and session['guest_last_generation']:
-        last_gen = datetime.fromisoformat(session['guest_last_generation'])
-        if last_gen.date() != datetime.utcnow().date():
+        last_gen = datetime.datetime.fromisoformat(session['guest_last_generation'])
+        if last_gen.date() != datetime.datetime.utcnow().date():
             session['guest_generations_today'] = 0
     
     return session.get('guest_generations_today', 0)
@@ -748,7 +749,7 @@ def get_guest_generations_today():
 def increment_guest_generations():
     """Increment guest generation count"""
     session['guest_generations_today'] = get_guest_generations_today() + 1
-    session['guest_last_generation'] = datetime.utcnow().isoformat()
+    session['guest_last_generation'] = datetime.datetime.utcnow().isoformat()
 
 def can_guest_generate():
     """Check if guest can generate (limit: 1 per day)"""
@@ -768,14 +769,15 @@ def cleanup_expired_guest_sessions():
 def check_ip_generation_limit(ip_address):
     """Check if IP has exceeded daily generation limit"""
     try:
-        from datetime import datetime, timedelta
+        import datetime
+        from datetime import timedelta
         import json
         from pathlib import Path
         
         # Simple file-based tracking (use Redis in production)
         ip_log_file = Path("ip_generations.json")
         
-        today = datetime.now().date().isoformat()
+        today = datetime.datetime.now().date().isoformat()
         
         # Load existing data
         ip_data = {}
@@ -809,10 +811,10 @@ def increment_ip_generation_count(ip_address):
     try:
         import json
         from pathlib import Path
-        from datetime import datetime
+        import datetime
         
         ip_log_file = Path("ip_generations.json")
-        today = datetime.now().date().isoformat()
+        today = datetime.datetime.now().date().isoformat()
         
         # Load existing data
         ip_data = {}
