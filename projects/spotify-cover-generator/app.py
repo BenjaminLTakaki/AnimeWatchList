@@ -890,6 +890,15 @@ def track_guest_generation():
     except Exception as e:
         print(f"Error tracking guest generation: {e}")
 
+# Context processor to inject common template variables
+@app.context_processor
+def inject_template_vars():
+    """Inject common variables into all templates"""
+    return {
+        'current_year': datetime.datetime.now().year,
+        'user_info': get_current_user_or_guest()
+    }
+
 # Update the root route
 @app.route("/")
 def root():
@@ -904,8 +913,7 @@ def root():
 @limiter.limit("10 per hour", methods=["POST"]) # Limit POST requests specifically for this route
 def generate(): # Renamed from 'index' to 'generate'
     global initialized
-    
-    # Get user or guest info
+      # Get user or guest info
     user_info = get_current_user_or_guest()
     
     if request.method == "POST" and not user_info['can_generate']:
@@ -913,8 +921,7 @@ def generate(): # Renamed from 'index' to 'generate'
             "index.html",
             error=f"Daily generation limit reached ({user_info['daily_limit']} per day). " + 
                   ("Try again tomorrow!" if user_info['type'] == 'guest' else "Try again tomorrow or upgrade to premium!"),
-            loras=[],
-            user_info=user_info
+            loras=[]
         )
     
     if not initialized:
@@ -925,8 +932,7 @@ def generate(): # Renamed from 'index' to 'generate'
             return render_template(
                 "index.html", 
                 error="Application is still initializing or encountered an issue. Please try again in a moment.",
-                loras=[],
-                user_info=user_info
+                loras=[]
             )
     
     # Get available loras (only for logged-in users)
@@ -958,8 +964,7 @@ def generate(): # Renamed from 'index' to 'generate'
                     return render_template(
                         "index.html",
                         error="Core generation modules are not available. The system is still starting up - please try again in a moment.",
-                        loras=loras,
-                        user_info=user_info
+                        loras=loras
                     )
             
             playlist_url = request.form.get("playlist_url")
@@ -972,8 +977,7 @@ def generate(): # Renamed from 'index' to 'generate'
                 return render_template(
                     "index.html", 
                     error="LoRA styles are only available for registered users. Please sign up for free to access advanced features!",
-                    loras=[],
-                    user_info=user_info
+                    loras=[]
                 )
             
             lora_input = None
@@ -987,22 +991,20 @@ def generate(): # Renamed from 'index' to 'generate'
                 return render_template(
                     "index.html", 
                     error="Please enter a Spotify playlist or album URL.",
-                    loras=loras,
-                    user_info=user_info
+                    loras=loras
                 )
             
             # Generate the cover
             import generator
             user_id = user_info['user'].id if user_info['type'] == 'user' else None
             result = generator.generate_cover(playlist_url, user_mood, lora_input, 
-                                            negative_prompt=negative_prompt, user_id=user_id) 
+                                negative_prompt=negative_prompt, user_id=user_id) 
             
             if "error" in result:
                 return render_template(
                     "index.html", 
                     error=result["error"],
-                    loras=loras,
-                    user_info=user_info
+                    loras=loras
                 )
             
             # Increment generation count
@@ -1084,7 +1086,6 @@ def generate(): # Renamed from 'index' to 'generate'
                     print(f"⚠️ Error saving generation result to DB: {e}")
 
             return render_template("result.html", **display_data)
-            
         except Exception as e:
             print(f"❌ Server error processing request: {e}")
             import traceback
@@ -1092,11 +1093,10 @@ def generate(): # Renamed from 'index' to 'generate'
             return render_template(
                 "index.html", 
                 error=f"An unexpected error occurred: {str(e)}. Please try again.",
-                loras=loras,
-                user_info=user_info
+                loras=loras
             )
     else:
-        return render_template("index.html", loras=loras, user_info=user_info)
+        return render_template("index.html", loras=loras)
 
 @app.route('/api/playlist/edit', methods=['POST'])
 @login_required
@@ -1455,7 +1455,7 @@ def register():
             flash('Registration failed. Please try again.', 'error')
             return redirect(url_for('register'))
         
-    return render_template('register.html', user_info=get_current_user_or_guest())
+    return render_template('register.html')
 
 # Optional: Analytics tracking
 def log_generation_analytics(user_info, success=True):
@@ -1557,7 +1557,7 @@ def login():
             flash('Please enter both username and password', 'error')
     
     # For GET requests or failed login, show login page
-    return render_template('login.html', user_info=get_current_user_or_guest())
+    return render_template('login.html')
 
 @app.route('/logout')
 def logout():
@@ -1612,7 +1612,7 @@ def profile():
         'is_premium': user.is_premium_user()
     }
     
-    return render_template('profile.html', **profile_data, user_info=get_current_user_or_guest())
+    return render_template('profile.html', **profile_data)
 
 @app.route('/spotify-login')
 def spotify_login():
