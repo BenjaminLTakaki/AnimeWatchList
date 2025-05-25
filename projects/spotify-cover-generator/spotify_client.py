@@ -93,8 +93,9 @@ def extract_playlist_data(playlist_url):
         if not tracks:
             return {"error": "No tracks found in the playlist or album"}
         
-        # Extract all artist IDs from tracks
+        # Extract all artist IDs and info from tracks
         artists = []
+        artist_ids = []  # NEW: Collect artist IDs
         track_names = []
         
         for item in tracks:
@@ -106,6 +107,7 @@ def extract_playlist_data(playlist_url):
                 for artist in track.get("artists"):
                     if artist.get("id"):
                         artists.append(artist.get("id"))
+                        artist_ids.append(artist.get("id"))  # NEW: Store artist ID
         
         if not artists:
             return {"error": "No artists found in tracks"}
@@ -129,7 +131,7 @@ def extract_playlist_data(playlist_url):
         # Create genre analysis
         genre_analysis = GenreAnalysis.from_genre_list(genres)
         
-        # Create playlist data
+        # Create playlist data - MODIFIED to include artist IDs
         playlist_data = PlaylistData(
             item_name=item_name,
             track_names=track_names[:10],
@@ -138,7 +140,15 @@ def extract_playlist_data(playlist_url):
             found_genres=bool(genres)
         )
         
-        return playlist_data
+        # Add artist IDs to the playlist data dict when converted
+        playlist_dict = playlist_data.to_dict()
+        playlist_dict["artist_ids"] = list(set(artist_ids))  # NEW: Add unique artist IDs
+        
+        # Convert back to PlaylistData object but with the extra data
+        # You might want to modify your PlaylistData class to include artist_ids
+        # Or just work with the dict that now has artist_ids
+        
+        return playlist_data  # This will be converted to dict in your generator
         
     except Exception as e:
         print(f"Error extracting data: {e}")

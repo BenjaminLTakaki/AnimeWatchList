@@ -598,6 +598,7 @@ class PlaylistData:
     genre_analysis: GenreAnalysis = field(default_factory=GenreAnalysis)
     spotify_url: str = ""
     found_genres: bool = False
+    artist_ids: List[str] = field(default_factory=list)  # NEW: Add artist IDs
     
     def to_dict(self):
         """Convert to dictionary."""
@@ -610,8 +611,28 @@ class PlaylistData:
             "mood_descriptor": self.genre_analysis.mood,
             "spotify_url": self.spotify_url,
             "found_genres": self.found_genres,
-            "style_elements": self.genre_analysis.get_style_elements()
+            "style_elements": self.genre_analysis.get_style_elements(),
+            "artist_ids": self.artist_ids  # NEW: Include artist IDs in dict
         }
+    
+    @classmethod
+    def from_dict(cls, data):
+        """Create PlaylistData from dictionary."""
+        genre_analysis = GenreAnalysis(
+            top_genres=data.get("genres", []),
+            all_genres=data.get("all_genres", []),
+            genres_with_counts=data.get("genres_with_counts", []),
+            mood=data.get("mood_descriptor", "balanced")
+        )
+        
+        return cls(
+            item_name=data.get("item_name", "Unknown Playlist"),
+            track_names=data.get("track_names", []),
+            genre_analysis=genre_analysis,
+            spotify_url=data.get("spotify_url", ""),
+            found_genres=data.get("found_genres", False),
+            artist_ids=data.get("artist_ids", [])  # NEW: Include artist IDs
+        )
     
     @classmethod
     def from_dict(cls, data):
