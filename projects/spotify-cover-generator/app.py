@@ -332,28 +332,60 @@ def login_required(f):
     return decorated_function
 
 def get_current_user():
-    """Get current logged in user"""
-    if 'user_id' not in session:
-        session_token = request.cookies.get('session_token')
-        if session_token:
-            user = LoginSession.get_user_from_session(session_token)
-            if user:
-                session['user_id'] = user.id
-                # Optionally, store more user info in session if frequently accessed
-                # session['username'] = user.username or user.display_name 
-                return user
-        return None
+    """Get current logged in user with better debugging"""
+    print(f"Debug - Checking session for user_id: {'user_id' in session}")
+    print(f"Debug - Checking session for user_session: {'user_session' in session}")
     
-    # Optimization: Check if user object is already cached in session or g
-    # For now, simple DB query
-    try:
-        return User.query.get(session['user_id'])
-    except Exception as e:
-        print(f"Error fetching user by ID from session: {e}")
-        # Clear potentially invalid session user_id
-        session.pop('user_id', None)
-        session.pop('username', None)
-        return None
+    # First check if we have user_id in session (from Spotify OAuth)
+    if 'user_id' in session:
+        try:
+            user = User.query.get(session['user_id'])
+            if user:
+                print(f"Debug - Found user via session user_id: {user.display_name}")
+                return user
+        except Exception as e:
+            print(f"Debug - Error fetching user by session user_id: {e}")
+    
+    # Check if we have user_session token (from login sessions)
+    if 'user_session' in session:
+        try:
+            session_token = session['user_session']
+            login_session = LoginSession.query.filter_by(session_token=session_token, is_active=True).first()
+            if login_session and login_session.expires_at > datetime.datetime.utcnow():
+                user = login_session.user
+                if user:
+                    print(f"Debug - Found user via session token: {user.display_name}")
+                    # Also set user_id in session for consistency
+                    session['user_id'] = user.id
+                    return user
+            else:
+                print("Debug - Session token expired or invalid")
+                # Clean up expired session
+                if 'user_session' in session:
+                    session.pop('user_session', None)
+        except Exception as e:
+            print(f"Debug - Error fetching user by session token: {e}")
+    
+    # Check for session_token cookie as fallback
+    session_token = request.cookies.get('session_token')
+    if session_token:
+        try:
+            login_session = LoginSession.query.filter_by(session_token=session_token, is_active=True).first()
+            if login_session and login_session.expires_at > datetime.datetime.utcnow():
+                user = login_session.user
+                if user:
+                    print(f"Debug - Found user via cookie: {user.display_name}")
+                    # Set session variables
+                    session['user_id'] = user.id
+                    session['user_session'] = session_token
+                    return user
+            else:
+                print("Debug - Cookie session token expired or invalid")
+        except Exception as e:
+            print(f"Debug - Error fetching user by cookie: {e}")
+    
+    print("Debug - No valid user session found")
+    return None
 
 def calculate_genre_percentages(genres_list):
     """Calculate percentage distribution of genres"""
@@ -903,10 +935,18 @@ def inject_template_vars():
 @app.route("/")
 def root():
     """Root route - redirect to login if not authenticated, otherwise to main app"""
+    # Debug: Print session info
+    print(f"Debug - Session contents: {dict(session)}")
+    print(f"Debug - Cookies: {dict(request.cookies)}")
+    
     user = get_current_user()
+    print(f"Debug - Current user: {user}")
+    
     if user:
-        return redirect(url_for('generate')) # Fixed: redirect to 'generate'
+        print(f"Debug - User found: {user.display_name or user.username}")
+        return redirect(url_for('generate'))
     else:
+        print("Debug - No user found, redirecting to login")
         return redirect(url_for('login'))
 
 @app.route("/generate", methods=["GET", "POST"])
@@ -1650,6 +1690,8 @@ def spotify_callback():
         state = request.args.get('state')
         error = request.args.get('error')
         
+        print(f"Debug - Spotify callback: code={bool(code)}, state={bool(state)}, error={error}")
+        
         if error:
             flash(f'Spotify authorization failed: {error}', 'error')
             return redirect(url_for('generate'))
@@ -1668,11 +1710,13 @@ def spotify_callback():
         oauth_state.used = True
         db.session.commit()
         
-        # Exchange code for tokens using SPOTIFY_REDIRECT_URI from config
+        # Exchange code for tokens
+        redirect_uri = SPOTIFY_REDIRECT_URI
+        
         token_data = {
             'grant_type': 'authorization_code',
             'code': code,
-            'redirect_uri': SPOTIFY_REDIRECT_URI,
+            'redirect_uri': redirect_uri,
             'client_id': SPOTIFY_CLIENT_ID,
             'client_secret': SPOTIFY_CLIENT_SECRET
         }
@@ -1680,6 +1724,7 @@ def spotify_callback():
         response = requests.post('https://accounts.spotify.com/api/token', data=token_data)
         
         if response.status_code != 200:
+            print(f"Debug - Token exchange failed: {response.status_code} - {response.text}")
             flash('Failed to get Spotify tokens', 'error')
             return redirect(url_for('generate'))
         
@@ -1688,21 +1733,27 @@ def spotify_callback():
         refresh_token = tokens.get('refresh_token')
         expires_in = tokens.get('expires_in', 3600)
         
+        print(f"Debug - Got Spotify tokens successfully")
+        
         # Get user info from Spotify
         headers = {'Authorization': f'Bearer {access_token}'}
         user_response = requests.get('https://api.spotify.com/v1/me', headers=headers)
         
         if user_response.status_code != 200:
+            print(f"Debug - Failed to get Spotify user info: {user_response.status_code}")
             flash('Failed to get Spotify user info', 'error')
             return redirect(url_for('generate'))
         
         spotify_user = user_response.json()
         spotify_id = spotify_user['id']
         
+        print(f"Debug - Got Spotify user: {spotify_id}")
+        
         # Find or create user
         user = User.query.filter_by(spotify_id=spotify_id).first()
         
         if not user:
+            print("Debug - Creating new user")
             # Create new user
             user = User(
                 spotify_id=spotify_id,
@@ -1713,6 +1764,7 @@ def spotify_callback():
             )
             db.session.add(user)
         else:
+            print("Debug - Updating existing user")
             # Update existing user
             user.display_name = spotify_user.get('display_name', spotify_user.get('id'))
             user.email = spotify_user.get('email')
@@ -1726,6 +1778,8 @@ def spotify_callback():
         
         db.session.commit()
         
+        print(f"Debug - User saved with ID: {user.id}")
+        
         # Create login session
         session_token = secrets.token_urlsafe(32)
         login_session = LoginSession(
@@ -1738,16 +1792,30 @@ def spotify_callback():
         db.session.add(login_session)
         db.session.commit()
         
+        print(f"Debug - Created login session: {session_token}")
+        
+        # Set BOTH session variables for compatibility
         session['user_session'] = session_token
+        session['user_id'] = user.id
+        session['username'] = user.display_name or user.username
+        
+        print(f"Debug - Set session variables: user_id={user.id}, user_session={session_token}")
+        
+        # Also set cookie as backup
+        response = redirect(url_for('generate'))
+        response.set_cookie('session_token', session_token, max_age=30*24*60*60)  # 30 days
+        
         flash('Successfully connected to Spotify!', 'success')
         
         # Track conversion if they were a guest
         track_guest_conversion()
         
-        return redirect(url_for('generate'))
+        return response
         
     except Exception as e:
         print(f"Error in Spotify callback: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         flash('An error occurred during Spotify authorization', 'error')
         return redirect(url_for('generate'))
 
