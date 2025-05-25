@@ -1030,9 +1030,7 @@ def generate(): # Renamed from 'index' to 'generate'
                 else:
                     genre_percentages_data = calculate_genre_percentages(result.get("all_genres", []))
             except Exception as e:
-                print(f"⚠️ Error calculating genre percentages: {e}")
-
-            # Extract playlist ID with fallback
+                print(f"⚠️ Error calculating genre percentages: {e}")            # Extract playlist ID with fallback
             playlist_id = None
             try:
                 if 'utils_available' in globals() and utils_available:
@@ -1060,6 +1058,7 @@ def generate(): # Renamed from 'index' to 'generate'
                 "lora_type": result.get("lora_type", ""),
                 "lora_url": result.get("lora_url", ""),
                 "user_info": user_info,
+                "user": user_info.get('user'),  # Add user object for template compatibility
                 "can_edit_playlist": user_info['can_edit_playlists'],
                 "playlist_id": playlist_id
             }
