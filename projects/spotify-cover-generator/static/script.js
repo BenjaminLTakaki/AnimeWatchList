@@ -1,5 +1,9 @@
 // Updated JavaScript for handling form and UI functionality
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if user is in guest mode
+    const userHeader = document.querySelector('.user-header');
+    const isGuestMode = userHeader && userHeader.textContent.includes('Guest');
+    
     // Add visual feedback when pasting Spotify URL
     const playlistUrlInput = document.getElementById('playlist_url');
     if (playlistUrlInput) {
@@ -28,31 +32,53 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Add loading state to form submission
+    // Enhanced loading state for form submission
     const form = document.querySelector('form');
     if (form) {
         form.addEventListener('submit', function() {
             const submitButton = this.querySelector('.submit-btn');
-            if (submitButton) {
+            if (submitButton && !submitButton.disabled) {
                 submitButton.disabled = true;
                 submitButton.innerHTML = 'Generating... <span class="spinner"></span>';
                 submitButton.classList.add('loading');
+                
+                // Create a loading overlay with guest-specific messaging
+                const loadingOverlay = document.createElement('div');
+                loadingOverlay.className = 'loading-overlay';
+                
+                let loadingMessage = 'Analyzing music and generating cover art...';
+                let subMessage = 'This may take a minute or two';
+                
+                if (isGuestMode) {
+                    subMessage = 'This is your free generation for today!';
+                }
+                
+                loadingOverlay.innerHTML = `
+                    <div class="loading-content">
+                        <div class="loading-spinner"></div>
+                        <p>${loadingMessage}</p>
+                        <p class="loading-subtext">${subMessage}</p>
+                        ${isGuestMode ? '<p class="loading-subtext" style="color: #1DB954;">Sign up for more generations!</p>' : ''}
+                    </div>
+                `;
+                document.body.appendChild(loadingOverlay);
             }
-            // Create a loading overlay
-            const loadingOverlay = document.createElement('div');
-            loadingOverlay.className = 'loading-overlay';
-            loadingOverlay.innerHTML = `
-                <div class="loading-content">
-                    <div class="loading-spinner"></div>
-                    <p>Analyzing music and generating cover art...</p>
-                    <p class="loading-subtext">This may take a minute or two</p>
-                </div>
-            `;
-            document.body.appendChild(loadingOverlay);
             
             // Allow form submission to continue
             return true;
         });
+    }
+    
+    // Guest mode specific features
+    if (isGuestMode) {
+        // Add guest mode indicators
+        addGuestModeIndicators();
+        
+        // Show upgrade prompts
+        showGuestUpgradePrompts();
+        
+        // Track guest interactions
+        trackGuestInteractions();
     }
     
     // On result page, add animation for cover reveal
@@ -68,7 +94,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // LoRA file upload handling
+    // LoRA file upload handling (only for registered users)
     const loraUploadForm = document.getElementById('lora-upload-form');
     if (loraUploadForm) {
         loraUploadForm.addEventListener('submit', function(e) {
@@ -176,6 +202,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     setTimeout(() => {
                         this.textContent = 'Copy Title';
                     }, 2000);
+                    
+                    // Show guest upgrade hint
+                    if (isGuestMode) {
+                        showGuestHint('Love this title? Sign up to save your generations!');
+                    }
                 })
                 .catch(err => {
                     console.error('Failed to copy title: ', err);
@@ -183,7 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Copy/Download cover button
+    // Download cover button
     const copyCoverButton = document.getElementById('copy-cover');
     if (copyCoverButton) {
         copyCoverButton.addEventListener('click', function() {
@@ -205,10 +236,15 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 this.textContent = 'Download Cover';
             }, 2000);
+            
+            // Show guest upgrade hint
+            if (isGuestMode) {
+                showGuestHint('Want to generate more covers? Sign up for free!');
+            }
         });
     }
     
-    // Regenerate cover button
+    // Regenerate cover button (enhanced for guest mode)
     const regenerateButton = document.getElementById('regenerate-cover');
     if (regenerateButton) {
         regenerateButton.addEventListener('click', function() {
@@ -250,7 +286,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     // Remove loading overlay
                     document.body.removeChild(loadingOverlay);
-                    alert('Error: ' + data.error);
+                    
+                    // Show guest-specific error messages
+                    if (isGuestMode && data.error.includes('limit')) {
+                        showGuestUpgradeModal();
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
                 }
             })
             .catch(error => {
@@ -261,33 +303,182 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-
-    // Add CSS for textarea in the form
-    if (document.getElementById('negative_prompt')) {
-        const style = document.createElement('style');
-        style.textContent = `
-            textarea {
-                width: 100%;
-                padding: 12px;
-                border: none;
-                background-color: #333;
-                color: #fff;
-                border-radius: 5px;
-                font-size: 1rem;
-                margin-bottom: 5px;
-                transition: all 0.3s ease;
-                border-left: 4px solid #1DB954;
-                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) inset;
-                font-family: monospace;
-                resize: vertical;
-            }
+    
+    // Guest mode specific functions
+    function addGuestModeIndicators() {
+        // Add subtle guest mode indicators
+        const restrictedElements = document.querySelectorAll('[data-requires-account]');
+        restrictedElements.forEach(element => {
+            element.style.opacity = '0.6';
+            element.style.pointerEvents = 'none';
             
-            textarea:focus {
-                outline: none;
-                box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.3);
-                background-color: #3a3a3a;
-            }
-        `;
-        document.head.appendChild(style);
+            const lockIcon = document.createElement('span');
+            lockIcon.innerHTML = ' 🔒';
+            lockIcon.style.color = '#666';
+            element.appendChild(lockIcon);
+        });
     }
+    
+    function showGuestUpgradePrompts() {
+        // Show periodic upgrade prompts (not too aggressive)
+        setTimeout(() => {
+            if (Math.random() < 0.3) { // 30% chance
+                showGuestHint('💡 Tip: Sign up for free to get 2 generations per day!');
+            }
+        }, 15000); // After 15 seconds
+    }
+    
+    function trackGuestInteractions() {
+        // Track guest user interactions for analytics
+        let interactions = 0;
+        
+        document.addEventListener('click', function() {
+            interactions++;
+            
+            // After several interactions, show upgrade prompt
+            if (interactions === 5) {
+                showGuestHint('You seem to like our tool! Sign up for free to unlock more features.');
+            }
+        });
+    }
+    
+    function showGuestHint(message) {
+        // Show non-intrusive hint to guests
+        const hint = document.createElement('div');
+        hint.className = 'guest-hint';
+        hint.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #1DB954, #1ed760);
+            color: #000;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            max-width: 300px;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        `;
+        hint.innerHTML = `
+            ${message}
+            <div style="margin-top: 8px;">
+                <a href="/register" style="color: #000; text-decoration: underline;">Sign Up Free</a>
+                <span style="margin: 0 10px;">|</span>
+                <span onclick="this.parentElement.parentElement.remove()" style="cursor: pointer;">Dismiss</span>
+            </div>
+        `;
+        
+        document.body.appendChild(hint);
+        
+        // Animate in
+        setTimeout(() => {
+            hint.style.transform = 'translateX(0)';
+        }, 100);
+        
+        // Auto-dismiss after 10 seconds
+        setTimeout(() => {
+            if (hint.parentElement) {
+                hint.style.transform = 'translateX(400px)';
+                setTimeout(() => hint.remove(), 300);
+            }
+        }, 10000);
+    }
+    
+    function showGuestUpgradeModal() {
+        // Show upgrade modal when guest hits limits
+        const modal = document.createElement('div');
+        modal.className = 'upgrade-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        `;
+        
+        modal.innerHTML = `
+            <div style="background: #1e1e1e; padding: 40px; border-radius: 12px; max-width: 500px; text-align: center; color: #fff;">
+                <h2 style="color: #1DB954; margin: 0 0 20px 0;">🎵 Ready for More?</h2>
+                <p>You've reached your daily limit as a guest user.</p>
+                <p>Sign up for <strong>free</strong> to get:</p>
+                <ul style="text-align: left; margin: 20px 0; color: #ccc;">
+                    <li>✅ 2 generations per day</li>
+                    <li>✅ Access to LoRA styles</li>
+                    <li>✅ Save your creations</li>
+                    <li>✅ Edit Spotify playlists</li>
+                </ul>
+                <div style="margin-top: 30px;">
+                    <a href="/register" style="background: #1DB954; color: #000; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; margin-right: 15px;">Sign Up Free</a>
+                    <button onclick="this.closest('.upgrade-modal').remove()" style="background: #666; color: #fff; padding: 15px 20px; border: none; border-radius: 25px; cursor: pointer;">Maybe Later</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+    }
+    
+    // Add CSS for new elements
+    const style = document.createElement('style');
+    style.textContent = `
+        .guest-hint {
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(400px); }
+            to { transform: translateX(0); }
+        }
+        
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .upgrade-modal {
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .guest-hint:hover {
+            transform: scale(1.02);
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            background-color: #333;
+            color: #fff;
+            border-radius: 5px;
+            font-size: 1rem;
+            margin-bottom: 5px;
+            transition: all 0.3s ease;
+            border-left: 4px solid #1DB954;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) inset;
+            font-family: monospace;
+            resize: vertical;
+        }
+        
+        textarea:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.3);
+            background-color: #3a3a3a;
+        }
+    `;
+    document.head.appendChild(style);
 });

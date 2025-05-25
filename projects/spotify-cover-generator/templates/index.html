@@ -8,18 +8,28 @@
 </head>
 <body>
     <div class="container">
-        <!-- User Header -->
+        <!-- User/Guest Header -->
         <div class="user-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: #252525; border-radius: 8px;">
             <div>
-                <span style="color: #1DB954;">Welcome, {{ user.display_name or user.username }}!</span>
-                {% if user.is_premium_user() %}
-                <span style="background: #1DB954; color: #000; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 10px;">Premium</span>
+                {% if user_info.type == 'user' %}
+                    <span style="color: #1DB954;">Welcome, {{ user_info.display_name }}!</span>
+                    {% if user_info.is_premium %}
+                    <span style="background: #1DB954; color: #000; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 10px;">Premium</span>
+                    {% endif %}
+                {% else %}
+                    <span style="color: #ccc;">👋 Welcome, Guest!</span>
+                    <span style="background: #666; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 10px;">Guest Mode</span>
                 {% endif %}
             </div>
             <div class="user-actions">
-                <span style="color: #ccc; margin-right: 15px;">{{ user.get_generations_today() }}/{{ user.get_daily_generation_limit() }} today</span>
-                <a href="{{ url_for('profile') }}" class="button secondary" style="margin-right: 10px;">Profile</a>
-                <a href="{{ url_for('logout') }}" class="button secondary">Logout</a>
+                <span style="color: #ccc; margin-right: 15px;">{{ user_info.generations_today }}/{{ user_info.daily_limit }} today</span>
+                {% if user_info.type == 'user' %}
+                    <a href="{{ url_for('profile') }}" class="button secondary" style="margin-right: 10px;">Profile</a>
+                    <a href="{{ url_for('logout') }}" class="button secondary">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('register') }}" class="button" style="background: #1DB954; margin-right: 10px;">Sign Up Free</a>
+                    <a href="{{ url_for('login') }}" class="button secondary">Login</a>
+                {% endif %}
             </div>
         </div>
 
@@ -30,21 +40,39 @@
             <p class="error">{{ error }}</p>
         {% endif %}
         
+        <!-- Guest Welcome Message -->
+        {% if user_info.type == 'guest' %}
+        <div class="guest-welcome" style="background: linear-gradient(135deg, #1DB954, #1ed760); color: #000; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="margin: 0 0 10px 0;">🎵 Welcome to Guest Mode!</h3>
+            <p style="margin: 0;">You can try our AI cover generator with <strong>1 free generation per day</strong>. 
+            <a href="{{ url_for('register') }}" style="color: #000; text-decoration: underline; font-weight: bold;">Sign up for free</a> 
+            to get more generations and access advanced features!</p>
+        </div>
+        {% endif %}
+        
         <!-- Generation Limit Warning -->
-        {% if not user.can_generate_today() %}
+        {% if not user_info.can_generate %}
         <div class="alert alert-error" style="background-color: rgba(255, 82, 82, 0.1); color: #ff5252; border-left: 4px solid #ff5252; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
             <strong>Daily Limit Reached!</strong><br>
-            You've used all {{ user.get_daily_generation_limit() }} of your daily generations. 
-            {% if not user.is_premium_user() %}
-            Try again tomorrow or <a href="mailto:bentakaki7@gmail.com" style="color: #1DB954;">contact us</a> for premium access.
+            {% if user_info.type == 'guest' %}
+                You've used your 1 free generation for today. 
+                <a href="{{ url_for('register') }}" style="color: #1DB954;">Sign up for free</a> to get {{ 2 }} generations per day, or try again tomorrow!
             {% else %}
-            Please try again tomorrow.
+                You've used all {{ user_info.daily_limit }} of your daily generations. 
+                {% if not user_info.is_premium %}
+                Try again tomorrow or <a href="mailto:bentakaki7@gmail.com" style="color: #1DB954;">contact us</a> for premium access.
+                {% else %}
+                Please try again tomorrow.
+                {% endif %}
             {% endif %}
         </div>
-        {% elif user.get_generations_today() >= user.get_daily_generation_limit() - 1 %}
+        {% elif user_info.generations_today >= user_info.daily_limit - 1 %}
         <div class="alert alert-warning" style="background-color: rgba(255, 152, 0, 0.1); color: #ff9800; border-left: 4px solid #ff9800; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
             <strong>Almost at your limit!</strong><br>
-            You have {{ user.get_daily_generation_limit() - user.get_generations_today() }} generation(s) remaining today.
+            You have {{ user_info.daily_limit - user_info.generations_today }} generation(s) remaining today.
+            {% if user_info.type == 'guest' %}
+            <a href="{{ url_for('register') }}" style="color: #1DB954;">Sign up for free</a> to get more daily generations!
+            {% endif %}
         </div>
         {% endif %}
         
@@ -67,6 +95,7 @@
                 <small>Leave empty to use the default negative prompt</small>
             </div>
             
+            {% if user_info.can_use_loras %}
             <div class="form-group">
                 <label for="lora_name">LoRA Style (Optional):</label>
                 <select id="lora_name" name="lora_name">
@@ -77,6 +106,15 @@
                 </select>
                 <small>Apply a custom LoRA for specialized art styles</small>
             </div>
+            {% else %}
+            <div class="form-group">
+                <label>LoRA Styles:</label>
+                <div style="background: #333; padding: 15px; border-radius: 5px; border-left: 4px solid #666;">
+                    <p style="margin: 0; color: #ccc;">🔒 LoRA styles are available for registered users. 
+                    <a href="{{ url_for('register') }}" style="color: #1DB954;">Sign up for free</a> to access advanced styling options!</p>
+                </div>
+            </div>
+            {% endif %}
             
             <div class="form-group preset-options">
                 <label>Preset styles:</label>
@@ -88,8 +126,8 @@
                 </div>
             </div>
             
-            <button type="submit" class="submit-btn" {% if not user.can_generate_today() %}disabled{% endif %}>
-                {% if user.can_generate_today() %}
+            <button type="submit" class="submit-btn" {% if not user_info.can_generate %}disabled{% endif %}>
+                {% if user_info.can_generate %}
                 Generate Cover
                 {% else %}
                 Daily Limit Reached
@@ -97,7 +135,7 @@
             </button>
         </form>
         
-        {% if user.is_premium_user() %}
+        {% if user_info.show_upload %}
         <div class="lora-upload">
             <h3>Upload LoRA</h3>
             
@@ -122,25 +160,32 @@
                 <li><strong>Gemini AI Titles</strong> - Using Google's Gemini 2.5 Flash Preview API for creative album titles</li>
                 <li><strong>Custom Prompts</strong> - Add additional words to customize the image generation</li>
                 <li><strong>Custom Negative Prompts</strong> - Control what you don't want in your generated images</li>
-                {% if user.spotify_access_token %}
+                {% if user_info.type == 'user' and user_info.can_edit_playlists %}
                 <li><strong>Spotify Integration</strong> - Edit playlist titles and covers directly from generated results</li>
                 {% endif %}
-                {% if user.is_premium_user() %}
-                <li><strong>LoRA Support</strong> - Add LoRAs via file upload for custom styles (Premium only)</li>
+                {% if user_info.can_use_loras %}
+                <li><strong>LoRA Support</strong> - Add LoRAs via file upload for custom styles{% if user_info.is_premium %} (Premium feature){% endif %}</li>
                 {% endif %}
                 <li><strong>Stable Diffusion API</strong> - Faster image generation using cloud-based Stable Diffusion</li>
             </ul>
             
             <h4>Usage Limits</h4>
             <ul>
+                {% if user_info.type == 'guest' %}
+                <li><strong>Guest Users:</strong> 1 generation per day</li>
+                <li><strong>Free Account:</strong> 2 generations per day + LoRA access</li>
+                <li><strong>Premium Users:</strong> Unlimited generations + file uploads</li>
+                <li><strong>Ready to unlock more?</strong> <a href="{{ url_for('register') }}" style="color: #1DB954;">Sign up for free!</a></li>
+                {% else %}
                 <li><strong>Free Users:</strong> 2 generations per day</li>
                 <li><strong>Premium Users:</strong> Unlimited generations</li>
-                {% if not user.is_premium_user() %}
+                {% if not user_info.is_premium %}
                 <li>Need more generations? <a href="mailto:bentakaki7@gmail.com" style="color: #1DB954;">Contact us</a> for premium access!</li>
+                {% endif %}
                 {% endif %}
             </ul>
             
-            {% if user.is_premium_user() %}
+            {% if user_info.type == 'user' and user_info.is_premium %}
             <h4>Tips for Using LoRAs</h4>
             <p>LoRAs (Low-Rank Adaptations) are specialized models that can dramatically change the visual style of generated images:</p>
             <ul>

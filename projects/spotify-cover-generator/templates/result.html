@@ -88,6 +88,32 @@
             border-radius: 50%;     /* Circular background */
             padding: 3px;           /* Padding around the logo inside the white bg */
         }
+
+        .guest-upgrade {
+            background: linear-gradient(135deg, #1DB954, #1ed760);
+            color: #000;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .guest-upgrade h3 {
+            margin: 0 0 10px 0;
+        }
+
+        .guest-upgrade p {
+            margin: 0 0 15px 0;
+        }
+
+        .guest-upgrade .button {
+            background: #000;
+            color: #fff;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -95,12 +121,22 @@
         <!-- User Header -->
         <div class="user-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: #252525; border-radius: 8px;">
             <div>
-                <span style="color: #1DB954;">{{ user.display_name or user.username }}</span>
-                <span style="color: #ccc; margin-left: 15px;">{{ user.get_generations_today() }}/{{ user.get_daily_generation_limit() }} today</span>
+                {% if user_info.type == 'user' %}
+                    <span style="color: #1DB954;">{{ user_info.display_name }}</span>
+                    <span style="color: #ccc; margin-left: 15px;">{{ user_info.generations_today }}/{{ user_info.daily_limit }} today</span>
+                {% else %}
+                    <span style="color: #ccc;">Guest User</span>
+                    <span style="color: #ccc; margin-left: 15px;">{{ user_info.generations_today }}/{{ user_info.daily_limit }} used today</span>
+                {% endif %}
             </div>
             <div class="user-actions">
-                <a href="{{ url_for('profile') }}" class="button secondary" style="margin-right: 10px;">Profile</a>
-                <a href="{{ url_for('logout') }}" class="button secondary">Logout</a>
+                {% if user_info.type == 'user' %}
+                    <a href="{{ url_for('profile') }}" class="button secondary" style="margin-right: 10px;">Profile</a>
+                    <a href="{{ url_for('logout') }}" class="button secondary">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('register') }}" class="button" style="background: #1DB954; margin-right: 10px;">Sign Up Free</a>
+                    <a href="{{ url_for('login') }}" class="button secondary">Login</a>
+                {% endif %}
             </div>
         </div>
 
@@ -142,6 +178,15 @@
             {% endif %}
         </div>
         
+        <!-- Guest upgrade message for result page -->
+        {% if user_info.type == 'guest' %}
+        <div class="guest-upgrade" style="background: linear-gradient(135deg, #1DB954, #1ed760); color: #000; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <h3 style="margin: 0 0 10px 0;">🎉 Love your generated cover?</h3>
+            <p style="margin: 0 0 15px 0;">Sign up for free to get 2 generations per day, save your creations, access LoRA styles, and edit Spotify playlists!</p>
+            <a href="{{ url_for('register') }}" class="button" style="background: #000; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 25px; font-weight: bold;">Get Free Account</a>
+        </div>
+        {% endif %}
+
         <!-- Spotify Playlist Editing Section -->
         {% if can_edit_playlist and playlist_id %}
         <div class="spotify-edit-section">
@@ -244,12 +289,16 @@
         
         <div class="actions">
             <a href="{{ url_for('index') }}" class="button">Generate Another Cover</a>
-            {% if user.can_generate_today() %}
+            {% if user_info.can_generate %}
             <button id="regenerate-cover" class="button" 
                     data-playlist-url="{{ playlist_url }}" 
                     data-mood="{{ user_mood }}"
                     data-negative-prompt="{{ negative_prompt }}"
                     data-lora-name="{{ lora_name }}">Regenerate Cover</button>
+            {% elif user_info.type == 'guest' %}
+            <div style="text-align: center; margin: 20px 0;">
+                <p style="color: #ccc; margin-bottom: 15px;">Want to regenerate? <a href="{{ url_for('register') }}" style="color: #1DB954;">Sign up for free</a> to get more generations!</p>
+            </div>
             {% endif %}
             <button id="copy-title" class="button secondary">Copy Title</button>
             <button id="copy-cover" class="button secondary" data-image-path="{{ image_file }}">Download Cover</button>
@@ -266,10 +315,22 @@
                     <strong>Style Enhancement:</strong> {{ lora_name }} LoRA
                 </li>
                 {% endif %}
-                <li><strong>Generated by:</strong> {{ user.display_name or user.username }}</li>
+                {% if user_info.type == 'user' %}
+                <li><strong>Generated by:</strong> {{ user_info.display_name }}</li>
+                {% else %}
+                <li><strong>Generated by:</strong> Guest User</li>
+                {% endif %}
             </ul>
             
             <p class="note">Cover generated on {{ timestamp|default('today') }}</p>
+            
+            {% if user_info.type == 'guest' %}
+            <div style="background: #333; padding: 15px; border-radius: 8px; margin-top: 20px; border-left: 4px solid #1DB954;">
+                <p style="margin: 0; color: #ccc;"><strong>💡 Pro Tip:</strong> 
+                <a href="{{ url_for('register') }}" style="color: #1DB954;">Create a free account</a> 
+                to save your generations, access advanced features, and get more daily generations!</p>
+            </div>
+            {% endif %}
         </div>
     </div>
     

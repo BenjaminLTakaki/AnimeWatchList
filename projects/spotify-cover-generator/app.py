@@ -2,7 +2,7 @@ import os
 import sys
 import random
 import json
-import datetime
+from datetime import datetime, timedelta
 from flask import Flask, request, render_template, send_from_directory, jsonify, session, redirect, url_for, flash
 from pathlib import Path
 from urllib.parse import urlparse
@@ -15,6 +15,9 @@ import secrets
 from sqlalchemy import text
 from collections import Counter
 from flask_migrate import Migrate
+import uuid
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # Get the directory where app.py is located
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -61,6 +64,14 @@ app.secret_key = FLASK_SECRET_KEY or ''.join(random.choices('abcdefghijklmnopqrs
 # Configure database
 app.config['SQLALCHEMY_DATABASE_URI'] = SPOTIFY_DB_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Add rate limiter (optional - for additional protection)
+limiter = Limiter(
+    app,
+    key_func=get_remote_address,
+    default_limits=["100 per hour"],  # General rate limit
+    storage_uri="memory://"  # Use Redis in production: "redis://localhost:6379"
+)
 
 # Initialize SQLAlchemy
 from flask_sqlalchemy import SQLAlchemy
@@ -712,6 +723,468 @@ def create_tables_manually():
                 print(f"❌ SQL command {i+1} failed: {e}")
                 raise
 
+def get_or_create_guest_session():
+    """Get or create a guest session for anonymous users"""
+    if 'guest_session_id' not in session:
+        session['guest_session_id'] = str(uuid.uuid4())
+        session['guest_created'] = datetime.utcnow().isoformat()
+        session['guest_generations_today'] = 0
+        session['guest_last_generation'] = None
+    return session['guest_session_id']
+
+def get_guest_generations_today():
+    """Get number of generations for guest today"""
+    if 'guest_session_id' not in session:
+        return 0
+    
+    # Check if it's a new day
+    if 'guest_last_generation' in session and session['guest_last_generation']:
+        last_gen = datetime.fromisoformat(session['guest_last_generation'])
+        if last_gen.date() != datetime.utcnow().date():
+            session['guest_generations_today'] = 0
+    
+    return session.get('guest_generations_today', 0)
+
+def increment_guest_generations():
+    """Increment guest generation count"""
+    session['guest_generations_today'] = get_guest_generations_today() + 1
+    session['guest_last_generation'] = datetime.utcnow().isoformat()
+
+def can_guest_generate():
+    """Check if guest can generate (limit: 1 per day)"""
+    return get_guest_generations_today() < 1
+
+# Enhanced guest session cleanup (run periodically)
+def cleanup_expired_guest_sessions():
+    """Clean up old guest session data (call this periodically)"""
+    try:
+        # This would be more robust with Redis or database storage
+        # For now, sessions auto-expire with Flask's built-in session management
+        pass
+    except Exception as e:
+        print(f"Error cleaning up guest sessions: {e}")
+
+# IP-based rate limiting for guests (alternative approach)
+def check_ip_generation_limit(ip_address):
+    """Check if IP has exceeded daily generation limit"""
+    try:
+        from datetime import datetime, timedelta
+        import json
+        from pathlib import Path
+        
+        # Simple file-based tracking (use Redis in production)
+        ip_log_file = Path("ip_generations.json")
+        
+        today = datetime.now().date().isoformat()
+        
+        # Load existing data
+        ip_data = {}
+        if ip_log_file.exists():
+            with open(ip_log_file, 'r') as f:
+                ip_data = json.load(f)
+        
+        # Clean old data
+        for ip in list(ip_data.keys()):
+            if ip_data[ip].get('date') != today:
+                del ip_data[ip]
+        
+        # Check current IP
+        if ip_address not in ip_data:
+            ip_data[ip_address] = {'date': today, 'count': 0}
+        
+        current_count = ip_data[ip_address]['count']
+        
+        # Save data
+        with open(ip_log_file, 'w') as f:
+            json.dump(ip_data, f)
+        
+        return current_count < 3  # Max 3 per IP per day
+        
+    except Exception as e:
+        print(f"Error checking IP limit: {e}")
+        return True  # Allow on error
+
+def increment_ip_generation_count(ip_address):
+    """Increment generation count for IP"""
+    try:
+        import json
+        from pathlib import Path
+        from datetime import datetime
+        
+        ip_log_file = Path("ip_generations.json")
+        today = datetime.now().date().isoformat()
+        
+        # Load existing data
+        ip_data = {}
+        if ip_log_file.exists():
+            with open(ip_log_file, 'r') as f:
+                ip_data = json.load(f)
+        
+        # Update count
+        if ip_address not in ip_data:
+            ip_data[ip_address] = {'date': today, 'count': 0}
+        
+        ip_data[ip_address]['count'] += 1
+        
+        # Save data
+        with open(ip_log_file, 'w') as f:
+            json.dump(ip_data, f)
+            
+    except Exception as e:
+        print(f"Error incrementing IP count: {e}")
+
+# Updated get_current_user_or_guest with IP limiting
+def get_current_user_or_guest():
+    """Get current logged in user or return guest info with IP-based limiting"""
+    user = get_current_user()
+    if user:
+        return {
+            'type': 'user',
+            'user': user,
+            'display_name': user.display_name or user.username,
+            'is_premium': user.is_premium_user(),
+            'daily_limit': user.get_daily_generation_limit(),
+            'generations_today': user.get_generations_today(),
+            'can_generate': user.can_generate_today(),
+            'can_use_loras': True,
+            'can_edit_playlists': bool(user.spotify_access_token),
+            'show_upload': user.is_premium_user()
+        }
+    else:
+        # Guest user with combined session + IP limiting
+        get_or_create_guest_session()
+        ip_address = request.remote_addr or '127.0.0.1'
+        
+        # Check both session and IP limits
+        session_can_generate = can_guest_generate()
+        ip_can_generate = check_ip_generation_limit(ip_address)
+        
+        return {
+            'type': 'guest',
+            'user': None,
+            'display_name': 'Guest',
+            'is_premium': False,
+            'daily_limit': 1, # Guest session limit
+            'generations_today': get_guest_generations_today(),
+            'can_generate': session_can_generate and ip_can_generate,
+            'can_use_loras': False,
+            'can_edit_playlists': False,
+            'show_upload': False,
+            'ip_address': ip_address
+        }
+
+# Enhanced generation tracking for guests
+def track_guest_generation():
+    """Track generation for both session and IP"""
+    try:
+        # Session tracking
+        increment_guest_generations()
+        
+        # IP tracking
+        ip_address = request.remote_addr or '127.0.0.1'
+        increment_ip_generation_count(ip_address)
+        
+    except Exception as e:
+        print(f"Error tracking guest generation: {e}")
+
+# Update the root route
+@app.route("/")
+def root():
+    """Root route - redirect to login if not authenticated, otherwise to main app"""
+    user = get_current_user()
+    if user:
+        return redirect(url_for('index')) # This should point to the main app page, now 'generate'
+    else:
+        return redirect(url_for('login'))
+
+# Update the main generate route (remove @login_required)
+@app.route("/generate", methods=["GET", "POST"])
+@limiter.limit("10 per hour", methods=["POST"]) # Limit POST requests specifically for this route
+def index():
+    global initialized
+    
+    # Get user or guest info
+    user_info = get_current_user_or_guest()
+    
+    if request.method == "POST" and not user_info['can_generate']:
+        return render_template(
+            "index.html",
+            error=f"Daily generation limit reached ({user_info['daily_limit']} per day). " + 
+                  ("Try again tomorrow!" if user_info['type'] == 'guest' else "Try again tomorrow or upgrade to premium!"),
+            loras=[],
+            user_info=user_info
+        )
+    
+    if not initialized:
+        if initialize_app():
+            print("Application initialized successfully from index route")
+        else:
+            print("Failed to initialize application from index route")
+            return render_template(
+                "index.html", 
+                error="Application is still initializing or encountered an issue. Please try again in a moment.",
+                loras=[],
+                user_info=user_info
+            )
+    
+    # Get available loras (only for logged-in users)
+    loras = []
+    if user_info['can_use_loras']:
+        try:
+            if 'utils_available' in globals() and utils_available:
+                import utils
+                loras = utils.get_available_loras()
+        except Exception as e:
+            print(f"⚠️ Error getting LoRAs: {e}")
+
+    if request.method == "POST":
+        try:
+            # Check if core generation modules are available
+            generation_available = (
+                'generator_available' in globals() and generator_available and
+                'spotify_client_available' in globals() and spotify_client_available
+            )
+            
+            if not generation_available:
+                try:
+                    import generator
+                    import spotify_client
+                    generation_available = True
+                    print("✓ Generation modules imported on demand")
+                except ImportError as e:
+                    print(f"⚠️ Core generation modules not available: {e}")
+                    return render_template(
+                        "index.html",
+                        error="Core generation modules are not available. The system is still starting up - please try again in a moment.",
+                        loras=loras,
+                        user_info=user_info
+                    )
+            
+            playlist_url = request.form.get("playlist_url")
+            user_mood = request.form.get("mood", "").strip()
+            negative_prompt = request.form.get("negative_prompt", "").strip()
+            lora_name = request.form.get("lora_name", "").strip()
+            
+            # Restrict LoRA usage for guests
+            if user_info['type'] == 'guest' and lora_name and lora_name != "none":
+                return render_template(
+                    "index.html", 
+                    error="LoRA styles are only available for registered users. Please sign up for free to access advanced features!",
+                    loras=[],
+                    user_info=user_info
+                )
+            
+            lora_input = None
+            if lora_name and lora_name != "none" and user_info['can_use_loras']:
+                for lora_item in loras:
+                    if hasattr(lora_item, 'name') and lora_item.name == lora_name:
+                        lora_input = lora_item
+                        break
+            
+            if not playlist_url:
+                return render_template(
+                    "index.html", 
+                    error="Please enter a Spotify playlist or album URL.",
+                    loras=loras,
+                    user_info=user_info
+                )
+            
+            # Generate the cover
+            import generator
+            user_id = user_info['user'].id if user_info['type'] == 'user' else None
+            result = generator.generate_cover(playlist_url, user_mood, lora_input, 
+                                            negative_prompt=negative_prompt, user_id=user_id) 
+            
+            if "error" in result:
+                return render_template(
+                    "index.html", 
+                    error=result["error"],
+                    loras=loras,
+                    user_info=user_info
+                )
+            
+            # Increment generation count
+            if user_info['type'] == 'guest':
+                # Use the new enhanced tracking
+                track_guest_generation()
+            
+            img_filename = os.path.basename(result["output_path"])
+            
+            # Generate charts with fallback
+            genres_chart_data = None
+            genre_percentages_data = []
+            
+            try:
+                import chart_generator
+                genres_chart_data = chart_generator.generate_genre_chart(result.get("all_genres", []))
+            except ImportError:
+                print("⚠️ chart_generator not available, skipping genre chart.")
+            except Exception as e:
+                print(f"⚠️ Error generating genre chart: {e}")
+
+            try:
+                if 'utils_available' in globals() and utils_available:
+                    import utils
+                    genre_percentages_data = utils.calculate_genre_percentages(result.get("all_genres", []))
+                else:
+                    genre_percentages_data = calculate_genre_percentages(result.get("all_genres", []))
+            except Exception as e:
+                print(f"⚠️ Error calculating genre percentages: {e}")
+
+            # Extract playlist ID with fallback
+            playlist_id = None
+            try:
+                if 'utils_available' in globals() and utils_available:
+                    import utils
+                    playlist_id = utils.extract_playlist_id(playlist_url) if playlist_url and "playlist/" in playlist_url else None
+                else:
+                    playlist_id = extract_playlist_id(playlist_url) if playlist_url and "playlist/" in playlist_url else None
+            except Exception as e:
+                print(f"⚠️ Error extracting playlist ID: {e}")
+            
+            display_data = {
+                "title": result["title"],
+                "image_file": img_filename,
+                "image_data_base64": result.get("image_data_base64", ""),
+                "genres": ", ".join(result.get("genres", [])),
+                "mood": result.get("mood", ""),
+                "playlist_name": result.get("item_name", "Your Music"),
+                "found_genres": bool(result.get("genres", [])),
+                "genres_chart": genres_chart_data,
+                "genre_percentages": genre_percentages_data,
+                "playlist_url": playlist_url,
+                "user_mood": user_mood,
+                "negative_prompt": negative_prompt,
+                "lora_name": result.get("lora_name", ""),
+                "lora_type": result.get("lora_type", ""),
+                "lora_url": result.get("lora_url", ""),
+                "user_info": user_info,
+                "can_edit_playlist": user_info['can_edit_playlists'],
+                "playlist_id": playlist_id
+            }
+            
+            # Record generation if user is logged in
+            if user_info['type'] == 'user':
+                try:
+                    new_generation = GenerationResultDB(
+                        title=result["title"],
+                        output_path=result["output_path"],
+                        item_name=result.get("item_name"),
+                        genres=result.get("genres"),
+                        all_genres=result.get("all_genres"),
+                        mood=user_mood,
+                        spotify_url=playlist_url,
+                        lora_name=result.get("lora_name"),
+                        user_id=user_info['user'].id
+                    )
+                    db.session.add(new_generation)
+                    db.session.commit()
+                except Exception as e:
+                    print(f"⚠️ Error saving generation result to DB: {e}")
+
+            return render_template("result.html", **display_data)
+            
+        except Exception as e:
+            print(f"❌ Server error processing request: {e}")
+            import traceback
+            traceback.print_exc()
+            return render_template(
+                "index.html", 
+                error=f"An unexpected error occurred: {str(e)}. Please try again.",
+                loras=loras,
+                user_info=user_info
+            )
+    else:
+        return render_template("index.html", loras=loras, user_info=user_info)
+
+# Update the regenerate API endpoint to work with guests
+@app.route('/api/regenerate', methods=['POST'])
+@limiter.limit("10 per hour") # Apply rate limit to regenerate as well
+def regenerate_cover():
+    """Regenerate cover with same playlist - now works for guests"""
+    try:
+        user_info = get_current_user_or_guest()
+        
+        if not user_info['can_generate']:
+            return jsonify({
+                "success": False, 
+                "error": "Daily generation limit reached" + 
+                        (" - Sign up for more generations!" if user_info['type'] == 'guest' else "")
+            }), 429
+        
+        data = request.get_json()
+        playlist_url = data.get('playlist_url')
+        mood = data.get('mood', '')
+        negative_prompt = data.get('negative_prompt', '')
+        lora_name = data.get('lora_name', '')
+        
+        # Restrict LoRA for guests
+        if user_info['type'] == 'guest' and lora_name and lora_name != "none":
+            return jsonify({
+                "success": False, 
+                "error": "LoRA styles are only available for registered users"
+            }), 400
+        
+        if not playlist_url:
+            return jsonify({"success": False, "error": "Missing playlist URL"}), 400
+        
+        # Get LoRA if specified and user can use it
+        lora_input = None
+        if lora_name and lora_name != "none" and user_info['can_use_loras']:
+            try:
+                import utils
+                loras = utils.get_available_loras()
+                for lora_item in loras:
+                    if hasattr(lora_item, 'name') and lora_item.name == lora_name:
+                        lora_input = lora_item
+                        break
+            except Exception as e:
+                print(f"Error getting LoRA: {e}")
+        
+        # Generate new cover
+        try:
+            import generator
+            user_id = user_info['user'].id if user_info['type'] == 'user' else None
+            result = generator.generate_cover(
+                playlist_url, 
+                mood, 
+                lora_input, 
+                negative_prompt=negative_prompt, 
+                user_id=user_id
+            )
+            
+            if "error" in result:
+                return jsonify({"success": False, "error": result["error"]}), 400
+            
+            # Increment generation count
+            if user_info['type'] == 'guest':
+                # Use the new enhanced tracking
+                track_guest_generation()
+            
+            # Return all relevant data for the frontend to update
+            return jsonify({
+                "success": True, 
+                "message": "Regeneration successful",
+                "title": result["title"],
+                "image_file": os.path.basename(result["output_path"]),
+                "image_data_base64": result.get("image_data_base64", ""),
+                "genres": ", ".join(result.get("genres", [])),
+                "mood": result.get("mood", ""),
+                "playlist_name": result.get("item_name", "Your Music"),
+                "found_genres": bool(result.get("genres", [])),
+                "lora_name": result.get("lora_name", ""),
+                "lora_type": result.get("lora_type", ""),
+                "lora_url": result.get("lora_url", "")
+            })
+            
+        except Exception as e:
+            print(f"Error generating cover: {e}")
+            return jsonify({"success": False, "error": "Failed to generate cover"}), 500
+    
+    except Exception as e:
+        print(f"Error in regenerate endpoint: {e}")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
 @app.route("/admin/nuclear-reset")
 def admin_nuclear_reset():
     """NUCLEAR OPTION: Drop and recreate all Spotify tables"""
@@ -1211,20 +1684,20 @@ def root():
         return redirect(url_for('login'))
 
 @app.route("/generate", methods=["GET", "POST"])
-@login_required
+@limiter.limit("10 per hour", methods=["POST"]) # Limit POST requests specifically for this route
 def index():
     global initialized
     
-    user = get_current_user()
-    if not user:
-        return redirect(url_for('login'))
+    # Get user or guest info
+    user_info = get_current_user_or_guest()
     
-    if request.method == "POST" and not user.can_generate_today():
+    if request.method == "POST" and not user_info['can_generate']:
         return render_template(
             "index.html",
-            error=f"Daily generation limit reached ({user.get_daily_generation_limit()} per day). Try again tomorrow!",
+            error=f"Daily generation limit reached ({user_info['daily_limit']} per day). " + 
+                  ("Try again tomorrow!" if user_info['type'] == 'guest' else "Try again tomorrow or upgrade to premium!"),
             loras=[],
-            user=user
+            user_info=user_info
         )
     
     if not initialized:
@@ -1236,19 +1709,18 @@ def index():
                 "index.html", 
                 error="Application is still initializing or encountered an issue. Please try again in a moment.",
                 loras=[],
-                user=user
+                user_info=user_info
             )
     
-    # Get available loras with fallback
+    # Get available loras (only for logged-in users)
     loras = []
-    try:
-        if 'utils_available' in globals() and utils_available:
-            import utils
-            loras = utils.get_available_loras()
-        else:
-            print("⚠️ Utils not available - using empty LoRA list")
-    except Exception as e:
-        print(f"⚠️ Error getting LoRAs: {e}")
+    if user_info['can_use_loras']:
+        try:
+            if 'utils_available' in globals() and utils_available:
+                import utils
+                loras = utils.get_available_loras()
+        except Exception as e:
+            print(f"⚠️ Error getting LoRAs: {e}")
 
     if request.method == "POST":
         try:
@@ -1259,7 +1731,6 @@ def index():
             )
             
             if not generation_available:
-                # Try to import them again
                 try:
                     import generator
                     import spotify_client
@@ -1271,7 +1742,7 @@ def index():
                         "index.html",
                         error="Core generation modules are not available. The system is still starting up - please try again in a moment.",
                         loras=loras,
-                        user=user
+                        user_info=user_info
                     )
             
             playlist_url = request.form.get("playlist_url")
@@ -1279,8 +1750,17 @@ def index():
             negative_prompt = request.form.get("negative_prompt", "").strip()
             lora_name = request.form.get("lora_name", "").strip()
             
+            # Restrict LoRA usage for guests
+            if user_info['type'] == 'guest' and lora_name and lora_name != "none":
+                return render_template(
+                    "index.html", 
+                    error="LoRA styles are only available for registered users. Please sign up for free to access advanced features!",
+                    loras=[],
+                    user_info=user_info
+                )
+            
             lora_input = None
-            if lora_name and lora_name != "none":
+            if lora_name and lora_name != "none" and user_info['can_use_loras']:
                 for lora_item in loras:
                     if hasattr(lora_item, 'name') and lora_item.name == lora_name:
                         lora_input = lora_item
@@ -1291,21 +1771,27 @@ def index():
                     "index.html", 
                     error="Please enter a Spotify playlist or album URL.",
                     loras=loras,
-                    user=user
+                    user_info=user_info
                 )
             
             # Generate the cover
             import generator
+            user_id = user_info['user'].id if user_info['type'] == 'user' else None
             result = generator.generate_cover(playlist_url, user_mood, lora_input, 
-                                            negative_prompt=negative_prompt, user_id=user.id) 
+                                            negative_prompt=negative_prompt, user_id=user_id) 
             
             if "error" in result:
                 return render_template(
                     "index.html", 
                     error=result["error"],
                     loras=loras,
-                    user=user
+                    user_info=user_info
                 )
+            
+            # Increment generation count
+            if user_info['type'] == 'guest':
+                # Use the new enhanced tracking
+                track_guest_generation()
             
             img_filename = os.path.basename(result["output_path"])
             
@@ -1326,7 +1812,6 @@ def index():
                     import utils
                     genre_percentages_data = utils.calculate_genre_percentages(result.get("all_genres", []))
                 else:
-                    # Fallback calculation
                     genre_percentages_data = calculate_genre_percentages(result.get("all_genres", []))
             except Exception as e:
                 print(f"⚠️ Error calculating genre percentages: {e}")
@@ -1358,28 +1843,29 @@ def index():
                 "lora_name": result.get("lora_name", ""),
                 "lora_type": result.get("lora_type", ""),
                 "lora_url": result.get("lora_url", ""),
-                "user": user,
-                "can_edit_playlist": bool(user.spotify_access_token and user.refresh_spotify_token_if_needed()),
+                "user_info": user_info,
+                "can_edit_playlist": user_info['can_edit_playlists'],
                 "playlist_id": playlist_id
             }
             
-            # Record generation if successful
-            try:
-                new_generation = GenerationResultDB(
-                    title=result["title"],
-                    output_path=result["output_path"],
-                    item_name=result.get("item_name"),
-                    genres=result.get("genres"),
-                    all_genres=result.get("all_genres"),
-                    mood=user_mood,
-                    spotify_url=playlist_url,
-                    lora_name=result.get("lora_name"),
-                    user_id=user.id
-                )
-                db.session.add(new_generation)
-                db.session.commit()
-            except Exception as e:
-                print(f"⚠️ Error saving generation result to DB: {e}")
+            # Record generation if user is logged in
+            if user_info['type'] == 'user':
+                try:
+                    new_generation = GenerationResultDB(
+                        title=result["title"],
+                        output_path=result["output_path"],
+                        item_name=result.get("item_name"),
+                        genres=result.get("genres"),
+                        all_genres=result.get("all_genres"),
+                        mood=user_mood,
+                        spotify_url=playlist_url,
+                        lora_name=result.get("lora_name"),
+                        user_id=user_info['user'].id
+                    )
+                    db.session.add(new_generation)
+                    db.session.commit()
+                except Exception as e:
+                    print(f"⚠️ Error saving generation result to DB: {e}")
 
             return render_template("result.html", **display_data)
             
@@ -1391,10 +1877,10 @@ def index():
                 "index.html", 
                 error=f"An unexpected error occurred: {str(e)}. Please try again.",
                 loras=loras,
-                user=user
+                user_info=user_info
             )
     else:
-        return render_template("index.html", loras=loras, user=user)
+        return render_template("index.html", loras=loras, user_info=user_info)
 
 @app.route('/api/playlist/edit', methods=['POST'])
 @login_required
@@ -1572,32 +2058,143 @@ def regenerate_cover():
 
 @app.route("/generated_covers/<path:filename>")
 def serve_image(filename):
-    try:
-        print(f"Attempting to serve image: {filename} from {COVERS_DIR}")
-        
-        file_path = os.path.join(COVERS_DIR, filename)
-        
-        if os.path.exists(file_path):
-            return send_from_directory(COVERS_DIR, filename)
-        else:
-            print(f"Image file not found: {file_path}")
-            return send_from_directory(os.path.join(app.static_folder, "images"), "image-placeholder.png")
-    except Exception as e:
-        print(f"Error serving image {filename}: {e}")
-        return send_from_directory(os.path.join(app.static_folder, "images"), "image-placeholder.png")
+    return send_from_directory(COVERS_DIR, filename)
 
-@app.route("/status")
-def status():
-    from spotify_client import spsssssssssad
-    from utils import get_available_loras
+# Add this route for checking generation status
+@app.route('/api/generation-status')
+def generation_status():
+    """API endpoint to check generation status"""
+    user_info = get_current_user_or_guest()
     
     return jsonify({
-        "initialized": initialized,
-        "spotify_working": sp is not None,
-        "loras_available": len(get_available_loras())
+        'type': user_info['type'],
+        'can_generate': user_info['can_generate'],
+        'generations_today': user_info['generations_today'],
+        'daily_limit': user_info['daily_limit'],
+        'display_name': user_info['display_name']
     })
 
-if __name__ == "__main__":
+# Guest conversion tracking
+def track_guest_conversion():
+    """Track when guests sign up (for analytics)"""
+    try:
+        if 'guest_session_id' in session:
+            guest_id = session['guest_session_id']
+            # Log conversion event (implement your analytics here)
+            print(f"Guest {guest_id} converted to user account")
+            
+            # Clear guest session
+            session.pop('guest_session_id', None)
+            session.pop('guest_generations_today', None)
+            session.pop('guest_last_generation', None)
+            
+    except Exception as e:
+        print(f"Error tracking conversion: {e}")
+
+# Update the register route
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Updated register route with conversion tracking"""
+    if request.method == 'POST':
+        email = request.form.get('email')
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if not email or not username or not password:
+            flash('All fields are required.', 'error')
+            return redirect(url_for('register'))
+
+        if User.query.filter_by(email=email).first():
+            flash('Email already registered.', 'error')
+            return redirect(url_for('register'))
+        
+        if User.query.filter_by(username=username).first():
+            flash('Username already taken.', 'error')
+            return redirect(url_for('register'))
+
+        new_user = User(email=email, username=username, display_name=username)
+        new_user.set_password(password)
+        db.session.add(new_user)
+        db.session.commit()
+        
+        # After successful user creation, track conversion
+        track_guest_conversion()
+        
+        flash('Registration successful! Please log in.', 'success')
+        return redirect(url_for('login'))
+        
+    return render_template('register.html', user_info=get_current_user_or_guest())
+
+# Optional: Analytics tracking
+def log_generation_analytics(user_info, success=True):
+    """Log generation analytics"""
+    try:
+        analytics_data = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'user_type': user_info['type'],
+            'success': success,
+            'ip_address': request.remote_addr,
+            'user_agent': request.headers.get('User-Agent', '')[:200],  # Truncate
+        }
+        
+        # Add to your analytics system here
+        # For now, just log to console
+        print(f"Analytics: {analytics_data}")
+        
+    except Exception as e:
+        print(f"Error logging analytics: {e}")
+
+# Add this function to check system health
+@app.route('/api/system-status')
+def system_status():
+    """Check system status and availability"""
+    try:
+        # Check if core systems are working
+        # Ensure config variables are loaded, use os.environ.get as fallback
+        SPOTIFY_CLIENT_ID_STATUS = bool(os.environ.get('SPOTIFY_CLIENT_ID') or (globals().get('SPOTIFY_CLIENT_ID')))
+        SPOTIFY_CLIENT_SECRET_STATUS = bool(os.environ.get('SPOTIFY_CLIENT_SECRET') or (globals().get('SPOTIFY_CLIENT_SECRET')))
+        GEMINI_API_KEY_STATUS = bool(os.environ.get('GEMINI_API_KEY') or (globals().get('GEMINI_API_KEY')))
+        STABILITY_API_KEY_STATUS = bool(os.environ.get('STABILITY_API_KEY') or (globals().get('STABILITY_API_KEY')))
+
+        status = {
+            'status': 'healthy',
+            'spotify_api': SPOTIFY_CLIENT_ID_STATUS and SPOTIFY_CLIENT_SECRET_STATUS,
+            'gemini_api': GEMINI_API_KEY_STATUS,
+            'stability_api': STABILITY_API_KEY_STATUS,
+            'database': False,
+            'guest_mode': True # Assuming guest mode is always enabled
+        }
+        
+        # Test database connection
+        try:
+            with db.engine.connect() as connection:
+                connection.execute(text('SELECT 1'))
+            status['database'] = True
+        except Exception as db_err:
+            print(f"Database connection test failed: {db_err}")
+            status['database'] = False
+        
+        # Overall health check
+        if not (status['spotify_api'] and status['gemini_api'] and status['stability_api'] and status['database']):
+            status['status'] = 'degraded'
+            if not status['database']:
+                 print("System status degraded: Database connection failed.")
+            if not (status['spotify_api'] and status['gemini_api'] and status['stability_api']):
+                 print("System status degraded: One or more API keys are missing.")
+
+        return jsonify(status)
+        
+    except Exception as e:
+        print(f"Error in system_status: {e}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
+# Login route
+# ... (keep existing login, logout, profile, spotify_login, spotify_callback, etc. routes) ...
+
+if __name__ == '__main__':
     # For Render deployment
     print("🚀 Starting Spotify Cover Generator for Render")
     
