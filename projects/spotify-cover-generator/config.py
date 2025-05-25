@@ -32,7 +32,7 @@ SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 # Dynamic redirect URI based on environment
 if os.getenv("RENDER"):
     # Production on Render - note the /spotify prefix for your app path
-    SPOTIFY_REDIRECT_URI = "https://www.benjamintakaki.com/spotify/auth/spotify/callback"
+    SPOTIFY_REDIRECT_URI = "https://www.benjamintakaki.com/spotify/spotify-callback"
 elif os.getenv("DEVELOPMENT"):
     # Local development
     SPOTIFY_REDIRECT_URI = "http://localhost:5000/spotify/auth/spotify/callback"
