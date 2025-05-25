@@ -1328,16 +1328,29 @@ def register():
             flash('Username already taken.', 'error')
             return redirect(url_for('register'))
 
-        new_user = User(email=email, username=username, display_name=username)
-        new_user.set_password(password)
-        db.session.add(new_user)
-        db.session.commit()
+        # Create new user
+        password_hash = generate_password_hash(password)
+        new_user = User(
+            email=email, 
+            username=username, 
+            display_name=username,
+            password_hash=password_hash
+        )
         
-        # After successful user creation, track conversion
-        track_guest_conversion()
-        
-        flash('Registration successful! Please log in.', 'success')
-        return redirect(url_for('login'))
+        try:
+            db.session.add(new_user)
+            db.session.commit()
+            
+            # After successful user creation, track conversion
+            track_guest_conversion()
+            
+            flash('Registration successful! Please log in.', 'success')
+            return redirect(url_for('login'))
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error creating user: {e}")
+            flash('Registration failed. Please try again.', 'error')
+            return redirect(url_for('register'))
         
     return render_template('register.html', user_info=get_current_user_or_guest())
 
@@ -1504,10 +1517,9 @@ def spotify_login():
     if not SPOTIFY_CLIENT_ID:
         flash('Spotify integration is not configured', 'error')
         return redirect(url_for('generate'))
-    
-    # Generate state for CSRF protection
+      # Generate state for CSRF protection
     state = secrets.token_urlsafe(32)
-    oauth_state = OAuthState(state=state)
+    oauth_state = SpotifyState(state=state)
     db.session.add(oauth_state)
     db.session.commit()
     
@@ -1541,9 +1553,8 @@ def spotify_callback():
         if not code or not state:
             flash('Invalid Spotify callback', 'error')
             return redirect(url_for('generate'))
-        
-        # Verify state
-        oauth_state = OAuthState.query.filter_by(state=state, used=False).first()
+          # Verify state
+        oauth_state = SpotifyState.query.filter_by(state=state, used=False).first()
         if not oauth_state:
             flash('Invalid state parameter', 'error')
             return redirect(url_for('generate'))

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Spotify Cover Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 Spotify Cover Generator</h1>
+            <p>Create your free account</p>
+        </div>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="register-container">
+            <!-- Spotify Sign Up (Primary) -->
+            <div class="spotify-signup-section">
+                <h2>🎵 Sign Up with Spotify</h2>
+                <p>Connect your Spotify account for the best experience</p>
+                <a href="{{ url_for('spotify_login') }}" class="spotify-signup-btn">
+                    <img src="{{ url_for('static', filename='images/Spotify_Primary_Logo_RGB_Green.png') }}" alt="Spotify Logo" class="spotify-logo">
+                    Sign Up with Spotify
+                </a>
+                <div class="spotify-benefits">
+                    <h3>🌟 Premium Benefits:</h3>
+                    <ul>
+                        <li>✅ Unlimited cover generations</li>
+                        <li>✅ Edit playlist covers directly</li>
+                        <li>✅ Modify playlist titles & descriptions</li>
+                        <li>✅ Access to advanced styling options</li>
+                        <li>✅ Priority support</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Divider -->
+            <div class="signup-divider">
+                <span>or</span>
+            </div>
+
+            <!-- Traditional Sign Up Form -->
+            <div class="traditional-signup-section">
+                <h2>Create Account</h2>
+                <form method="POST" class="signup-form">
+                    <div class="form-group">
+                        <label for="email">Email Address:</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="username">Username:</label>
+                        <input type="text" id="username" name="username" required minlength="3" maxlength="50">
+                        <small>3-50 characters, letters and numbers only</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password:</label>
+                        <input type="password" id="password" name="password" required minlength="6">
+                        <small>Minimum 6 characters</small>
+                    </div>
+                    <button type="submit" class="button primary">Create Account</button>
+                </form>
+                
+                <div class="free-benefits">
+                    <h3>🆓 Free Account Includes:</h3>
+                    <ul>
+                        <li>✅ 2 cover generations per day</li>
+                        <li>✅ High-quality AI-generated covers</li>
+                        <li>✅ Genre-based styling</li>
+                        <li>✅ Custom mood descriptions</li>
+                    </ul>
+                </div>
+                
+                <div class="auth-links">
+                    <p>Already have an account? <a href="{{ url_for('login') }}">Sign in here</a></p>
+                </div>
+            </div>
+
+            <!-- Guest Option -->
+            <div class="guest-section">
+                <h3>Just Browsing?</h3>
+                <p>Try 1 free generation without signing up</p>
+                <a href="{{ url_for('generate') }}" class="button secondary">Continue as Guest</a>
+            </div>
+        </div>
+
+        <!-- Terms and Privacy -->
+        <div class="legal-notice">
+            <p>By creating an account, you agree to our <a href="#" onclick="alert('Terms coming soon!')">Terms of Service</a> and <a href="#" onclick="alert('Privacy Policy coming soon!')">Privacy Policy</a></p>
+        </div>
+    </div>
+
+    <style>
+        .register-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .spotify-signup-section {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px;
+            background: linear-gradient(135deg, #1a1a1a, #0f3c2b);
+            border-radius: 15px;
+            border: 2px solid #1DB954;
+        }
+
+        .spotify-signup-btn {
+            display: inline-flex;
+            align-items: center;
+            background: #1DB954;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 18px;
+            transition: all 0.3s;
+            margin: 20px 0;
+        }
+
+        .spotify-signup-btn:hover {
+            background: #1ed760;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(29, 185, 84, 0.4);
+        }
+
+        .spotify-logo {
+            width: 28px;
+            height: 28px;
+            margin-right: 12px;
+        }
+
+        .spotify-benefits {
+            margin-top: 25px;
+            text-align: left;
+        }
+
+        .spotify-benefits h3 {
+            color: #1DB954;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .spotify-benefits ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .spotify-benefits li {
+            margin: 8px 0;
+            color: #ccc;
+            font-size: 14px;
+        }
+
+        .signup-divider {
+            text-align: center;
+            margin: 40px 0;
+            position: relative;
+        }
+
+        .signup-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #333;
+            z-index: 1;
+        }
+
+        .signup-divider span {
+            background: #000;
+            padding: 0 20px;
+            color: #ccc;
+            position: relative;
+            z-index: 2;
+        }
+
+        .traditional-signup-section {
+            background: #1a1a1a;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .signup-form .form-group {
+            margin-bottom: 20px;
+        }
+
+        .signup-form label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ccc;
+            font-weight: bold;
+        }
+
+        .signup-form input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #000;
+            color: white;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        .signup-form input:focus {
+            outline: none;
+            border-color: #1DB954;
+            box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.2);
+        }
+
+        .signup-form small {
+            color: #666;
+            font-size: 12px;
+            margin-top: 5px;
+            display: block;
+        }
+
+        .free-benefits {
+            margin-top: 25px;
+            padding: 20px;
+            background: #0a0a0a;
+            border-radius: 10px;
+        }
+
+        .free-benefits h3 {
+            color: #1DB954;
+            margin-bottom: 15px;
+        }
+
+        .free-benefits ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .free-benefits li {
+            margin: 8px 0;
+            color: #ccc;
+            font-size: 14px;
+        }
+
+        .auth-links {
+            text-align: center;
+            margin-top: 25px;
+        }
+
+        .auth-links a {
+            color: #1DB954;
+            text-decoration: none;
+        }
+
+        .auth-links a:hover {
+            text-decoration: underline;
+        }
+
+        .guest-section {
+            text-align: center;
+            padding: 20px;
+            background: #111;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .legal-notice {
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .legal-notice a {
+            color: #1DB954;
+            text-decoration: none;
+        }
+
+        .legal-notice a:hover {
+            text-decoration: underline;
+        }
+
+        .flash-message {
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .flash-message.success {
+            background: #1DB954;
+            color: white;
+        }
+
+        .flash-message.error {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .flash-message.info {
+            background: #3498db;
+            color: white;
+        }
+
+        @media (max-width: 600px) {
+            .register-container {
+                padding: 10px;
+            }
+            
+            .spotify-signup-section,
+            .traditional-signup-section {
+                padding: 20px;
+            }
+            
+            .spotify-signup-btn {
+                padding: 12px 24px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</body>
+</html>
