@@ -4,12 +4,21 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+import tempfile
 
 # Base paths - adjusted for Render deployment
 BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 COVERS_DIR = BASE_DIR / "generated_covers"
 DATA_DIR = BASE_DIR / "data"
-LORA_DIR = BASE_DIR / "loras"
+
+# For Render deployment - use temp directory for file uploads
+if os.getenv("RENDER"):
+    # On Render, use /tmp for temporary file storage
+    TEMP_DIR = Path("/tmp")
+    LORA_DIR = TEMP_DIR / "loras"
+else:
+    # Local development
+    LORA_DIR = BASE_DIR / "loras"
 
 # Create necessary directories
 COVERS_DIR.mkdir(exist_ok=True)

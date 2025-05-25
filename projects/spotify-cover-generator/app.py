@@ -12,6 +12,7 @@ import requests
 import base64
 import scipy as sp
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 import secrets
 from sqlalchemy import text
 from collections import Counter
@@ -1260,15 +1261,118 @@ def regenerate_cover():
                 "found_genres": bool(result.get("genres", [])),
                 "lora_name": result.get("lora_name", ""),
                 "lora_type": result.get("lora_type", ""),
-                "lora_url": result.get("lora_url", "")
-            })
+                "lora_url": result.get("lora_url", "")            })
             
         except Exception as e:
             print(f"Error generating cover: {e}")
             return jsonify({"success": False, "error": "Failed to generate cover"}), 500
-    
+            
     except Exception as e:
         print(f"Error in regenerate endpoint: {e}")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+@app.route('/api/upload_lora', methods=['POST'])
+@login_required
+@limiter.limit("5 per hour")  # Limit uploads
+def upload_lora():
+    """Upload LoRA file (Premium users only)"""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"success": False, "error": "User not authenticated"}), 401
+        
+        # Check if user is premium (only premium users can upload files)
+        if not user.is_premium_user():
+            return jsonify({"success": False, "error": "File uploads are only available for premium users. Use URL-based LoRAs instead."}), 403
+        
+        # Check if file was uploaded
+        if 'file' not in request.files:
+            return jsonify({"success": False, "error": "No file uploaded"}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"success": False, "error": "No file selected"}), 400
+        
+        # Validate file extension
+        filename = secure_filename(file.filename)
+        if not filename.lower().endswith(('.safetensors', '.ckpt', '.pt')):
+            return jsonify({"success": False, "error": "Invalid file type. Only .safetensors, .ckpt, and .pt files are allowed."}), 400
+        
+        # Get name without extension for database
+        lora_name = filename.rsplit('.', 1)[0]
+        
+        # Check if LoRA with this name already exists
+        existing = LoraModelDB.query.filter_by(name=lora_name).first()
+        if existing:
+            return jsonify({"success": False, "error": f"LoRA with name '{lora_name}' already exists"}), 400
+        
+        # Handle file storage based on environment
+        if os.getenv("RENDER"):
+            # On Render, files are ephemeral - return error with suggestion
+            return jsonify({
+                "success": False, 
+                "error": "File uploads are not supported on this hosting platform. Please use URL-based LoRAs from Civitai or HuggingFace instead."
+            }), 400
+        
+        # Save file locally (for local development)
+        from config import LORA_DIR
+        LORA_DIR.mkdir(exist_ok=True)
+        
+        file_path = LORA_DIR / filename
+        file.save(str(file_path))
+        
+        # Add to database
+        new_lora = LoraModelDB(
+            name=lora_name,
+            source_type="local",
+            path=str(file_path),
+            url="",
+            trigger_words=[],
+            strength=0.7
+        )
+        
+        db.session.add(new_lora)
+        db.session.commit()
+        
+        return jsonify({
+            "success": True, 
+            "message": f"LoRA '{lora_name}' uploaded successfully"
+        })
+        
+    except Exception as e:
+        print(f"Error uploading LoRA: {e}")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+@app.route('/api/add_lora_link', methods=['POST'])
+@login_required
+@limiter.limit("10 per hour")  # Allow more URL-based additions
+def add_lora_link():
+    """Add LoRA via URL (available for all registered users)"""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"success": False, "error": "User not authenticated"}), 401
+        
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        url = data.get('url', '').strip()
+        trigger_words = data.get('trigger_words', [])
+        strength = float(data.get('strength', 0.7))
+        
+        if not name or not url:
+            return jsonify({"success": False, "error": "Name and URL are required"}), 400
+        
+        # Use the utility function to add the LoRA
+        from utils import add_lora_link
+        success, message = add_lora_link(name, url, trigger_words, strength)
+        
+        if success:
+            return jsonify({"success": True, "message": message})
+        else:
+            return jsonify({"success": False, "error": message}), 400
+            
+    except Exception as e:
+        print(f"Error adding LoRA link: {e}")
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @app.route("/generated_covers/<path:filename>")

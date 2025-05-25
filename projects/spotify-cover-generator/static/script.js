@@ -144,10 +144,99 @@ document.addEventListener('DOMContentLoaded', function() {
                     uploadStatus.textContent = data.error || 'Upload failed';
                     uploadStatus.className = 'error';
                 }
-            })
-            .catch(error => {
+            })            .catch(error => {
                 uploadStatus.textContent = 'Error: ' + error.message;
                 uploadStatus.className = 'error';
+            });
+        });
+    }
+    
+    // LoRA tab functionality
+    const tabButtons = document.querySelectorAll('.lora-tab-btn');
+    const tabContents = document.querySelectorAll('.lora-tab-content');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const targetTab = this.dataset.tab;
+            
+            // Remove active class from all tabs and buttons
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            // Add active class to clicked button and corresponding content
+            this.classList.add('active');
+            document.getElementById(targetTab + '-tab').classList.add('active');
+        });
+    });
+    
+    // LoRA URL form handling
+    const loraUrlForm = document.getElementById('lora-url-form');
+    if (loraUrlForm) {
+        const strengthSlider = document.getElementById('lora_strength');
+        const strengthValue = document.getElementById('strength-value');
+        
+        // Update strength display
+        if (strengthSlider && strengthValue) {
+            strengthSlider.addEventListener('input', function() {
+                strengthValue.textContent = this.value;
+            });
+        }
+        
+        loraUrlForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const urlStatus = document.getElementById('url-status');
+            const formData = new FormData(this);
+            
+            const name = formData.get('name').trim();
+            const url = formData.get('url').trim();
+            const strength = parseFloat(formData.get('strength'));
+            
+            if (!name || !url) {
+                urlStatus.textContent = 'Please fill in all required fields';
+                urlStatus.className = 'error';
+                return;
+            }
+            
+            // Create loading state
+            urlStatus.textContent = 'Adding LoRA...';
+            urlStatus.className = '';
+            
+            // Submit via AJAX
+            fetch('/api/add_lora_link', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: name,
+                    url: url,
+                    strength: strength,
+                    trigger_words: [] // Can be extended later
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    urlStatus.textContent = data.message;
+                    urlStatus.className = 'success';
+                    
+                    // Clear form
+                    this.reset();
+                    strengthValue.textContent = '0.7';
+                    
+                    // Refresh page after a delay to show updated LoRA list
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    urlStatus.textContent = data.error || 'Failed to add LoRA';
+                    urlStatus.className = 'error';
+                }
+            })
+            .catch(error => {
+                urlStatus.textContent = 'Error: ' + error.message;
+                urlStatus.className = 'error';
             });
         });
     }
