@@ -47,7 +47,7 @@ print(f"🔍 Python path includes current dir: {current_dir in sys.path}")
 
 # Import config first (this should work)
 try:
-    from config import BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY, SPOTIFY_DB_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
+    from config import BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY, SPOTIFY_DB_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
     print("✓ Config imported successfully")
 except ImportError as e:
     print(f"❌ Config import failed: {e}")
@@ -1630,15 +1630,12 @@ def spotify_login():
     # Spotify OAuth parameters
     scope = 'playlist-read-private playlist-modify-public playlist-modify-private ugc-image-upload'
     
-    # FIXED: Use absolute URL construction to avoid path duplication
-    base_url = request.url_root.rstrip('/')  # Remove trailing slash
-    redirect_uri = f"{base_url}/spotify/spotify-callback"  # Construct absolute URL
-    
+    # Use SPOTIFY_REDIRECT_URI from config instead of dynamic construction
     auth_url = (
         'https://accounts.spotify.com/authorize?'
         f'client_id={SPOTIFY_CLIENT_ID}&'
         f'response_type=code&'
-        f'redirect_uri={redirect_uri}&'
+        f'redirect_uri={SPOTIFY_REDIRECT_URI}&'
         f'scope={scope}&'
         f'state={state}'
     )
@@ -1671,15 +1668,11 @@ def spotify_callback():
         oauth_state.used = True
         db.session.commit()
         
-        # Exchange code for tokens
-        # FIXED: Use same absolute URL construction for consistency
-        base_url = request.url_root.rstrip('/')
-        redirect_uri = f"{base_url}/spotify/spotify-callback"
-        
+        # Exchange code for tokens using SPOTIFY_REDIRECT_URI from config
         token_data = {
             'grant_type': 'authorization_code',
             'code': code,
-            'redirect_uri': redirect_uri,
+            'redirect_uri': SPOTIFY_REDIRECT_URI,
             'client_id': SPOTIFY_CLIENT_ID,
             'client_secret': SPOTIFY_CLIENT_SECRET
         }
