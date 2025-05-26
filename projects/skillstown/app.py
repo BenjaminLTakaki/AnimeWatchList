@@ -445,7 +445,7 @@ def create_app(config_name=None):
             else:
                 flash('Please upload a PDF file.', 'danger')
         
-        return render_template('assessment/upload.html', get_url_for=get_url_for)
+        return render_template('assessment/assessment.html', get_url_for=get_url_for)
 
     @app.route("/cv-analysis")
     @login_required
