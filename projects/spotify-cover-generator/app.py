@@ -451,6 +451,79 @@ def ensure_tables_exist():
 # Global initialization flag
 initialized = False
 
+def migrate_lora_table():
+    """Migrate LoRA table to add missing columns"""
+    try:
+        with app.app_context():
+            with db.engine.connect() as connection:
+                # Check if columns exist first
+                result = connection.execute(text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'spotify_lora_models'
+                """))
+                existing_columns = [row[0] for row in result]
+                
+                print(f"Existing columns in spotify_lora_models: {existing_columns}")
+                
+                # Add missing columns if they don't exist
+                migrations = []
+                
+                if 'file_size' not in existing_columns:
+                    migrations.append("ALTER TABLE spotify_lora_models ADD COLUMN file_size INTEGER DEFAULT 0")
+                    
+                if 'uploaded_at' not in existing_columns:
+                    migrations.append("ALTER TABLE spotify_lora_models ADD COLUMN uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+                    
+                if 'uploaded_by' not in existing_columns:
+                    migrations.append("ALTER TABLE spotify_lora_models ADD COLUMN uploaded_by INTEGER")
+                
+                # Remove old URL-related columns if they exist
+                if 'url' in existing_columns:
+                    migrations.append("ALTER TABLE spotify_lora_models DROP COLUMN IF EXISTS url CASCADE")
+                    
+                if 'trigger_words' in existing_columns:
+                    migrations.append("ALTER TABLE spotify_lora_models DROP COLUMN IF EXISTS trigger_words CASCADE")
+                    
+                if 'strength' in existing_columns:
+                    migrations.append("ALTER TABLE spotify_lora_models DROP COLUMN IF EXISTS strength CASCADE")
+                
+                # Execute migrations
+                for migration in migrations:
+                    try:
+                        connection.execute(text(migration))
+                        connection.commit()
+                        print(f"✓ Executed: {migration}")
+                    except Exception as e:
+                        print(f"⚠️ Migration failed (might already exist): {migration} - {e}")
+                        
+                # Add foreign key constraint if it doesn't exist
+                try:
+                    connection.execute(text("""
+                        DO $
+                        BEGIN
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.table_constraints 
+                                WHERE constraint_name = 'fk_lora_models_uploaded_by'
+                            ) THEN
+                                ALTER TABLE spotify_lora_models 
+                                ADD CONSTRAINT fk_lora_models_uploaded_by 
+                                FOREIGN KEY (uploaded_by) REFERENCES spotify_users(id) ON DELETE SET NULL;
+                            END IF;
+                        END $;
+                    """))
+                    connection.commit()
+                    print("✓ Foreign key constraint added/verified")
+                except Exception as e:
+                    print(f"⚠️ Foreign key constraint warning: {e}")
+                
+                print("✅ LoRA table migration completed")
+                return True
+                
+    except Exception as e:
+        print(f"❌ LoRA table migration failed: {e}")
+        return False
+
 def initialize_app():
     """Initialize the application's dependencies with better import handling"""
     global initialized
@@ -488,6 +561,9 @@ def initialize_app():
             
             db.create_all()
             print("✓ db.create_all() executed")
+            
+            # Run LoRA table migration
+            migrate_lora_table()
             
             # Verify required tables exist
             new_tables = inspector.get_table_names()

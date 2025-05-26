@@ -5,122 +5,67 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Spotify Cover Generator</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Spotify Cover Generator</h1>
-            <p>Login to your account</p>
-        </div>
-
-        <!-- Flash messages -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="flash-message {{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <div class="login-container">
-            <!-- Spotify Login (Primary) -->
-            <div class="spotify-login-section">
-                <h2>Continue with Spotify</h2>
-                <p>Connect your Spotify account to generate custom playlist covers</p>
-                <a href="{{ url_for('spotify_login') }}" class="spotify-login-btn">
-                    <img src="{{ url_for('static', filename='images/Spotify_Primary_Logo_RGB_Green.png') }}" alt="Spotify Logo" class="spotify-logo">
-                    Connect with Spotify
-                </a>
-                <p class="spotify-note">✓ Generate unlimited covers<br>✓ Edit your playlists directly<br>✓ Access premium features</p>
-            </div>
-
-            <!-- Divider -->
-            <div class="login-divider">
-                <span>or</span>
-            </div>
-
-            <!-- Traditional Login Form (if implemented) -->
-            <div class="traditional-login-section">
-                <h2>Username Login</h2>
-                <form method="POST" class="login-form">
-                    <div class="form-group">
-                        <label for="username">Username:</label>
-                        <input type="text" id="username" name="username" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="password">Password:</label>
-                        <input type="password" id="password" name="password" required>
-                    </div>
-                    <button type="submit" class="button primary">Login</button>
-                </form>
-                
-                <div class="auth-links">
-                    <p>Don't have an account? <a href="{{ url_for('register') }}">Sign up here</a></p>
-                </div>
-            </div>
-
-            <!-- Guest Access -->
-            <div class="guest-section">
-                <h3>Try as Guest</h3>
-                <p>Get 1 free generation per day without signing up</p>
-                <a href="{{ url_for('generate') }}" class="button secondary">Continue as Guest</a>
-            </div>
-        </div>
-    </div>
-
     <style>
-        .login-container {
+        .auth-container {
             max-width: 500px;
-            margin: 0 auto;
-            padding: 20px;
+            margin: 50px auto;
+            padding: 40px;
+            background: #1e1e1e;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
-
-        .spotify-login-section {
+        
+        .auth-title {
             text-align: center;
+            color: #1DB954;
             margin-bottom: 30px;
-            padding: 30px;
-            background: #1a1a1a;
-            border-radius: 15px;
-            border: 2px solid #1DB954;
+            font-size: 2rem;
         }
-
-        .spotify-login-btn {
+        
+        .spotify-btn {
+            width: 100%;
+            padding: 15px;
+            background: #1DB954;
+            color: #000000;
+            border: none;
+            border-radius: 25px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-decoration: none;
             display: inline-flex;
             align-items: center;
-            background: #1DB954;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 25px;
-            text-decoration: none;
-            font-weight: bold;
-            font-size: 16px;
-            transition: background 0.3s;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            cursor: pointer;
         }
-
-        .spotify-login-btn:hover {
+        
+        .spotify-btn:hover {
             background: #1ed760;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(29, 185, 84, 0.3);
         }
-
+        
         .spotify-logo {
             width: 24px;
             height: 24px;
-            margin-right: 10px;
+            background: #ffffff;
+            border-radius: 50%;
+            padding: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-
-        .spotify-note {
-            margin-top: 15px;
-            color: #ccc;
-            font-size: 14px;
-            line-height: 1.4;
-        }
-
-        .login-divider {
+        
+        .divider {
             text-align: center;
             margin: 30px 0;
             position: relative;
+            color: #666;
         }
-
-        .login-divider::before {
+        
+        .divider::after {
             content: '';
             position: absolute;
             top: 50%;
@@ -130,89 +75,164 @@
             background: #333;
             z-index: 1;
         }
-
-        .login-divider span {
-            background: #000;
+        
+        .divider span {
+            background: #1e1e1e;
             padding: 0 20px;
-            color: #ccc;
             position: relative;
             z-index: 2;
         }
-
-        .traditional-login-section {
-            background: #1a1a1a;
-            padding: 30px;
-            border-radius: 15px;
-            margin-bottom: 20px;
-        }
-
-        .login-form .form-group {
-            margin-bottom: 20px;
-        }
-
-        .login-form label {
-            display: block;
-            margin-bottom: 5px;
-            color: #ccc;
-        }
-
-        .login-form input {
-            width: 100%;
+        
+        .alert {
             padding: 12px;
-            border: 1px solid #333;
-            border-radius: 8px;
-            background: #000;
-            color: white;
-            font-size: 16px;
+            border-radius: 5px;
+            margin-bottom: 20px;
         }
-
-        .login-form input:focus {
-            outline: none;
-            border-color: #1DB954;
+        
+        .alert-error {
+            background-color: rgba(255, 82, 82, 0.1);
+            color: #ff5252;
+            border-left: 4px solid #ff5252;
         }
-
+        
+        .alert-success {
+            background-color: rgba(29, 185, 84, 0.1);
+            color: #1DB954;
+            border-left: 4px solid #1DB954;
+        }
+        
+        .alert-info {
+            background-color: rgba(33, 150, 243, 0.1);
+            color: #2196F3;
+            border-left: 4px solid #2196F3;
+        }
+        
         .auth-links {
             text-align: center;
             margin-top: 20px;
         }
-
+        
         .auth-links a {
             color: #1DB954;
             text-decoration: none;
         }
-
+        
         .auth-links a:hover {
             text-decoration: underline;
         }
-
+        
+        .form-section {
+            background: #252525;
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
         .guest-section {
             text-align: center;
             padding: 20px;
             background: #111;
             border-radius: 10px;
+            border: 1px solid #333;
         }
-
-        .flash-message {
-            padding: 12px;
-            margin: 10px 0;
-            border-radius: 8px;
-            text-align: center;
+        
+        .guest-section h3 {
+            color: #1DB954;
+            margin-bottom: 15px;
         }
-
-        .flash-message.success {
-            background: #1DB954;
-            color: white;
+        
+        .benefits-list {
+            text-align: left;
+            color: #ccc;
+            margin: 15px 0;
         }
-
-        .flash-message.error {
-            background: #e74c3c;
-            color: white;
+        
+        .benefits-list li {
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-
-        .flash-message.info {
-            background: #3498db;
-            color: white;
+        
+        .check-icon {
+            color: #1DB954;
+            font-weight: bold;
         }
     </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h1 class="auth-title">Welcome Back</h1>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'error' if category == 'error' else 'success' if category == 'success' else 'info' }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <!-- Spotify Login Section -->
+        <div class="form-section">
+            <h3 style="color: #1DB954; text-align: center; margin-bottom: 15px;">Connect with Spotify</h3>
+            <p style="text-align: center; color: #ccc; margin-bottom: 20px;">
+                Get the full experience with Spotify integration
+            </p>
+            
+            <a href="{{ url_for('spotify_login') }}" class="spotify-btn">
+                <div class="spotify-logo">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#1DB954">
+                        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.54-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/>
+                    </svg>
+                </div>
+                Continue with Spotify
+            </a>
+            
+            <div class="benefits-list">
+                <h4 style="color: #1DB954; margin-bottom: 10px;">Premium Benefits (bentakaki7@gmail.com):</h4>
+                <ul style="list-style: none; padding: 0;">
+                    <li><span class="check-icon">✓</span> Unlimited cover generations</li>
+                    <li><span class="check-icon">✓</span> Edit playlist covers directly</li>
+                    <li><span class="check-icon">✓</span> Upload custom LoRA files</li>
+                    <li><span class="check-icon">✓</span> Priority support</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="divider">
+            <span>or</span>
+        </div>
+        
+        <!-- Regular Login Form -->
+        <div class="form-section">
+            <h3 style="color: #1DB954; margin-bottom: 15px;">Username Login</h3>
+            <form method="POST">
+                <div class="form-group">
+                    <label for="username" style="color: #ccc;">Username:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password" style="color: #ccc;">Password:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <button type="submit" class="submit-btn">Sign In</button>
+            </form>
+        </div>
+        
+        <div class="auth-links">
+            <p style="color: #ccc;">Don't have an account? <a href="{{ url_for('register') }}">Sign up here</a></p>
+        </div>
+        
+        <!-- Guest Access -->
+        <div class="guest-section">
+            <h3>Try as Guest</h3>
+            <p style="color: #ccc; margin-bottom: 15px;">Get 1 free generation per day without signing up</p>
+            <a href="{{ url_for('generate') }}" class="button secondary">Continue as Guest</a>
+        </div>
+    </div>
 </body>
 </html>
