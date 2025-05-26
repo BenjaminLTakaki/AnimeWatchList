@@ -452,7 +452,7 @@ def ensure_tables_exist():
 initialized = False
 
 def migrate_lora_table():
-    """Migrate LoRA table to add missing columns"""
+    """Migrate LoRA table to add missing columns - FIXED POSTGRESQL SYNTAX"""
     try:
         with app.app_context():
             with db.engine.connect() as connection:
@@ -497,23 +497,26 @@ def migrate_lora_table():
                     except Exception as e:
                         print(f"⚠️ Migration failed (might already exist): {migration} - {e}")
                         
-                # Add foreign key constraint if it doesn't exist
+                # Add foreign key constraint - FIXED: Use simple SQL instead of DO block
                 try:
-                    connection.execute(text("""
-                        DO $
-                        BEGIN
-                            IF NOT EXISTS (
-                                SELECT 1 FROM information_schema.table_constraints 
-                                WHERE constraint_name = 'fk_lora_models_uploaded_by'
-                            ) THEN
-                                ALTER TABLE spotify_lora_models 
-                                ADD CONSTRAINT fk_lora_models_uploaded_by 
-                                FOREIGN KEY (uploaded_by) REFERENCES spotify_users(id) ON DELETE SET NULL;
-                            END IF;
-                        END $;
-                    """))
-                    connection.commit()
-                    print("✓ Foreign key constraint added/verified")
+                    # First check if constraint exists
+                    constraint_check = connection.execute(text("""
+                        SELECT constraint_name 
+                        FROM information_schema.table_constraints 
+                        WHERE table_name = 'spotify_lora_models' 
+                        AND constraint_name = 'fk_lora_models_uploaded_by'
+                    """)).fetchone()
+                    
+                    if not constraint_check:
+                        connection.execute(text("""
+                            ALTER TABLE spotify_lora_models 
+                            ADD CONSTRAINT fk_lora_models_uploaded_by 
+                            FOREIGN KEY (uploaded_by) REFERENCES spotify_users(id) ON DELETE SET NULL
+                        """))
+                        connection.commit()
+                        print("✓ Foreign key constraint added")
+                    else:
+                        print("✓ Foreign key constraint already exists")
                 except Exception as e:
                     print(f"⚠️ Foreign key constraint warning: {e}")
                 
@@ -683,8 +686,7 @@ def initialize_app():
         SPOTIFY_CLIENT_ID, 
         SPOTIFY_CLIENT_SECRET, 
         GEMINI_API_KEY, 
-        STABILITY_API_KEY
-    ])
+        STABILITY_API_KEY    ])
     
     if not env_vars_present:
         missing = []
@@ -697,6 +699,9 @@ def initialize_app():
         print(f"❌ Missing environment variables: {', '.join(missing)}")
     else:
         print("✓ All environment variables present")
+    
+    # Register and verify API routes
+    register_api_routes()
     
     # Set initialization status
     initialized = env_vars_present and (spotify_client_available or models_available)
@@ -1509,15 +1514,392 @@ def profile():
 def serve_image(filename):
     return send_from_directory(COVERS_DIR, filename)
 
-# Keep other existing API routes (regenerate, playlist edit, etc.)
+# API ROUTES - MISSING ROUTES ADDED
 
-if __name__ == '__main__':
-    # Initialize the app
-    if initialize_app():
-        print("✅ Application initialized successfully")
-    else:
-        print("⚠️ Application initialization had issues, but continuing...")
+@app.route('/api/regenerate', methods=['POST'])
+@login_required
+def regenerate_cover():
+    """Regenerate cover with same playlist"""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"success": False, "error": "User not authenticated"}), 401
+        
+        if not user.can_generate_today():
+            return jsonify({"success": False, "error": "Daily generation limit reached"}), 429
+        
+        data = request.get_json()
+        playlist_url = data.get('playlist_url')
+        mood = data.get('mood', '')
+        negative_prompt = data.get('negative_prompt', '')
+        lora_name = data.get('lora_name', '')
+        
+        if not playlist_url:
+            return jsonify({"success": False, "error": "Missing playlist URL"}), 400
+        
+        # Get LoRA if specified
+        lora_input = None
+        if lora_name and lora_name != "none":
+            try:
+                import utils
+                loras = utils.get_available_loras()
+                for lora_item in loras:
+                    if hasattr(lora_item, 'name') and lora_item.name == lora_name:
+                        lora_input = lora_item
+                        break
+            except Exception as e:
+                print(f"Error getting LoRA: {e}")
+        
+        # Generate new cover
+        try:
+            import generator
+            result = generator.generate_cover(
+                playlist_url, 
+                mood, 
+                lora_input, 
+                negative_prompt=negative_prompt, 
+                user_id=user.id
+            )
+            
+            if "error" in result:
+                return jsonify({"success": False, "error": result["error"]}), 400
+            
+            # Return all relevant data for the frontend to update
+            return jsonify({
+                "success": True, 
+                "message": "Cover regenerated successfully",
+                "title": result["title"],
+                "image_file": os.path.basename(result["output_path"]),
+                "image_data_base64": result.get("image_data_base64", ""),
+                "genres": ", ".join(result.get("genres", [])),
+                "mood": result.get("mood", ""),
+                "playlist_name": result.get("item_name", "Your Music"),
+                "found_genres": bool(result.get("genres", [])),
+                "lora_name": result.get("lora_name", ""),
+                "lora_type": result.get("lora_type", ""),
+                "lora_url": result.get("lora_url", "")
+            })
+            
+        except Exception as e:
+            print(f"Error generating cover: {e}")
+            return jsonify({"success": False, "error": "Failed to generate cover"}), 500
+            
+    except Exception as e:
+        print(f"Error in regenerate endpoint: {e}")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+@app.route('/api/generation-status')
+def generation_status():
+    """API endpoint to check generation status"""
+    user_info = get_current_user_or_guest()
     
-    # Run the app
-    port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host="0.0.0.0", port=port)
+    return jsonify({
+        'type': user_info['type'],
+        'can_generate': user_info['can_generate'],
+        'generations_today': user_info['generations_today'],
+        'daily_limit': user_info['daily_limit'],
+        'display_name': user_info['display_name']
+    })
+
+@app.route('/api/playlist/edit', methods=['POST'])
+@login_required
+def edit_playlist():
+    """Edit Spotify playlist title and description"""
+    try:
+        user = get_current_user()
+        if not user or not user.spotify_access_token:
+            return jsonify({"success": False, "error": "Spotify not connected"}), 401
+        
+        # Refresh token if needed
+        if not user.refresh_spotify_token_if_needed():
+            return jsonify({"success": False, "error": "Failed to refresh Spotify token"}), 401
+        
+        data = request.get_json()
+        playlist_id = data.get('playlist_id')
+        name = data.get('name')
+        description = data.get('description', '')
+        
+        if not playlist_id or not name:
+            return jsonify({"success": False, "error": "Missing playlist ID or name"}), 400
+        
+        # Update playlist using Spotify API
+        headers = {'Authorization': f'Bearer {user.spotify_access_token}'}
+        url = f'https://api.spotify.com/v1/playlists/{playlist_id}'
+        
+        payload = {
+            'name': name,
+            'description': description
+        }
+        
+        response = requests.put(url, headers=headers, json=payload)
+        
+        if response.status_code == 200:
+            return jsonify({"success": True, "message": "Playlist updated successfully"})
+        else:
+            error_msg = "Failed to update playlist"
+            if response.status_code == 403:
+                error_msg = "You don't have permission to edit this playlist"
+            elif response.status_code == 404:
+                error_msg = "Playlist not found"
+            
+            return jsonify({"success": False, "error": error_msg}), response.status_code
+    
+    except Exception as e:
+        print(f"Error editing playlist: {e}")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+@app.route('/api/playlist/cover', methods=['POST']) 
+@login_required
+def update_playlist_cover():
+    """Update Spotify playlist cover image"""
+    try:
+        user = get_current_user()
+        if not user or not user.spotify_access_token:
+            return jsonify({"success": False, "error": "Spotify not connected"}), 401
+        
+        # Refresh token if needed
+        if not user.refresh_spotify_token_if_needed():
+            return jsonify({"success": False, "error": "Failed to refresh Spotify token"}), 401
+        
+        data = request.get_json()
+        playlist_id = data.get('playlist_id')
+        image_data = data.get('image_data')
+        
+        if not playlist_id or not image_data:
+            return jsonify({"success": False, "error": "Missing playlist ID or image data"}), 400
+        
+        # Extract base64 data from data URL
+        if image_data.startswith('data:image'):
+            # Remove data URL prefix
+            image_data = image_data.split(',')[1]
+        
+        # Update playlist cover using Spotify API
+        headers = {
+            'Authorization': f'Bearer {user.spotify_access_token}',
+            'Content-Type': 'image/jpeg'
+        }
+        url = f'https://api.spotify.com/v1/playlists/{playlist_id}/images'
+        
+        # Decode base64 image
+        import base64
+        image_bytes = base64.b64decode(image_data)
+        
+        response = requests.put(url, headers=headers, data=image_bytes)
+        
+        if response.status_code == 202:  # Spotify returns 202 for successful image upload
+            return jsonify({"success": True, "message": "Playlist cover updated successfully"})
+        else:
+            error_msg = "Failed to update playlist cover"
+            if response.status_code == 403:
+                error_msg = "You don't have permission to edit this playlist"
+            elif response.status_code == 404:
+                error_msg = "Playlist not found"
+            elif response.status_code == 413:
+                error_msg = "Image too large (max 256KB)"
+            
+            return jsonify({"success": False, "error": error_msg}), response.status_code
+    
+    except Exception as e:
+        print(f"Error updating playlist cover: {e}")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+@app.route('/api/generate', methods=['POST'])
+@limiter.limit("10 per hour")
+def api_generate():
+    """API endpoint for generating covers programmatically"""
+    try:
+        # Get user info for rate limiting and feature access
+        user_info = get_current_user_or_guest()
+        
+        # Check generation limits
+        if not user_info['can_generate']:
+            return jsonify({
+                "success": False, 
+                "error": f"Daily generation limit reached ({user_info['daily_limit']} per day)"
+            }), 429
+        
+        # Get request data
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "No JSON data provided"}), 400
+        
+        playlist_url = data.get('playlist_url', '').strip()
+        mood = data.get('mood', '').strip()
+        negative_prompt = data.get('negative_prompt', '').strip()
+        lora_name = data.get('lora_name', '').strip()
+        
+        # Validate required fields
+        if not playlist_url:
+            return jsonify({"success": False, "error": "playlist_url is required"}), 400
+        
+        # Restrict LoRA usage for guests
+        if user_info['type'] == 'guest' and lora_name and lora_name != "none":
+            return jsonify({
+                "success": False, 
+                "error": "LoRA styles are only available for registered users"
+            }), 403
+        
+        # Get LoRA if specified and user has access
+        lora_input = None
+        if lora_name and lora_name != "none" and user_info['can_use_loras']:
+            try:
+                if 'utils_available' in globals() and utils_available:
+                    import utils
+                    loras = utils.get_available_loras()
+                    for lora_item in loras:
+                        if hasattr(lora_item, 'name') and lora_item.name == lora_name:
+                            lora_input = lora_item
+                            break
+            except Exception as e:
+                print(f"Error getting LoRA: {e}")
+        
+        # Check if generation modules are available
+        try:
+            import generator
+        except ImportError:
+            return jsonify({
+                "success": False, 
+                "error": "Generation modules not available"
+            }), 503
+        
+        # Generate the cover
+        user_id = user_info['user'].id if user_info['type'] == 'user' else None
+        result = generator.generate_cover(
+            playlist_url, 
+            mood, 
+            lora_input, 
+            negative_prompt=negative_prompt, 
+            user_id=user_id
+        )
+        
+        if "error" in result:
+            return jsonify({"success": False, "error": result["error"]}), 400
+        
+        # Track generation
+        if user_info['type'] == 'guest':
+            track_guest_generation()
+        
+        # Prepare response data
+        response_data = {
+            "success": True,
+            "title": result["title"],
+            "image_file": os.path.basename(result["output_path"]),
+            "image_data_base64": result.get("image_data_base64", ""),
+            "genres": result.get("genres", []),
+            "all_genres": result.get("all_genres", []),
+            "mood": result.get("mood", mood),
+            "playlist_name": result.get("item_name", "Your Music"),
+            "found_genres": bool(result.get("genres", [])),
+            "lora_name": result.get("lora_name", ""),
+            "lora_type": result.get("lora_type", ""),
+            "lora_url": result.get("lora_url", ""),
+            "spotify_url": playlist_url
+        }
+        
+        # Save to database if user is logged in
+        if user_info['type'] == 'user':
+            try:
+                new_generation = GenerationResultDB(
+                    title=result["title"],
+                    output_path=result["output_path"],
+                    item_name=result.get("item_name"),
+                    genres=result.get("genres"),
+                    all_genres=result.get("all_genres"),
+                    mood=mood,
+                    spotify_url=playlist_url,
+                    lora_name=result.get("lora_name"),
+                    user_id=user_info['user'].id
+                )
+                db.session.add(new_generation)
+                db.session.commit()
+            except Exception as e:
+                print(f"⚠️ Error saving generation result to DB: {e}")
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        print(f"Error in API generate endpoint: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False, 
+            "error": "Internal server error"
+        }), 500
+
+@app.route('/api/status')
+def api_status():
+    """Check API status and user info"""
+    try:
+        user_info = get_current_user_or_guest()
+        
+        return jsonify({
+            'status': 'ok',
+            'user_type': user_info['type'],
+            'can_generate': user_info['can_generate'],
+            'can_use_loras': user_info.get('can_use_loras', False),
+            'show_upload': user_info.get('show_upload', False),
+            'is_premium': user_info.get('is_premium', False),
+            'database_connection': True,
+            'timestamp': datetime.datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.datetime.utcnow().isoformat()
+        }), 500
+
+@app.route('/api/debug/routes')
+def debug_routes():
+    """Debug route to check all available routes"""
+    routes = []
+    for rule in app.url_map.iter_rules():
+        routes.append({
+            'endpoint': rule.endpoint,
+            'methods': list(rule.methods),
+            'rule': str(rule)
+        })
+    
+    # Sort routes by rule for easier reading
+    routes.sort(key=lambda x: x['rule'])
+    
+    return jsonify({
+        'total_routes': len(routes),
+        'routes': routes
+    })
+
+@app.route('/health')
+def health_check():
+    """Simple health check endpoint"""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.datetime.utcnow().isoformat(),
+        'app': 'spotify-cover-generator'
+    })
+
+@app.before_request
+def before_request():
+    """Log requests for debugging"""
+    if request.path.startswith('/api/'):
+        print(f"API Request: {request.method} {request.path}")
+        print(f"Headers: {dict(request.headers)}")
+        if request.is_json:
+            print(f"JSON: {request.get_json()}")
+
+def register_api_routes():
+    """Ensure all API routes are registered"""
+    print("🔗 Registering API routes...")
+    
+    # Check if routes are registered
+    api_routes = [rule for rule in app.url_map.iter_rules() if rule.rule.startswith('/api/')]
+    
+    print(f"📊 Found {len(api_routes)} API routes:")
+    for route in api_routes:
+        print(f"  - {route.methods} {route.rule} -> {route.endpoint}")
+    
+    if len(api_routes) == 0:
+        print("❌ No API routes found! This might be the issue.")
+    else:
+        print("✅ API routes are registered")
+
+# ...existing code...

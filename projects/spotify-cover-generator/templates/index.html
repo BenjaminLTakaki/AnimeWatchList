@@ -574,7 +574,7 @@
                     showUploadStatus('Uploading LoRA file...', 'loading');
                     
                     // Submit via AJAX
-                    fetch('/api/upload_lora', {
+                    fetch('/spotify/api/upload_lora', {
                         method: 'POST',
                         body: formData
                     })
@@ -600,7 +600,7 @@
                 const lorasList = document.getElementById('loras-list');
                 if (!lorasList) return;
                 
-                fetch('/api/loras')
+                fetch('/spotify/api/loras')
                 .then(response => response.json())
                 .then(data => {
                     if (data.loras && data.loras.length > 0) {
