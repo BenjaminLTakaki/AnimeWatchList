@@ -496,10 +496,10 @@ def migrate_lora_table():
                         connection.execute(text(migration))
                         connection.commit()
                         print(f"✓ Executed: {migration}")
-                    except Exception as e:
-                        print(f"⚠️ Migration failed (might already exist): {migration} - {e}")
+                    except Exception as e:                        print(f"⚠️ Migration failed (might already exist): {migration} - {e}")
                         
-                # Add foreign key constraint if it doesn't exist                try:
+                # Add foreign key constraint if it doesn't exist
+                try:
                     # Check if constraint exists
                     constraint_exists = connection.execute(text("""
                         SELECT 1 FROM information_schema.table_constraints 
@@ -517,13 +517,12 @@ def migrate_lora_table():
                     print("✓ Foreign key constraint added/verified")
                 except Exception as e:
                     print(f"⚠️ Foreign key constraint warning: {e}")
-                
-                print("✅ LoRA table migration completed")
+                  print("✅ LoRA table migration completed")
                 return True
                 
-    except Exception as e:
-        print(f"❌ LoRA table migration failed: {e}")
-        return False
+        except Exception as e:
+            print(f"❌ LoRA table migration failed: {e}")
+            return False
 
 def initialize_app():
     """Initialize the application's dependencies with better import handling"""
