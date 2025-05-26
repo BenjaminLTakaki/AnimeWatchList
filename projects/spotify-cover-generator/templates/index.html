@@ -595,34 +595,63 @@
                 });
             }
             
-            // Load current LoRAs list
+            // Load current LoRAs list AND update dropdown
             function loadLorasList() {
                 const lorasList = document.getElementById('loras-list');
-                if (!lorasList) return;
+                const loraDropdown = document.getElementById('lora_name');
                 
                 fetch('/spotify/api/loras')
                 .then(response => response.json())
                 .then(data => {
-                    if (data.loras && data.loras.length > 0) {
-                        lorasList.innerHTML = data.loras.map(lora => `
-                            <div class="lora-item">
-                                <div style="font-size: 2rem; margin-bottom: 10px;">📄</div>
-                                <h4 style="color: #1DB954; margin: 10px 0 5px 0;">${lora.name}</h4>
-                                <p style="color: #ccc; font-size: 0.9rem; margin: 0;">
-                                    ${lora.file_size ? `${(lora.file_size / 1024 / 1024).toFixed(1)} MB` : 'Unknown size'}
-                                </p>
-                                <p style="color: #666; font-size: 0.8rem; margin: 5px 0 0 0;">
-                                    ${lora.uploaded_at ? new Date(lora.uploaded_at).toLocaleDateString() : 'Unknown date'}
-                                </p>
-                            </div>
-                        `).join('');
-                    } else {
-                        lorasList.innerHTML = `
-                            <div class="lora-item" style="color: #666;">
-                                <div style="font-size: 2rem; margin-bottom: 10px;">📁</div>
-                                <p style="margin: 0;">No LoRAs uploaded yet</p>
-                            </div>
-                        `;
+                    // Update the visual list
+                    if (lorasList) {
+                        if (data.loras && data.loras.length > 0) {
+                            lorasList.innerHTML = data.loras.map(lora => `
+                                <div class="lora-item">
+                                    <div style="font-size: 2rem; margin-bottom: 10px;">📄</div>
+                                    <h4 style="color: #1DB954; margin: 10px 0 5px 0;">${lora.name}</h4>
+                                    <p style="color: #ccc; font-size: 0.9rem; margin: 0;">
+                                        ${lora.file_size ? `${(lora.file_size / 1024 / 1024).toFixed(1)} MB` : 'Unknown size'}
+                                    </p>
+                                    <p style="color: #666; font-size: 0.8rem; margin: 5px 0 0 0;">
+                                        ${lora.uploaded_at ? new Date(lora.uploaded_at).toLocaleDateString() : 'Unknown date'}
+                                    </p>
+                                </div>
+                            `).join('');
+                        } else {
+                            lorasList.innerHTML = `
+                                <div class="lora-item" style="color: #666;">
+                                    <div style="font-size: 2rem; margin-bottom: 10px;">📁</div>
+                                    <p style="margin: 0;">No LoRAs uploaded yet</p>
+                                </div>
+                            `;
+                        }
+                    }
+                    
+                    // Update the dropdown in the form
+                    if (loraDropdown && data.loras && data.loras.length > 0) {
+                        // Clear existing options except the first "None" option
+                        const noneOption = loraDropdown.querySelector('option[value="none"]');
+                        loraDropdown.innerHTML = '';
+                        if (noneOption) {
+                            loraDropdown.appendChild(noneOption);
+                        } else {
+                            // Add "None" option if it doesn't exist
+                            const defaultOption = document.createElement('option');
+                            defaultOption.value = 'none';
+                            defaultOption.textContent = 'None (Default Stable Diffusion)';
+                            loraDropdown.appendChild(defaultOption);
+                        }
+                        
+                        // Add LoRA options
+                        data.loras.forEach(lora => {
+                            const option = document.createElement('option');
+                            option.value = lora.name;
+                            option.textContent = lora.name;
+                            loraDropdown.appendChild(option);
+                        });
+                        
+                        console.log(`Added ${data.loras.length} LoRAs to dropdown`);
                     }
                 })
                 .catch(error => {
