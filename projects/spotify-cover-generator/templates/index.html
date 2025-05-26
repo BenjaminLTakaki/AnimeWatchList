@@ -135,19 +135,67 @@
             </button>
         </form>
         
+        <!-- LoRA MANAGEMENT SECTION - THIS WAS MISSING! -->
         {% if user_info.show_upload %}
         <div class="lora-upload">
-            <h3>Upload LoRA</h3>
+            <h3>LoRA Management</h3>
             
-            <form id="lora-upload-form" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label for="lora_file">LoRA File (.safetensors, .ckpt, .pt):</label>
-                    <input type="file" id="lora_file" name="file" accept=".safetensors,.ckpt,.pt">
+            <!-- LoRA Tabs -->
+            <div class="lora-tabs">
+                {% if not os.environ.get('RENDER') %}
+                <button class="lora-tab-btn active" data-tab="upload">Upload File</button>
+                {% endif %}
+                <button class="lora-tab-btn{% if os.environ.get('RENDER') %} active{% endif %}" data-tab="url">Add Via Link</button>
+            </div>
+            
+            {% if not os.environ.get('RENDER') %}
+            <!-- File Upload Tab -->
+            <div class="lora-tab-content active" id="upload-tab">
+                <form id="lora-upload-form" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="lora_file">LoRA File (.safetensors, .ckpt, .pt):</label>
+                        <input type="file" id="lora_file" name="file" accept=".safetensors,.ckpt,.pt">
+                        <small>Upload your LoRA files for custom styles</small>
+                    </div>
+                    <button type="submit" class="upload-btn">Upload LoRA</button>
+                </form>
+                
+                <div id="upload-status"></div>
+            </div>
+            {% endif %}
+            
+            <!-- URL Upload Tab -->
+            <div class="lora-tab-content{% if os.environ.get('RENDER') %} active{% endif %}" id="url-tab">
+                <form id="lora-url-form">
+                    <div class="form-group">
+                        <label for="lora_name_input">LoRA Name:</label>
+                        <input type="text" id="lora_name_input" name="name" placeholder="Enter a name for this LoRA" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="lora_url_input">LoRA URL:</label>
+                        <input type="url" id="lora_url_input" name="url" placeholder="https://civitai.com/models/12345 or https://example.com/lora.safetensors" required>
+                        <small>Supported: Civitai model pages, HuggingFace repos, direct file URLs</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="lora_strength">LoRA Strength:</label>
+                        <input type="range" id="lora_strength" name="strength" min="0.1" max="2.0" step="0.1" value="0.7">
+                        <span id="strength-value">0.7</span>
+                    </div>
+                    
+                    <button type="submit" class="upload-btn">Add LoRA</button>
+                </form>
+                
+                <div id="url-status"></div>
+                
+                {% if os.environ.get('RENDER') %}
+                <div class="info-notice">
+                    <p><strong>💡 Note:</strong> File uploads are not available on this hosting platform. 
+                    Use URL-based LoRAs from services like Civitai or HuggingFace instead.</p>
                 </div>
-                <button type="submit" class="upload-btn">Upload LoRA</button>
-            </form>
-            
-            <div id="upload-status"></div>
+                {% endif %}
+            </div>
         </div>
         {% endif %}
         
