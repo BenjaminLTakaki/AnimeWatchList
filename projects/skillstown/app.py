@@ -44,10 +44,10 @@ def analyze_skills_with_gemini(cv_text, job_description=None):
 Analyze this CV and job description to extract skills and provide career guidance.
 
 CV TEXT:
-{cv_text[:3000]}  # Limit CV text to avoid token limits
+{cv_text[:3000]}
 
 JOB DESCRIPTION:
-{job_description[:2000]}  # Limit job description text
+{job_description[:2000]}
 
 Please provide a JSON response with:
 1. "current_skills": Array of technical and professional skills found in the CV
@@ -56,24 +56,28 @@ Please provide a JSON response with:
 4. "matching_skills": Array of skills that match between CV and job
 5. "learning_recommendations": Array of specific courses/skills to focus on
 6. "career_advice": Brief advice on how to bridge the gap
+7. "skill_categories": Object categorizing skills (e.g. "programming": [...], "data": [...])
+8. "experience_level": Estimated experience level (entry/mid/senior)
 
 Focus on technical skills, programming languages, frameworks, tools, certifications, and professional competencies.
+Return only valid JSON without markdown formatting.
 """
     else:
         prompt = f"""
 Analyze this CV to extract skills and provide learning recommendations.
 
 CV TEXT:
-{cv_text[:4000]}  # Allow more text when no job description
+{cv_text[:4000]}
 
 Please provide a JSON response with:
 1. "current_skills": Array of technical and professional skills found in the CV
-2. "skill_categories": Object categorizing skills (e.g. "programming", "data", "management")
+2. "skill_categories": Object categorizing skills (e.g. "programming": [...], "data": [...], "management": [...])
 3. "experience_level": Estimated experience level (entry/mid/senior)
 4. "learning_recommendations": Array of suggested areas for skill development
 5. "career_paths": Array of potential career directions based on current skills
 
 Focus on technical skills, programming languages, frameworks, tools, certifications, and professional competencies.
+Return only valid JSON without markdown formatting.
 """
     
     try:
@@ -97,7 +101,10 @@ Focus on technical skills, programming languages, frameworks, tools, certificati
                 
                 # Try to extract JSON from the response
                 try:
-                    # Find JSON in the response (it might be wrapped in markdown code blocks)
+                    # Remove any markdown formatting
+                    text_content = text_content.strip()
+                    
+                    # Find JSON in the response
                     json_match = re.search(r'```json\s*(.*?)\s*```', text_content, re.DOTALL)
                     if json_match:
                         json_str = json_match.group(1)
@@ -110,10 +117,17 @@ Focus on technical skills, programming languages, frameworks, tools, certificati
                             json_str = text_content
                     
                     result = json.loads(json_str)
-                    return result
-                except json.JSONDecodeError:
-                    print(f"Failed to parse JSON from Gemini response: {text_content}")
-                    # Fallback to basic skill extraction
+                    
+                    # Validate the result
+                    if isinstance(result, dict) and 'current_skills' in result:
+                        return result
+                    else:
+                        print(f"Invalid result structure from Gemini API")
+                        return extract_skills_fallback(cv_text)
+                        
+                except json.JSONDecodeError as e:
+                    print(f"Failed to parse JSON from Gemini response: {e}")
+                    print(f"Response content: {text_content}")
                     return extract_skills_fallback(cv_text)
         else:
             print(f"Gemini API error: {response.status_code} - {response.text}")
@@ -163,7 +177,7 @@ def create_app(config_name=None):
     # Create the Flask app
     app = Flask(__name__)
 
-    # Configure the Jinja2 loader to look in both skillstown and animewatchlist template folders
+    # Configure the Jinja2 loader
     skillstown_template_dir = os.path.join(os.path.dirname(__file__), 'templates')
     animewatchlist_template_dir = os.path.join(animewatchlist_path, 'templates')
     
@@ -200,7 +214,6 @@ def create_app(config_name=None):
     
     # Initialize auth with skillstown-specific functions
     db = init_auth(app, get_url_for, lambda user_id: get_skillstown_stats(user_id))
-
     Migrate(app, db)
 
     # Create base tables
@@ -241,9 +254,9 @@ def create_app(config_name=None):
         id = db.Column(db.Integer, primary_key=True)
         user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
         cv_text = db.Column(db.Text)
-        job_description = db.Column(db.Text)  # New field for job descriptions
+        job_description = db.Column(db.Text)
         skills = db.Column(db.Text)
-        skill_analysis = db.Column(db.Text)  # Store full Gemini analysis as JSON
+        skill_analysis = db.Column(db.Text)
         uploaded_at = db.Column(db.DateTime, default=db.func.current_timestamp())
         user = db.relationship('User', backref='skillstown_profile')
 
@@ -251,7 +264,7 @@ def create_app(config_name=None):
     with app.app_context():
         db.create_all()
 
-    # Now properly redefine the stats function
+    # Redefine the stats function
     def get_skillstown_stats(user_id):
         """Get user statistics for SkillsTown courses"""
         total = UserCourse.query.filter_by(user_id=user_id).count()
@@ -361,6 +374,7 @@ def create_app(config_name=None):
     def upload_cv():
         """Handle CV upload and analysis with optional job description"""
         if request.method == 'POST':
+            # Check if file was uploaded
             if 'cv_file' not in request.files:
                 flash('No file selected.', 'danger')
                 return redirect(request.url)
@@ -378,10 +392,12 @@ def create_app(config_name=None):
                 
                 # Ensure upload directory exists
                 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                file.save(filepath)
                 
-                # Extract text from PDF
                 try:
+                    # Save the uploaded file
+                    file.save(filepath)
+                    
+                    # Extract text from PDF
                     cv_text = extract_text_from_pdf(filepath)
                     
                     # Analyze with Gemini API
@@ -397,7 +413,7 @@ def create_app(config_name=None):
                         profile.job_description = job_description
                         profile.skills = json.dumps(skills)
                         profile.skill_analysis = json.dumps(analysis_result)
-                        profile.uploaded_at = db.func.current_timestamp()
+                        profile.uploaded_at = datetime.datetime.utcnow()
                     else:
                         profile = UserProfile(
                             user_id=current_user.id,
@@ -406,7 +422,7 @@ def create_app(config_name=None):
                             skills=json.dumps(skills),
                             skill_analysis=json.dumps(analysis_result)
                         )
-                    db.session.add(profile)
+                        db.session.add(profile)
                     
                     db.session.commit()
                     
@@ -418,10 +434,14 @@ def create_app(config_name=None):
                         success_msg += ' Job description analysis included.'
                     flash(success_msg, 'success')
                     return redirect(url_for('cv_analysis'))
+                    
                 except Exception as e:
-                    flash(f'Error processing CV: {str(e)}', 'danger')
+                    print(f"Error processing CV: {e}")
+                    # Clean up file if it exists
                     if os.path.exists(filepath):
                         os.remove(filepath)
+                    flash(f'Error processing CV: {str(e)}', 'danger')
+                    return render_template('assessment/upload.html', get_url_for=get_url_for)
             else:
                 flash('Please upload a PDF file.', 'danger')
         
@@ -542,7 +562,6 @@ def create_app(config_name=None):
         """About page"""
         return render_template('about.html', get_url_for=get_url_for)
 
-    # Debug route to manually create tables if needed
     @app.route("/debug/create_tables")
     def create_tables_debug():
         """Manual route to create database tables."""
