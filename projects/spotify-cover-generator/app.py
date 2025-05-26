@@ -433,6 +433,31 @@ def extract_playlist_id(playlist_url):
         print(f"Error parsing playlist URL '{playlist_url}': {e}")
     return None
 
+def get_user_lora_upload_info(user):
+    """Get user's LoRA upload information"""
+    if not user:
+        return {"can_upload": False, "current_count": 0, "limit": 0}
+    
+    current_count = LoraModelDB.query.filter_by(
+        source_type="local", 
+        uploaded_by=user.id
+    ).count()
+    
+    if user.is_premium_user():
+        return {
+            "can_upload": True,
+            "current_count": current_count,
+            "limit": "unlimited",
+            "is_premium": True
+        }
+    else:
+        return {
+            "can_upload": current_count < 2,
+            "current_count": current_count,
+            "limit": 2,
+            "is_premium": False
+        }
+
 def ensure_tables_exist():
     """Ensure tables exist before any database operation."""
     try:
@@ -895,7 +920,7 @@ def get_current_user_or_guest():
             'can_generate': user.can_generate_today(),
             'can_use_loras': True,
             'can_edit_playlists': bool(user.spotify_access_token),
-            'show_upload': user.is_premium_user()  # ONLY premium users can upload files
+            'show_upload': True  # All users can now upload (with limits)
         }
     else:
         get_or_create_guest_session()
@@ -1129,29 +1154,24 @@ def generate():
     else:
         return render_template("index.html", loras=loras)
 
-# LoRA UPLOAD ROUTE (FIXED FOR FILE UPLOADS ONLY)
+# LoRA UPLOAD ROUTE (UPDATED FOR ALL USERS WITH LIMITS)
 @app.route('/api/upload_lora', methods=['POST'])
 @login_required
 @limiter.limit("5 per hour")
 def upload_lora():
-    """Upload LoRA file (Premium users only)"""
+    """Upload LoRA file (Premium users unlimited, others limited to 2 total)"""
     try:
         user = get_current_user()
         if not user:
             return jsonify({"success": False, "error": "User not authenticated"}), 401
-        
-        # Check if user is premium (only premium users can upload files)
-        if not user.is_premium_user():
-            return jsonify({
-                "success": False, 
-                "error": "File uploads are only available for premium users. Premium access is granted to bentakaki7@gmail.com and Spotify user 'benthegamer'."
-            }), 403
         
         # Check if file was uploaded
         if 'file' not in request.files:
             return jsonify({"success": False, "error": "No file uploaded"}), 400
         
         file = request.files['file']
+        overwrite = request.form.get('overwrite', 'false').lower() == 'true'
+        
         if file.filename == '':
             return jsonify({"success": False, "error": "No file selected"}), 400
         
@@ -1168,11 +1188,29 @@ def upload_lora():
         
         # Check if LoRA with this name already exists
         existing = LoraModelDB.query.filter_by(name=lora_name).first()
-        if existing:
+        if existing and not overwrite:
             return jsonify({
                 "success": False, 
-                "error": f"LoRA with name '{lora_name}' already exists"
+                "error": f"LoRA with name '{lora_name}' already exists. Enable 'overwrite' option to replace it.",
+                "exists": True
             }), 400
+        
+        # Check upload limits for non-premium users
+        if not user.is_premium_user():
+            current_count = LoraModelDB.query.filter_by(
+                source_type="local", 
+                uploaded_by=user.id
+            ).count()
+            
+            # If overwriting, don't count the existing one
+            if existing and existing.uploaded_by == user.id:
+                current_count -= 1
+            
+            if current_count >= 2:
+                return jsonify({
+                    "success": False, 
+                    "error": "Free users are limited to 2 LoRA uploads total. Delete an existing LoRA first or contact us for premium access."
+                }), 403
         
         # Create LoRA directory if it doesn't exist
         lora_dir = BASE_DIR / "loras"
@@ -1185,21 +1223,41 @@ def upload_lora():
         # Get file size
         file_size = os.path.getsize(str(file_path))
         
-        # Add to database
-        new_lora = LoraModelDB(
-            name=lora_name,
-            source_type="local",
-            path=str(file_path),
-            file_size=file_size,
-            uploaded_by=user.id
-        )
+        # Handle overwrite vs new upload
+        if existing:
+            # Delete old file if it exists and is different
+            if existing.path and os.path.exists(existing.path) and existing.path != str(file_path):
+                try:
+                    os.remove(existing.path)
+                    print(f"✓ Deleted old LoRA file: {existing.path}")
+                except Exception as e:
+                    print(f"⚠️ Could not delete old file: {e}")
+            
+            # Update existing record
+            existing.path = str(file_path)
+            existing.file_size = file_size
+            existing.uploaded_at = datetime.datetime.utcnow()
+            existing.uploaded_by = user.id
+            
+            message = f"LoRA '{lora_name}' updated successfully ({file_size} bytes)"
+        else:
+            # Add new record to database
+            new_lora = LoraModelDB(
+                name=lora_name,
+                source_type="local",
+                path=str(file_path),
+                file_size=file_size,
+                uploaded_by=user.id
+            )
+            db.session.add(new_lora)
+            
+            message = f"LoRA '{lora_name}' uploaded successfully ({file_size} bytes)"
         
-        db.session.add(new_lora)
         db.session.commit()
         
         return jsonify({
             "success": True, 
-            "message": f"LoRA '{lora_name}' uploaded successfully ({file_size} bytes)"
+            "message": message
         })
         
     except Exception as e:
@@ -1209,11 +1267,9 @@ def upload_lora():
 # API ROUTES (keep existing ones but remove lora link route)
 @app.route('/api/loras')
 def get_loras():
-    """Get list of available LoRAs (file uploads only)"""
+    """Get list of available LoRAs (file uploads only) with ownership info"""
     try:
         user = get_current_user()
-        if not user:
-            return jsonify({"loras": []})
         
         loras = []
         db_loras = LoraModelDB.query.filter_by(source_type="local").all()
@@ -1221,18 +1277,90 @@ def get_loras():
         for db_lora in db_loras:
             # Check if file still exists
             if os.path.exists(db_lora.path):
-                loras.append({
+                lora_data = {
                     "name": db_lora.name,
                     "source_type": "local",
                     "file_size": db_lora.file_size,
-                    "uploaded_at": db_lora.uploaded_at.isoformat() if db_lora.uploaded_at else None
-                })
-        
-        return jsonify({"loras": loras})
+                    "uploaded_at": db_lora.uploaded_at.isoformat() if db_lora.uploaded_at else None,
+                    "can_delete": False,
+                    "uploaded_by_current_user": False
+                }
+                
+                # Add ownership info if user is logged in
+                if user:
+                    lora_data["uploaded_by_current_user"] = (db_lora.uploaded_by == user.id)
+                    # User can delete if: they uploaded it, or they're premium
+                    lora_data["can_delete"] = (
+                        db_lora.uploaded_by == user.id or 
+                        user.is_premium_user()
+                    )
+                
+                loras.append(lora_data)
+          return jsonify({"loras": loras})
         
     except Exception as e:
         print(f"Error getting LoRAs: {e}")
         return jsonify({"loras": []})
+
+@app.route('/api/delete_lora', methods=['DELETE'])
+@login_required
+@limiter.limit("10 per hour")
+def delete_lora():
+    """Delete LoRA file (All users can delete their own uploads)"""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"success": False, "error": "User not authenticated"}), 401
+        
+        data = request.get_json()
+        lora_name = data.get('name', '').strip()
+        
+        if not lora_name:
+            return jsonify({"success": False, "error": "LoRA name is required"}), 400
+        
+        # Find the LoRA in database
+        lora_record = LoraModelDB.query.filter_by(name=lora_name).first()
+        if not lora_record:
+            return jsonify({"success": False, "error": "LoRA not found"}), 404
+        
+        # Check if user can delete this LoRA (only their own uploads or premium users can delete any)
+        if not user.is_premium_user() and lora_record.uploaded_by != user.id:
+            return jsonify({
+                "success": False, 
+                "error": "You can only delete LoRAs you uploaded"
+            }), 403
+        
+        # Delete the physical file if it exists
+        if lora_record.path and os.path.exists(lora_record.path):
+            try:
+                os.remove(lora_record.path)
+                print(f"✓ Deleted LoRA file: {lora_record.path}")
+            except Exception as e:
+                print(f"⚠️ Could not delete file {lora_record.path}: {e}")
+        
+        # Delete from database
+        db.session.delete(lora_record)
+        db.session.commit()
+        
+        return jsonify({
+            "success": True, 
+            "message": f"LoRA '{lora_name}' deleted successfully"
+        })
+        
+    except Exception as e:
+        print(f"Error deleting LoRA: {e}")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+@app.route('/api/upload_info')
+@login_required
+def get_upload_info():
+    """Get user's upload information"""
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    info = get_user_lora_upload_info(user)
+    return jsonify(info)
 
 # SPOTIFY AUTH ROUTES (FIXED)
 @app.route('/spotify-login')

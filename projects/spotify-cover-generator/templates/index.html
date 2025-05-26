@@ -6,34 +6,6 @@
     <title>Spotify Music Cover Generator</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
-        .spotify-btn {
-            background: #1DB954 !important;
-            color: #000000 !important;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 25px;
-            font-weight: bold;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.3s ease;
-        }
-        
-        .spotify-btn:hover {
-            background: #1ed760 !important;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(29, 185, 84, 0.3);
-        }
-        
-        .spotify-logo {
-            width: 20px;
-            height: 20px;
-            background: #ffffff;
-            border-radius: 50%;
-            padding: 2px;
-        }
-        
         .premium-badge {
             background: linear-gradient(135deg, #FFD700, #FFA500);
             color: #000;
@@ -51,17 +23,9 @@
             font-size: 0.75rem;
         }
         
-        .status-good {
-            color: #1DB954;
-        }
-        
-        .status-warning {
-            color: #ff9800;
-        }
-        
-        .status-error {
-            color: #ff5252;
-        }
+        .status-good { color: #1DB954; }
+        .status-warning { color: #ff9800; }
+        .status-error { color: #ff5252; }
         
         .form-section {
             background: linear-gradient(135deg, #1e1e1e, #2a2a2a);
@@ -69,13 +33,6 @@
             border-radius: 15px;
             border: 1px solid #333;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
-        
-        .info-card {
-            background: #333;
-            padding: 15px;
-            border-radius: 8px;
-            border-left: 4px solid #1DB954;
         }
         
         .lora-upload-section {
@@ -99,36 +56,79 @@
             padding: 15px;
             border-radius: 8px;
             text-align: center;
+            position: relative;
+            transition: all 0.3s ease;
         }
         
-        .contrast-fix {
-            color: #ffffff !important;
+        .lora-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
         }
         
-        .secondary-text {
-            color: #cccccc;
+        .delete-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
         }
         
-        .muted-text {
-            color: #999999;
+        .delete-btn:hover {
+            background: #c82333;
+            transform: translateY(-1px);
+        }
+        
+        .overwrite-option {
+            margin: 15px 0;
+            padding: 15px;
+            background: #333;
+            border-radius: 8px;
+            border-left: 4px solid #ff9800;
+            display: none;
+        }
+        
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .upload-limit-info {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #1DB954;
+        }
+        
+        .limit-warning {
+            background: #1a1a1a;
+            padding: 15px;  
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ff9800;
         }
     </style>
 </head>
-<body>
+<body data-user-type="{% if user_info and user_info.type == 'user' %}user{% else %}guest{% endif %}">
     <div class="container">
         <!-- User Header -->
         <div class="user-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, #252525, #1a1a1a); border-radius: 8px; border: 1px solid #333;">
             <div style="display: flex; align-items: center; gap: 15px;">
                 {% if user_info and user_info.type == 'user' %}
                     <div>
-                        <span class="contrast-fix" style="font-weight: bold;">Welcome, {{ user_info.display_name }}!</span>
+                        <span style="font-weight: bold; color: #ffffff;">Welcome, {{ user_info.display_name }}!</span>
                         {% if user_info.is_premium %}
                         <span class="premium-badge">Premium</span>
                         {% endif %}
                     </div>
                 {% else %}
                     <div>
-                        <span class="contrast-fix" style="font-weight: bold;">Welcome, Guest!</span>
+                        <span style="font-weight: bold; color: #ffffff;">Welcome, Guest!</span>
                         <span class="guest-badge">Guest Mode</span>
                     </div>
                 {% endif %}
@@ -136,7 +136,7 @@
             
             <div class="user-actions" style="display: flex; align-items: center; gap: 10px;">
                 <div style="text-align: right; margin-right: 15px;">
-                    <div class="secondary-text" style="font-size: 0.9rem;">
+                    <div style="font-size: 0.9rem; color: #cccccc;">
                         <strong>{{ user_info.generations_today if user_info else 0 }}/{{ user_info.daily_limit if user_info else 1 }}</strong> today
                     </div>
                     {% if user_info and user_info.can_generate %}
@@ -161,7 +161,7 @@
             <h1 style="background: linear-gradient(135deg, #1DB954, #1ed760); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-size: 2.5rem; margin-bottom: 10px;">
                 Spotify Music Cover Generator
             </h1>
-            <p class="secondary-text" style="font-size: 1.1rem; margin-bottom: 0;">Create AI-generated album art based on your playlist or album's genres</p>
+            <p style="font-size: 1.1rem; margin-bottom: 0; color: #cccccc;">Create AI-generated album art based on your playlist or album's genres</p>
         </div>
         
         {% if error %}
@@ -238,7 +238,7 @@
                 <input type="text" id="playlist_url" name="playlist_url" 
                        placeholder="https://open.spotify.com/playlist/... or https://open.spotify.com/album/..." 
                        required>
-                <small class="muted-text" style="display: flex; align-items: center; gap: 5px; margin-top: 8px;">
+                <small style="display: flex; align-items: center; gap: 5px; margin-top: 8px; color: #999999;">
                     Paste the full URL of a Spotify playlist or album
                 </small>
             </div>
@@ -250,7 +250,7 @@
                 </label>
                 <input type="text" id="mood" name="mood" 
                        placeholder="e.g., retro, neon, minimalist, cinematic, dark, vibrant">
-                <small class="muted-text" style="display: flex; align-items: center; gap: 5px; margin-top: 8px;">
+                <small style="display: flex; align-items: center; gap: 5px; margin-top: 8px; color: #999999;">
                     Add extra words to customize the image generation (optional)
                 </small>
             </div>
@@ -283,7 +283,7 @@
                         </label>
                         <textarea id="negative_prompt" name="negative_prompt" rows="3" 
                                   placeholder="Enter things you want to avoid in the generated image"></textarea>
-                        <small class="muted-text">Leave empty to use the default negative prompt</small>
+                        <small style="color: #999999;">Leave empty to use the default negative prompt</small>
                     </div>
                     
                     <!-- LoRA Selection -->
@@ -298,14 +298,14 @@
                             <option value="{{ lora.name }}">{{ lora.name }}</option>
                             {% endfor %}
                         </select>
-                        <small class="muted-text">Apply a custom LoRA for specialized art styles</small>
+                        <small style="color: #999999;">Apply a custom LoRA for specialized art styles</small>
                     </div>
                     {% else %}
                     <div class="form-group">
                         <label style="display: flex; align-items: center; gap: 8px; font-weight: bold; color: #666;">
                             LoRA Styles:
                         </label>
-                        <div class="info-card" style="border-left-color: #666;">
+                        <div style="background: #333; padding: 15px; border-radius: 8px; border-left: 4px solid #666;">
                             <p style="margin: 0; color: #ccc;">
                                 LoRA styles are available for registered users. 
                                 <a href="{{ url_for('register') }}" style="color: #1DB954; font-weight: bold;">Sign up for free</a> 
@@ -333,13 +333,24 @@
             </div>
         </form>
         
-        <!-- LoRA File Upload Section (Premium Users Only) -->
-        {% if user_info and user_info.show_upload %}
+        <!-- LoRA File Upload Section (Registered Users) -->
+        {% if user_info and user_info.type == 'user' %}
         <div class="lora-upload-section" style="margin-top: 40px;">
             <h3 style="color: #1DB954; margin-top: 0; display: flex; align-items: center; gap: 10px; font-size: 1.3rem;">
                 LoRA File Management
+                {% if user_info.is_premium %}
                 <span class="premium-badge">PREMIUM</span>
+                {% else %}
+                <span style="background: #666; color: #ccc; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem;">FREE TIER</span>
+                {% endif %}
             </h3>
+            
+            <!-- Upload Limit Info -->
+            <div id="upload-limit-info" class="upload-limit-info">
+                <p style="margin: 0; color: #ccc;">
+                    <strong>Upload Status:</strong> <span id="upload-status-text">Loading...</span>
+                </p>
+            </div>
             
             <div class="file-upload-area">
                 <form id="lora-upload-form" enctype="multipart/form-data">
@@ -349,12 +360,25 @@
                         </label>
                         <input type="file" id="lora_file" name="file" accept=".safetensors,.ckpt,.pt"
                                style="width: 100%; padding: 15px; background-color: #333; color: #fff; border-radius: 8px; margin-bottom: 15px; border: 2px solid #555; transition: all 0.3s ease; cursor: pointer;">
-                        <small class="muted-text" style="display: block; margin-bottom: 15px; text-align: center;">
+                        <small style="display: block; margin-bottom: 15px; text-align: center; color: #999999;">
                             Supported formats: .safetensors, .ckpt, .pt
                         </small>
                     </div>
                     
-                    <button type="submit" class="upload-btn" 
+                    <!-- Overwrite Option -->
+                    <div class="overwrite-option" id="overwrite-section">
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" id="overwrite-checkbox" name="overwrite">
+                            <label for="overwrite-checkbox" style="color: #ff9800; font-weight: bold;">
+                                Overwrite existing LoRA with the same name
+                            </label>
+                        </div>
+                        <p style="margin: 8px 0 0 28px; color: #ccc; font-size: 0.9rem;">
+                            A LoRA with this name already exists. Check this box to replace it.
+                        </p>
+                    </div>
+                    
+                    <button type="submit" class="upload-btn" id="upload-button"
                             style="background: linear-gradient(135deg, #1DB954, #1ed760); color: #000; border: none; border-radius: 25px; padding: 12px 30px; font-weight: bold; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 8px; margin: 0 auto;">
                         Upload LoRA
                     </button>
@@ -364,53 +388,31 @@
                 
                 <!-- Current LoRAs List -->
                 <div id="current-loras" style="margin-top: 30px;">
-                    <h4 style="color: #1DB954; margin-bottom: 15px; text-align: center;">Your Uploaded LoRAs:</h4>
+                    <h4 style="color: #1DB954; margin-bottom: 15px; text-align: center;">Your LoRAs:</h4>
                     <div id="loras-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px;">
                         <!-- LoRAs will be loaded here via JavaScript -->
                         <div class="lora-item" style="color: #666;">
                             <div style="font-size: 2rem; margin-bottom: 10px;">📁</div>
-                            <p style="margin: 0;">No LoRAs uploaded yet</p>
+                            <p style="margin: 0;">Loading LoRAs...</p>
                         </div>
                     </div>
                 </div>
             </div>
             
             <div style="margin-top: 25px; padding: 20px; background: #333; border-radius: 8px; border-left: 4px solid #1DB954;">
-                <h4 style="color: #1DB954; margin: 0 0 15px 0;">Tips for Using LoRAs:</h4>
-                <ul class="secondary-text" style="margin: 0; padding-left: 20px;">
-                    <li style="margin-bottom: 8px;">LoRAs (Low-Rank Adaptations) dramatically change the visual style of generated images</li>
-                    <li style="margin-bottom: 8px;">Upload high-quality LoRA files for best results</li>
-                    <li style="margin-bottom: 8px;">Different LoRAs produce vastly different artistic styles</li>
-                    <li style="margin-bottom: 8px;">Premium users get unlimited LoRA uploads and generations</li>
-                    <li>Files are stored securely on our paid hosting instance</li>
+                <h4 style="color: #1DB954; margin: 0 0 15px 0;">LoRA Upload Limits:</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #cccccc;">
+                    {% if user_info.is_premium %}
+                    <li style="margin-bottom: 8px;">✅ <strong>Premium users:</strong> Unlimited LoRA uploads</li>
+                    <li style="margin-bottom: 8px;">✅ Can delete any LoRA</li>
+                    <li style="margin-bottom: 8px;">✅ Overwrite existing LoRAs</li>
+                    {% else %}
+                    <li style="margin-bottom: 8px;">📄 <strong>Free users:</strong> Limited to 2 LoRA uploads total</li>
+                    <li style="margin-bottom: 8px;">🗑️ Can delete your own uploaded LoRAs</li>
+                    <li style="margin-bottom: 8px;">🔄 Can overwrite your own existing LoRAs</li>
+                    <li style="margin-bottom: 8px;">🌟 <strong>Want more?</strong> Premium users get unlimited uploads!</li>
+                    {% endif %}
                 </ul>
-            </div>
-        </div>
-        {% elif user_info and user_info.type == 'user' and not user_info.is_premium %}
-        <!-- Non-Premium User LoRA Info -->
-        <div style="margin-top: 40px; background: linear-gradient(135deg, #333, #2a2a2a); padding: 25px; border-radius: 12px; border: 1px solid #555;">
-            <h3 style="color: #1DB954; display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                LoRA File Uploads
-                <span style="background: #666; color: #ccc; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem;">PREMIUM FEATURE</span>
-            </h3>
-            <p class="secondary-text" style="margin-bottom: 20px;">
-                Upload your own LoRA files for unlimited customization! Premium users can upload and manage custom LoRA files for specialized art styles.
-            </p>
-            <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-                <div class="secondary-text" style="font-size: 0.9rem;">
-                    <strong>Premium benefits:</strong>
-                    <ul style="margin: 10px 0 0 20px; padding: 0;">
-                        <li>Upload unlimited LoRA files</li>
-                        <li>Unlimited generations per day</li>
-                        <li>Priority support</li>
-                        <li>Advanced customization options</li>
-                    </ul>
-                </div>
-                <a href="mailto:bentakaki7@gmail.com?subject=Premium%20Access%20Request" 
-                   class="button" 
-                   style="background: linear-gradient(135deg, #1DB954, #1ed760); color: #000; padding: 12px 24px; border-radius: 25px; text-decoration: none; font-weight: bold;">
-                    Request Premium Access
-                </a>
             </div>
         </div>
         {% endif %}
@@ -420,7 +422,7 @@
             <h3 style="color: #1DB954; display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
                 How it works
             </h3>
-            <p style="font-size: 1.1rem; line-height: 1.6;" class="secondary-text" style="margin-bottom: 25px;">
+            <p style="font-size: 1.1rem; line-height: 1.6; color: #cccccc; margin-bottom: 25px;">
                 This tool analyzes your Spotify playlist or album to extract genres from the artists. It then uses AI to generate a unique album cover that matches your music's genres and style, with a detailed genre analysis chart.
             </p>
             
@@ -431,31 +433,31 @@
                     <ul style="list-style: none; padding: 0;">
                         <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                             <span style="color: #1DB954;">•</span>
-                            <span class="contrast-fix"><strong>Gemini AI Titles</strong> - Creative album titles using Google's Gemini API</span>
+                            <span style="color: #ffffff;"><strong>Gemini AI Titles</strong> - Creative album titles using Google's Gemini API</span>
                         </li>
                         <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                             <span style="color: #1DB954;">•</span>
-                            <span class="contrast-fix"><strong>Custom Prompts</strong> - Add additional words to customize image generation</span>
+                            <span style="color: #ffffff;"><strong>Custom Prompts</strong> - Add additional words to customize image generation</span>
                         </li>
                         <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                             <span style="color: #1DB954;">•</span>
-                            <span class="contrast-fix"><strong>Custom Negative Prompts</strong> - Control what you don't want in your images</span>
+                            <span style="color: #ffffff;"><strong>Custom Negative Prompts</strong> - Control what you don't want in your images</span>
                         </li>
                         {% if user_info and user_info.type == 'user' and user_info.can_edit_playlists %}
                         <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                             <span style="color: #1DB954;">•</span>
-                            <span class="contrast-fix"><strong>Spotify Integration</strong> - Edit playlist titles and covers directly</span>
+                            <span style="color: #ffffff;"><strong>Spotify Integration</strong> - Edit playlist titles and covers directly</span>
                         </li>
                         {% endif %}
-                        {% if user_info and user_info.is_premium %}
+                        {% if user_info and user_info.type == 'user' %}
                         <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                             <span style="color: #1DB954;">•</span>
-                            <span class="contrast-fix"><strong>LoRA File Uploads</strong> - Upload custom LoRA files for specialized art styles</span>
+                            <span style="color: #ffffff;"><strong>LoRA File Management</strong> - Upload and manage custom LoRA files</span>
                         </li>
                         {% endif %}
                         <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                             <span style="color: #1DB954;">•</span>
-                            <span class="contrast-fix"><strong>Stable Diffusion API</strong> - Fast, cloud-based image generation</span>
+                            <span style="color: #ffffff;"><strong>Stable Diffusion API</strong> - Fast, cloud-based image generation</span>
                         </li>
                     </ul>
                 </div>
@@ -467,15 +469,15 @@
                         {% if user_info and user_info.type == 'guest' %}
                         <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                             <span style="color: #666;">•</span>
-                            <span class="secondary-text"><strong>Guests:</strong> 1 generation per day</span>
+                            <span style="color: #cccccc;"><strong>Guests:</strong> 1 generation per day</span>
                         </li>
                         <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                             <span style="color: #1DB954;">•</span>
-                            <span class="contrast-fix"><strong>Free Account:</strong> 2 generations per day + LoRA access</span>
+                            <span style="color: #ffffff;"><strong>Free Account:</strong> 2 generations per day + 2 LoRA uploads</span>
                         </li>
                         <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                             <span style="color: #FFD700;">•</span>
-                            <span class="contrast-fix"><strong>Premium:</strong> Unlimited generations + file uploads</span>
+                            <span style="color: #ffffff;"><strong>Premium:</strong> Unlimited generations + unlimited LoRA uploads</span>
                         </li>
                         <li style="margin-bottom: 10px;">
                             <a href="{{ url_for('register') }}" style="color: #1DB954; font-weight: bold; text-decoration: underline;">
@@ -485,16 +487,16 @@
                         {% else %}
                         <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                             <span style="color: #1DB954;">•</span>
-                            <span class="contrast-fix"><strong>Free Users:</strong> 2 generations per day</span>
+                            <span style="color: #ffffff;"><strong>Free Users:</strong> 2 generations per day + 2 LoRA uploads</span>
                         </li>
                         <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                             <span style="color: #FFD700;">•</span>
-                            <span class="contrast-fix"><strong>Premium Users:</strong> Unlimited generations + file uploads</span>
+                            <span style="color: #ffffff;"><strong>Premium Users:</strong> Unlimited generations + unlimited LoRA uploads</span>
                         </li>
                         {% if not user_info.is_premium %}
                         <li style="margin-bottom: 10px;">
                             <a href="mailto:bentakaki7@gmail.com?subject=Premium%20Access%20Request" style="color: #1DB954; font-weight: bold; text-decoration: underline;">
-                                Request Premium Access for unlimited generations!
+                                Request Premium Access for unlimited features!
                             </a>
                         </li>
                         {% endif %}
@@ -502,57 +504,53 @@
                     </ul>
                 </div>
             </div>
-            
-            {% if user_info and user_info.is_premium %}
-            <div style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; border-radius: 8px;">
-                <h4 style="margin: 0 0 15px 0; color: #000;">Premium User Benefits</h4>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; color: #000;">
-                    <div>Unlimited daily generations</div>
-                    <div>Custom LoRA file uploads</div>
-                    <div>Priority support</div>
-                    <div>Advanced customization</div>
-                </div>
-            </div>
-            {% endif %}
-            
-            <div style="margin-top: 30px; padding: 20px; background: #333; border-radius: 8px; border-left: 4px solid #1DB954;">
-                <h4 style="color: #1DB954; margin: 0 0 15px 0;">About Negative Prompts</h4>
-                <p class="secondary-text" style="margin: 0; line-height: 1.5;">
-                    Negative prompts tell the AI what you don't want in the image. The default negative prompt helps avoid common issues like extra fingers or distorted faces. You can customize this to further refine your results and get exactly the style you want.
-                </p>
-            </div>
         </div>
-    </div>
+    </div>    <script src="{{ url_for('static', filename='script.js') }}"></script>
     
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
-    
-    <!-- JavaScript for functionality -->
+    <!-- JavaScript for LoRA Management -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Advanced options toggle
             const toggleAdvanced = document.getElementById('toggle-advanced');
             const advancedContent = document.getElementById('advanced-content');
             
-            if (toggleAdvanced && advancedContent) {
-                toggleAdvanced.addEventListener('click', function() {
+            if (toggleAdvanced && advancedContent) {                toggleAdvanced.addEventListener('click', function() {
                     if (advancedContent.style.display === 'none') {
                         advancedContent.style.display = 'block';
                         this.textContent = 'Hide Advanced Options';
                     } else {
                         advancedContent.style.display = 'none';
                         this.textContent = 'Advanced Options';
-                    }
-                });
+                    }                });            }
+            
+            // Load upload info and LoRAs on page load (only for logged-in users)
+            const userType = document.body.getAttribute('data-user-type');
+            if (userType === 'user') {
+                loadUploadInfo();
+                loadLorasList();
             }
             
-            // LoRA upload form handling (Premium users only)
+            // LoRA upload form handling
             const loraUploadForm = document.getElementById('lora-upload-form');
             if (loraUploadForm) {
+                const fileInput = document.getElementById('lora_file');
+                const overwriteSection = document.getElementById('overwrite-section');
+                const overwriteCheckbox = document.getElementById('overwrite-checkbox');
+                
+                // Check for name conflicts when file is selected
+                fileInput.addEventListener('change', function() {
+                    if (this.files.length > 0) {
+                        const fileName = this.files[0].name;
+                        const loraName = fileName.split('.')[0];
+                        checkLoraNameConflict(loraName);
+                    } else {
+                        overwriteSection.style.display = 'none';
+                    }
+                });
+                
                 loraUploadForm.addEventListener('submit', function(e) {
                     e.preventDefault();
                     
-                    const formData = new FormData(this);
-                    const uploadStatus = document.getElementById('upload-status');
                     const fileInput = document.getElementById('lora_file');
                     
                     // Validate file
@@ -570,11 +568,16 @@
                         return;
                     }
                     
+                    // Create FormData
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('overwrite', overwriteCheckbox.checked ? 'true' : 'false');
+                    
                     // Show loading state
                     showUploadStatus('Uploading LoRA file...', 'loading');
                     
                     // Submit via AJAX
-                    fetch('/spotify/api/upload_lora', {
+                    fetch('/api/upload_lora', {
                         method: 'POST',
                         body: formData
                     })
@@ -582,11 +585,18 @@
                     .then(data => {
                         if (data.success) {
                             showUploadStatus(data.message, 'success');
-                            // Clear form and refresh LoRA list
+                            // Clear form and refresh lists
                             this.reset();
+                            overwriteSection.style.display = 'none';
+                            loadUploadInfo();
                             loadLorasList();
                         } else {
-                            showUploadStatus(data.error, 'error');
+                            if (data.exists && !overwriteCheckbox.checked) {
+                                overwriteSection.style.display = 'block';
+                                showUploadStatus(data.error, 'warning');
+                            } else {
+                                showUploadStatus(data.error, 'error');
+                            }
                         }
                     })
                     .catch(error => {
@@ -595,12 +605,64 @@
                 });
             }
             
-            // Load current LoRAs list AND update dropdown
+            function checkLoraNameConflict(loraName) {
+                fetch('/api/loras')
+                .then(response => response.json())
+                .then(data => {
+                    const exists = data.loras && data.loras.some(lora => lora.name === loraName);
+                    const overwriteSection = document.getElementById('overwrite-section');
+                    if (exists) {
+                        overwriteSection.style.display = 'block';
+                    } else {
+                        overwriteSection.style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking LoRA name conflict:', error);
+                });
+            }
+            
+            function loadUploadInfo() {
+                fetch('/api/upload_info')
+                .then(response => response.json())
+                .then(data => {
+                    const statusText = document.getElementById('upload-status-text');
+                    const uploadButton = document.getElementById('upload-button');
+                    const limitInfo = document.getElementById('upload-limit-info');
+                    
+                    if (statusText) {
+                        if (data.is_premium) {
+                            statusText.textContent = `${data.current_count} LoRAs uploaded (Unlimited)`;
+                            statusText.style.color = '#1DB954';
+                            if (limitInfo) limitInfo.className = 'upload-limit-info';
+                        } else {
+                            statusText.textContent = `${data.current_count}/${data.limit} LoRAs uploaded`;
+                            if (data.can_upload) {
+                                statusText.style.color = '#1DB954';
+                                if (limitInfo) limitInfo.className = 'upload-limit-info';
+                            } else {
+                                statusText.style.color = '#ff9800';
+                                if (limitInfo) limitInfo.className = 'limit-warning';
+                                if (uploadButton) {
+                                    uploadButton.disabled = true;
+                                    uploadButton.textContent = 'Upload Limit Reached';
+                                    uploadButton.style.background = '#666';
+                                    uploadButton.style.cursor = 'not-allowed';
+                                }
+                            }
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading upload info:', error);
+                });
+            }
+            
             function loadLorasList() {
                 const lorasList = document.getElementById('loras-list');
                 const loraDropdown = document.getElementById('lora_name');
                 
-                fetch('/spotify/api/loras')
+                fetch('/api/loras')
                 .then(response => response.json())
                 .then(data => {
                     // Update the visual list
@@ -616,6 +678,12 @@
                                     <p style="color: #666; font-size: 0.8rem; margin: 5px 0 0 0;">
                                         ${lora.uploaded_at ? new Date(lora.uploaded_at).toLocaleDateString() : 'Unknown date'}
                                     </p>
+                                    ${lora.uploaded_by_current_user ? '<p style="color: #1DB954; font-size: 0.7rem; margin: 5px 0;">Your upload</p>' : ''}
+                                    ${lora.can_delete ? `
+                                    <div style="margin-top: 15px;">
+                                        <button class="delete-btn" onclick="deleteLora('${lora.name}')">Delete</button>
+                                    </div>
+                                    ` : ''}
                                 </div>
                             `).join('');
                         } else {
@@ -650,14 +718,42 @@
                             option.textContent = lora.name;
                             loraDropdown.appendChild(option);
                         });
-                        
-                        console.log(`Added ${data.loras.length} LoRAs to dropdown`);
                     }
                 })
                 .catch(error => {
                     console.error('Error loading LoRAs:', error);
                 });
             }
+            
+            // Make deleteLora function global
+            window.deleteLora = function(loraName) {
+                if (!confirm(`Are you sure you want to delete the LoRA "${loraName}"? This action cannot be undone.`)) {
+                    return;
+                }
+                
+                fetch('/api/delete_lora', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: loraName
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showUploadStatus(data.message, 'success');
+                        loadUploadInfo();
+                        loadLorasList();
+                    } else {
+                        showUploadStatus(data.error, 'error');
+                    }
+                })
+                .catch(error => {
+                    showUploadStatus('Delete failed: ' + error.message, 'error');
+                });
+            };
             
             function showUploadStatus(message, type) {
                 const uploadStatus = document.getElementById('upload-status');
@@ -683,15 +779,14 @@
                         return 'background: rgba(29, 185, 84, 0.1); color: #1DB954; border-left: 4px solid #1DB954;';
                     case 'error':
                         return 'background: rgba(255, 82, 82, 0.1); color: #ff5252; border-left: 4px solid #ff5252;';
+                    case 'warning':
+                        return 'background: rgba(255, 152, 0, 0.1); color: #ff9800; border-left: 4px solid #ff9800;';
                     case 'loading':
                         return 'background: rgba(33, 150, 243, 0.1); color: #2196F3; border-left: 4px solid #2196F3;';
                     default:
                         return 'background: #333; color: #ccc;';
                 }
             }
-            
-            // Load LoRAs on page load
-            loadLorasList();
         });
     </script>
 </body>
