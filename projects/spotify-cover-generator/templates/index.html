@@ -8,245 +8,566 @@
 </head>
 <body>
     <div class="container">
-        <!-- User/Guest Header -->
-        <div class="user-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: #252525; border-radius: 8px;">
-            <div>
-                {% if user_info.type == 'user' %}
-                    <span style="color: #1DB954;">Welcome, {{ user_info.display_name }}!</span>
-                    {% if user_info.is_premium %}
-                    <span style="background: #1DB954; color: #000; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 10px;">Premium</span>
-                    {% endif %}
+        <!-- Enhanced User/Guest Header -->
+        <div class="user-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, #252525, #1a1a1a); border-radius: 8px; border: 1px solid #333;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                {% if user_info and user_info.type == 'user' %}
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2em;">🎵</span>
+                        <div>
+                            <span style="color: #1DB954; font-weight: bold;">Welcome, {{ user_info.display_name }}!</span>
+                            {% if user_info.is_premium %}
+                            <span style="background: linear-gradient(135deg, #1DB954, #1ed760); color: #000; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; margin-left: 8px; font-weight: bold;">✨ Premium</span>
+                            {% endif %}
+                        </div>
+                    </div>
                 {% else %}
-                    <span style="color: #ccc;">👋 Welcome, Guest!</span>
-                    <span style="background: #666; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 10px;">Guest Mode</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2em;">👋</span>
+                        <div>
+                            <span style="color: #ccc; font-weight: bold;">Welcome, Guest!</span>
+                            <span style="background: #666; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; margin-left: 8px;">Guest Mode</span>
+                        </div>
+                    </div>
                 {% endif %}
             </div>
-            <div class="user-actions">
-                <span style="color: #ccc; margin-right: 15px;">{{ user_info.generations_today }}/{{ user_info.daily_limit }} today</span>
-                {% if user_info.type == 'user' %}
-                    <a href="{{ url_for('profile') }}" class="button secondary" style="margin-right: 10px;">Profile</a>
-                    <a href="{{ url_for('logout') }}" class="button secondary">Logout</a>
+            
+            <div class="user-actions" style="display: flex; align-items: center; gap: 10px;">
+                <div style="text-align: right; margin-right: 15px;">
+                    <div style="color: #ccc; font-size: 0.9rem;">
+                        <strong>{{ user_info.generations_today if user_info else 0 }}/{{ user_info.daily_limit if user_info else 1 }}</strong> today
+                    </div>
+                    {% if user_info and user_info.can_generate %}
+                        <div style="color: #1DB954; font-size: 0.8rem;">✓ Ready to generate</div>
+                    {% else %}
+                        <div style="color: #ff5252; font-size: 0.8rem;">⚠ Limit reached</div>
+                    {% endif %}
+                </div>
+                
+                {% if user_info and user_info.type == 'user' %}
+                    <a href="{{ url_for('profile') }}" class="button secondary" style="padding: 8px 16px; font-size: 0.9rem;">Profile</a>
+                    <a href="{{ url_for('logout') }}" class="button secondary" style="padding: 8px 16px; font-size: 0.9rem;">Logout</a>
                 {% else %}
-                    <a href="{{ url_for('register') }}" class="button" style="background: #1DB954; margin-right: 10px;">Sign Up Free</a>
-                    <a href="{{ url_for('login') }}" class="button secondary">Login</a>
+                    <a href="{{ url_for('register') }}" class="button" style="background: linear-gradient(135deg, #1DB954, #1ed760); padding: 8px 16px; font-size: 0.9rem; font-weight: bold;">Sign Up Free</a>
+                    <a href="{{ url_for('login') }}" class="button secondary" style="padding: 8px 16px; font-size: 0.9rem;">Login</a>
                 {% endif %}
             </div>
         </div>
 
-        <h1>Spotify Music Cover Generator</h1>
-        <p>Create AI-generated album art based on your playlist or album's genres</p>
+        <!-- Main Title -->
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="background: linear-gradient(135deg, #1DB954, #1ed760); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-size: 2.5rem; margin-bottom: 10px;">
+                🎵 Spotify Music Cover Generator
+            </h1>
+            <p style="color: #ccc; font-size: 1.1rem; margin-bottom: 0;">Create AI-generated album art based on your playlist or album's genres</p>
+        </div>
         
         {% if error %}
-            <p class="error">{{ error }}</p>
+            <div class="error" style="background: linear-gradient(135deg, rgba(255, 82, 82, 0.1), rgba(255, 82, 82, 0.05)); border-left: 4px solid #ff5252;">
+                <strong>⚠️ Error:</strong> {{ error }}
+            </div>
         {% endif %}
         
         <!-- Guest Welcome Message -->
-        {% if user_info.type == 'guest' %}
-        <div class="guest-welcome" style="background: linear-gradient(135deg, #1DB954, #1ed760); color: #000; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <h3 style="margin: 0 0 10px 0;">🎵 Welcome to Guest Mode!</h3>
-            <p style="margin: 0;">You can try our AI cover generator with <strong>1 free generation per day</strong>. 
-            <a href="{{ url_for('register') }}" style="color: #000; text-decoration: underline; font-weight: bold;">Sign up for free</a> 
-            to get more generations and access advanced features!</p>
+        {% if not user_info or user_info.type == 'guest' %}
+        <div class="guest-welcome" style="background: linear-gradient(135deg, #1DB954, #1ed760); color: #000; padding: 25px; border-radius: 12px; margin-bottom: 25px; position: relative; overflow: hidden;">
+            <div style="position: absolute; top: -50%; right: -50%; width: 100%; height: 100%; background: rgba(255,255,255,0.1); transform: rotate(45deg);"></div>
+            <div style="position: relative; z-index: 2;">
+                <h3 style="margin: 0 0 15px 0; font-size: 1.3rem;">🎵 Welcome to Guest Mode!</h3>
+                <p style="margin: 0 0 15px 0; font-size: 1rem; line-height: 1.5;">
+                    Try our AI cover generator with <strong>1 free generation per day</strong>. 
+                    Experience the magic of AI-powered album art creation!
+                </p>
+                <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                    <a href="{{ url_for('register') }}" class="button" style="background: #000; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 25px; font-weight: bold;">
+                        Get Free Account
+                    </a>
+                    <div style="color: #000; font-size: 0.9rem;">
+                        <strong>Free accounts get:</strong> 2 daily generations + LoRA styles!
+                    </div>
+                </div>
+            </div>
         </div>
         {% endif %}
         
-        <!-- Generation Limit Warning -->
-        {% if not user_info.can_generate %}
-        <div class="alert alert-error" style="background-color: rgba(255, 82, 82, 0.1); color: #ff5252; border-left: 4px solid #ff5252; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
-            <strong>Daily Limit Reached!</strong><br>
-            {% if user_info.type == 'guest' %}
-                You've used your 1 free generation for today. 
-                <a href="{{ url_for('register') }}" style="color: #1DB954;">Sign up for free</a> to get {{ 2 }} generations per day, or try again tomorrow!
-            {% else %}
-                You've used all {{ user_info.daily_limit }} of your daily generations. 
-                {% if not user_info.is_premium %}
-                Try again tomorrow or <a href="mailto:bentakaki7@gmail.com" style="color: #1DB954;">contact us</a> for premium access.
-                {% else %}
-                Please try again tomorrow.
-                {% endif %}
-            {% endif %}
+        <!-- Generation Limit Warnings -->
+        {% if user_info and not user_info.can_generate %}
+        <div class="alert alert-error" style="background: linear-gradient(135deg, rgba(255, 82, 82, 0.15), rgba(255, 82, 82, 0.05)); color: #ff5252; border-left: 4px solid #ff5252; padding: 20px; margin-bottom: 25px; border-radius: 8px;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span style="font-size: 2rem;">🚫</span>
+                <div>
+                    <strong style="font-size: 1.1rem;">Daily Limit Reached!</strong><br>
+                    {% if user_info.type == 'guest' %}
+                        You've used your 1 free generation for today. 
+                        <a href="{{ url_for('register') }}" style="color: #1DB954; font-weight: bold;">Sign up for free</a> to get 2 generations per day!
+                    {% else %}
+                        You've used all {{ user_info.daily_limit }} of your daily generations. 
+                        {% if not user_info.is_premium %}
+                        Try again tomorrow or contact us for premium access with unlimited generations!
+                        {% else %}
+                        Please try again tomorrow.
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
         </div>
-        {% elif user_info.generations_today >= user_info.daily_limit - 1 %}
-        <div class="alert alert-warning" style="background-color: rgba(255, 152, 0, 0.1); color: #ff9800; border-left: 4px solid #ff9800; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
-            <strong>Almost at your limit!</strong><br>
-            You have {{ user_info.daily_limit - user_info.generations_today }} generation(s) remaining today.
-            {% if user_info.type == 'guest' %}
-            <a href="{{ url_for('register') }}" style="color: #1DB954;">Sign up for free</a> to get more daily generations!
-            {% endif %}
+        {% elif user_info and user_info.generations_today >= user_info.daily_limit - 1 %}
+        <div class="alert alert-warning" style="background: linear-gradient(135deg, rgba(255, 152, 0, 0.15), rgba(255, 152, 0, 0.05)); color: #ff9800; border-left: 4px solid #ff9800; padding: 20px; margin-bottom: 25px; border-radius: 8px;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span style="font-size: 2rem;">⚠️</span>
+                <div>
+                    <strong style="font-size: 1.1rem;">Almost at your limit!</strong><br>
+                    You have {{ user_info.daily_limit - user_info.generations_today }} generation(s) remaining today.
+                    {% if user_info.type == 'guest' %}
+                    <a href="{{ url_for('register') }}" style="color: #1DB954; font-weight: bold;">Sign up for free</a> to get more daily generations!
+                    {% endif %}
+                </div>
+            </div>
         </div>
         {% endif %}
         
-        <form method="POST" enctype="multipart/form-data">
+        <!-- Main Generation Form -->
+        <form method="POST" enctype="multipart/form-data" style="background: linear-gradient(135deg, #1e1e1e, #2a2a2a); padding: 30px; border-radius: 15px; border: 1px solid #333; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">            
+            <!-- Spotify URL Input -->
             <div class="form-group">
-                <label for="playlist_url">Spotify Playlist or Album URL:</label>
-                <input type="text" id="playlist_url" name="playlist_url" placeholder="https://open.spotify.com/playlist/... or https://open.spotify.com/album/..." required>
-                <small>Paste the full URL of a Spotify playlist or album</small>
+                <label for="playlist_url" style="display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 1.1rem; color: #1DB954;">
+                    🎵 Spotify Playlist or Album URL:
+                </label>
+                <input type="text" id="playlist_url" name="playlist_url" 
+                       placeholder="https://open.spotify.com/playlist/... or https://open.spotify.com/album/..." 
+                       required>
+                <small style="color: #a0a0a0; display: flex; align-items: center; gap: 5px; margin-top: 8px;">
+                    💡 Paste the full URL of a Spotify playlist or album
+                </small>
             </div>
             
+            <!-- Custom Mood Input -->
             <div class="form-group">
-                <label for="mood">Additional Prompt Words:</label>
-                <input type="text" id="mood" name="mood" placeholder="e.g., retro, neon, minimalist, cinematic">
-                <small>Add extra words to customize the image generation (optional)</small>
+                <label for="mood" style="display: flex; align-items: center; gap: 8px; font-weight: bold; color: #1DB954;">
+                    ✨ Additional Prompt Words:
+                </label>
+                <input type="text" id="mood" name="mood" 
+                       placeholder="e.g., retro, neon, minimalist, cinematic, dark, vibrant">
+                <small style="color: #a0a0a0; display: flex; align-items: center; gap: 5px; margin-top: 8px;">
+                    🎨 Add extra words to customize the image generation (optional)
+                </small>
             </div>
             
-            <div class="form-group">
-                <label for="negative_prompt">Custom Negative Prompt:</label>
-                <textarea id="negative_prompt" name="negative_prompt" rows="4" placeholder="Enter things you want to avoid in the generated image"></textarea>
-                <small>Leave empty to use the default negative prompt</small>
-            </div>
-            
-            {% if user_info.can_use_loras %}
-            <div class="form-group">
-                <label for="lora_name">LoRA Style (Optional):</label>
-                <select id="lora_name" name="lora_name">
-                    <option value="none">None (Default Stable Diffusion)</option>
-                    {% for lora in loras %}
-                    <option value="{{ lora.name }}">{{ lora.name }}</option>
-                    {% endfor %}
-                </select>
-                <small>Apply a custom LoRA for specialized art styles</small>
-            </div>
-            {% else %}
-            <div class="form-group">
-                <label>LoRA Styles:</label>
-                <div style="background: #333; padding: 15px; border-radius: 5px; border-left: 4px solid #666;">
-                    <p style="margin: 0; color: #ccc;">🔒 LoRA styles are available for registered users. 
-                    <a href="{{ url_for('register') }}" style="color: #1DB954;">Sign up for free</a> to access advanced styling options!</p>
-                </div>
-            </div>
-            {% endif %}
-            
-            <div class="form-group preset-options">
-                <label>Preset styles:</label>
-                <div class="preset-buttons">
-                    <button type="button" class="preset-btn" data-preset="minimalist">Minimalist</button>
-                    <button type="button" class="preset-btn" data-preset="high-contrast">High Contrast</button>
-                    <button type="button" class="preset-btn" data-preset="retro">Retro</button>
-                    <button type="button" class="preset-btn" data-preset="bold-colors">Bold Colors</button>
+            <!-- Preset Style Buttons -->
+            <div class="form-group preset-options" style="text-align: center;">
+                <label style="display: block; margin-bottom: 15px; font-weight: bold; color: #1DB954;">
+                    🎨 Quick Style Presets:
+                </label>
+                <div class="preset-buttons" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;">
+                    <button type="button" class="preset-btn" data-preset="minimalist">✨ Minimalist</button>
+                    <button type="button" class="preset-btn" data-preset="high-contrast">🔥 High Contrast</button>
+                    <button type="button" class="preset-btn" data-preset="retro">📻 Retro</button>
+                    <button type="button" class="preset-btn" data-preset="bold-colors">🌈 Bold Colors</button>
                 </div>
             </div>
             
-            <button type="submit" class="submit-btn" {% if not user_info.can_generate %}disabled{% endif %}>
-                {% if user_info.can_generate %}
-                Generate Cover
+            <!-- Advanced Options -->
+            <div class="advanced-options" style="margin-top: 25px;">
+                <button type="button" id="toggle-advanced" class="button secondary" 
+                        style="width: 100%; padding: 12px; margin-bottom: 15px;">
+                    ⚙️ Advanced Options
+                </button>
+                
+                <div id="advanced-content" style="display: none; padding: 20px; background: #222; border-radius: 8px; border: 1px solid #444;">
+                    <!-- Negative Prompt -->
+                    <div class="form-group">
+                        <label for="negative_prompt" style="display: flex; align-items: center; gap: 8px; font-weight: bold; color: #1DB954;">
+                            🚫 Custom Negative Prompt:
+                        </label>
+                        <textarea id="negative_prompt" name="negative_prompt" rows="3" 
+                                  placeholder="Enter things you want to avoid in the generated image"></textarea>
+                        <small style="color: #a0a0a0;">Leave empty to use the default negative prompt</small>
+                    </div>
+                    
+                    <!-- LoRA Selection -->
+                    {% if user_info and user_info.can_use_loras %}
+                    <div class="form-group">
+                        <label for="lora_name" style="display: flex; align-items: center; gap: 8px; font-weight: bold; color: #1DB954;">
+                            🎭 LoRA Style (Optional):
+                        </label>
+                        <select id="lora_name" name="lora_name">
+                            <option value="none">None (Default Stable Diffusion)</option>
+                            {% for lora in loras %}
+                            <option value="{{ lora.name }}">{{ lora.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small style="color: #a0a0a0;">Apply a custom LoRA for specialized art styles</small>
+                    </div>
+                    {% else %}
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px; font-weight: bold; color: #666;">
+                            🎭 LoRA Styles:
+                        </label>
+                        <div style="background: #333; padding: 15px; border-radius: 8px; border-left: 4px solid #666;">
+                            <p style="margin: 0; color: #ccc;">
+                                🔒 LoRA styles are available for registered users. 
+                                <a href="{{ url_for('register') }}" style="color: #1DB954; font-weight: bold;">Sign up for free</a> 
+                                to access advanced styling options!
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Submit Button -->
+            <div style="text-align: center; margin-top: 30px;">
+                {% if not user_info or user_info.can_generate %}
+                <button type="submit" class="submit-btn" 
+                        style="background: linear-gradient(135deg, #1DB954, #1ed760); color: #000; border: none; border-radius: 30px; padding: 15px 40px; font-size: 1.2rem; font-weight: bold; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(29, 185, 84, 0.3);">
+                    🎨 Generate Cover
+                </button>
                 {% else %}
-                Daily Limit Reached
+                <button type="button" disabled 
+                        style="background: #666; color: #999; border: none; border-radius: 30px; padding: 15px 40px; font-size: 1.2rem; font-weight: bold; cursor: not-allowed;">
+                    🚫 Daily Limit Reached
+                </button>
                 {% endif %}
-            </button>
+            </div>
         </form>
         
-        <!-- LoRA MANAGEMENT SECTION - THIS WAS MISSING! -->
-        {% if user_info.show_upload %}
-        <div class="lora-upload">
-            <h3>LoRA Management</h3>
+        <!-- LoRA File Upload Section (Premium Users Only) -->
+        {% if user_info and user_info.show_upload %}
+        <div class="lora-upload" style="margin-top: 40px; background: linear-gradient(135deg, #252525, #2a2a2a); padding: 30px; border-radius: 15px; border: 1px solid #333; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);">
+            <h3 style="color: #1DB954; margin-top: 0; display: flex; align-items: center; gap: 10px; font-size: 1.3rem;">
+                🎭 LoRA File Management
+                <span style="background: linear-gradient(135deg, #1DB954, #1ed760); color: #000; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: bold;">PREMIUM</span>
+            </h3>
             
-            <!-- LoRA Tabs -->
-            <div class="lora-tabs">
-                {% if not os.environ.get('RENDER') %}
-                <button class="lora-tab-btn active" data-tab="upload">Upload File</button>
-                {% endif %}
-                <button class="lora-tab-btn{% if os.environ.get('RENDER') %} active{% endif %}" data-tab="url">Add Via Link</button>
-            </div>
-            
-            {% if not os.environ.get('RENDER') %}
-            <!-- File Upload Tab -->
-            <div class="lora-tab-content active" id="upload-tab">
+            <div style="background: #1a1a1a; padding: 25px; border-radius: 8px; border: 2px dashed #1DB954;">
                 <form id="lora-upload-form" enctype="multipart/form-data">
                     <div class="form-group">
-                        <label for="lora_file">LoRA File (.safetensors, .ckpt, .pt):</label>
-                        <input type="file" id="lora_file" name="file" accept=".safetensors,.ckpt,.pt">
-                        <small>Upload your LoRA files for custom styles</small>
+                        <label for="lora_file" style="display: flex; align-items: center; gap: 8px; font-weight: bold; color: #1DB954; margin-bottom: 10px;">
+                            📁 Upload LoRA File:
+                        </label>
+                        <input type="file" id="lora_file" name="file" accept=".safetensors,.ckpt,.pt"
+                               style="width: 100%; padding: 15px; background-color: #333; color: #fff; border-radius: 8px; margin-bottom: 15px; border: 2px solid #555; transition: all 0.3s ease; cursor: pointer;">
+                        <small style="color: #a0a0a0; display: block; margin-bottom: 15px;">
+                            📋 Supported formats: .safetensors, .ckpt, .pt (Max file size depends on your hosting plan)
+                        </small>
                     </div>
-                    <button type="submit" class="upload-btn">Upload LoRA</button>
+                    
+                    <button type="submit" class="upload-btn" 
+                            style="background: linear-gradient(135deg, #1DB954, #1ed760); color: #000; border: none; border-radius: 25px; padding: 12px 30px; font-weight: bold; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 8px;">
+                        <span>🚀</span> Upload LoRA
+                    </button>
                 </form>
                 
-                <div id="upload-status"></div>
-            </div>
-            {% endif %}
-            
-            <!-- URL Upload Tab -->
-            <div class="lora-tab-content{% if os.environ.get('RENDER') %} active{% endif %}" id="url-tab">
-                <form id="lora-url-form">
-                    <div class="form-group">
-                        <label for="lora_name_input">LoRA Name:</label>
-                        <input type="text" id="lora_name_input" name="name" placeholder="Enter a name for this LoRA" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="lora_url_input">LoRA URL:</label>
-                        <input type="url" id="lora_url_input" name="url" placeholder="https://civitai.com/models/12345 or https://example.com/lora.safetensors" required>
-                        <small>Supported: Civitai model pages, HuggingFace repos, direct file URLs</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="lora_strength">LoRA Strength:</label>
-                        <input type="range" id="lora_strength" name="strength" min="0.1" max="2.0" step="0.1" value="0.7">
-                        <span id="strength-value">0.7</span>
-                    </div>
-                    
-                    <button type="submit" class="upload-btn">Add LoRA</button>
-                </form>
+                <div id="upload-status" style="margin-top: 20px;"></div>
                 
-                <div id="url-status"></div>
-                
-                {% if os.environ.get('RENDER') %}
-                <div class="info-notice">
-                    <p><strong>💡 Note:</strong> File uploads are not available on this hosting platform. 
-                    Use URL-based LoRAs from services like Civitai or HuggingFace instead.</p>
+                <!-- Current LoRAs List -->
+                <div id="current-loras" style="margin-top: 30px;">
+                    <h4 style="color: #1DB954; margin-bottom: 15px;">📚 Your Uploaded LoRAs:</h4>
+                    <div id="loras-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px;">
+                        <!-- LoRAs will be loaded here via JavaScript -->
+                        <div style="background: #333; padding: 15px; border-radius: 8px; text-align: center; color: #666;">
+                            <span style="font-size: 2rem;">📁</span>
+                            <p style="margin: 10px 0 0 0;">No LoRAs uploaded yet</p>
+                        </div>
+                    </div>
                 </div>
-                {% endif %}
+            </div>
+            
+            <div style="margin-top: 25px; padding: 20px; background: #333; border-radius: 8px; border-left: 4px solid #1DB954;">
+                <h4 style="color: #1DB954; margin: 0 0 15px 0;">💡 Tips for Using LoRAs:</h4>
+                <ul style="color: #ccc; margin: 0; padding-left: 20px;">
+                    <li style="margin-bottom: 8px;">LoRAs (Low-Rank Adaptations) dramatically change the visual style of generated images</li>
+                    <li style="margin-bottom: 8px;">Upload high-quality LoRA files for best results</li>
+                    <li style="margin-bottom: 8px;">Different LoRAs produce vastly different artistic styles</li>
+                    <li style="margin-bottom: 8px;">Premium users get unlimited LoRA uploads and generations</li>
+                    <li>Files are stored securely on our paid Render instance</li>
+                </ul>
+            </div>
+        </div>
+        {% elif user_info and user_info.type == 'user' and not user_info.is_premium %}
+        <!-- Non-Premium User LoRA Info -->
+        <div style="margin-top: 40px; background: linear-gradient(135deg, #333, #2a2a2a); padding: 25px; border-radius: 12px; border: 1px solid #555;">
+            <h3 style="color: #1DB954; display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                🎭 LoRA File Uploads
+                <span style="background: #666; color: #ccc; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem;">PREMIUM FEATURE</span>
+            </h3>
+            <p style="color: #ccc; margin-bottom: 20px;">
+                Upload your own LoRA files for unlimited customization! Premium users can upload and manage custom LoRA files for specialized art styles.
+            </p>
+            <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                <div style="color: #ccc; font-size: 0.9rem;">
+                    <strong>Premium benefits:</strong>
+                    <ul style="margin: 10px 0 0 20px; padding: 0;">
+                        <li>Upload unlimited LoRA files</li>
+                        <li>Unlimited generations per day</li>
+                        <li>Priority support</li>
+                        <li>Advanced customization options</li>
+                    </ul>
+                </div>
+                <a href="mailto:bentakaki7@gmail.com?subject=Premium%20Access%20Request" 
+                   class="button" 
+                   style="background: linear-gradient(135deg, #1DB954, #1ed760); color: #000; padding: 12px 24px; border-radius: 25px; text-decoration: none; font-weight: bold;">
+                    Request Premium Access
+                </a>
             </div>
         </div>
         {% endif %}
         
-        <div class="info-section">
-            <h3>How it works</h3>
-            <p>This tool analyzes your Spotify playlist or album to extract genres from the artists. It then uses AI to generate a unique album cover that matches your music's genres and style, with a detailed genre analysis chart.</p>
+        <!-- Enhanced Info Section -->
+        <div class="info-section" style="margin-top: 40px; padding: 30px; background: linear-gradient(135deg, #1a1a1a, #252525); border-radius: 15px; border: 1px solid #333;">
+            <h3 style="color: #1DB954; display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                ℹ️ How it works
+            </h3>
+            <p style="font-size: 1.1rem; line-height: 1.6; color: #ccc; margin-bottom: 25px;">
+                This tool analyzes your Spotify playlist or album to extract genres from the artists. It then uses AI to generate a unique album cover that matches your music's genres and style, with a detailed genre analysis chart.
+            </p>
             
-            <h4>Features</h4>
-            <ul>
-                <li><strong>Gemini AI Titles</strong> - Using Google's Gemini 2.5 Flash Preview API for creative album titles</li>
-                <li><strong>Custom Prompts</strong> - Add additional words to customize the image generation</li>
-                <li><strong>Custom Negative Prompts</strong> - Control what you don't want in your generated images</li>
-                {% if user_info.type == 'user' and user_info.can_edit_playlists %}
-                <li><strong>Spotify Integration</strong> - Edit playlist titles and covers directly from generated results</li>
-                {% endif %}
-                {% if user_info.can_use_loras %}
-                <li><strong>LoRA Support</strong> - Add LoRAs via file upload for custom styles{% if user_info.is_premium %} (Premium feature){% endif %}</li>
-                {% endif %}
-                <li><strong>Stable Diffusion API</strong> - Faster image generation using cloud-based Stable Diffusion</li>
-            </ul>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px;">
+                <!-- Features -->
+                <div>
+                    <h4 style="color: #1DB954; display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
+                        ✨ Features
+                    </h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                            <span style="color: #1DB954;">🤖</span>
+                            <strong>Gemini AI Titles</strong> - Creative album titles using Google's Gemini 2.5 Flash Preview API
+                        </li>
+                        <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                            <span style="color: #1DB954;">🎨</span>
+                            <strong>Custom Prompts</strong> - Add additional words to customize image generation
+                        </li>
+                        <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                            <span style="color: #1DB954;">🚫</span>
+                            <strong>Custom Negative Prompts</strong> - Control what you don't want in your images
+                        </li>
+                        {% if user_info and user_info.type == 'user' and user_info.can_edit_playlists %}
+                        <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                            <span style="color: #1DB954;">🎵</span>
+                            <strong>Spotify Integration</strong> - Edit playlist titles and covers directly
+                        </li>
+                        {% endif %}
+                        {% if user_info and user_info.is_premium %}
+                        <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                            <span style="color: #1DB954;">🎭</span>
+                            <strong>LoRA File Uploads</strong> - Upload custom LoRA files for specialized art styles
+                        </li>
+                        {% endif %}
+                        <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                            <span style="color: #1DB954;">⚡</span>
+                            <strong>Stable Diffusion API</strong> - Fast, cloud-based image generation
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Usage Limits -->
+                <div>
+                    <h4 style="color: #1DB954; display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
+                        📊 Usage Limits
+                    </h4>
+                    <ul style="list-style: none; padding: 0;">
+                        {% if user_info and user_info.type == 'guest' %}
+                        <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                            <span style="color: #666;">👤</span>
+                            <strong>Guests:</strong> 1 generation per day
+                        </li>
+                        <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                            <span style="color: #1DB954;">🆓</span>
+                            <strong>Free Account:</strong> 2 generations per day + LoRA access
+                        </li>
+                        <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                            <span style="color: #1DB954;">⭐</span>
+                            <strong>Premium:</strong> Unlimited generations + file uploads
+                        </li>
+                        <li style="margin-bottom: 10px;">
+                            <a href="{{ url_for('register') }}" style="color: #1DB954; font-weight: bold; text-decoration: underline;">
+                                🎯 Sign up for free to unlock more features!
+                            </a>
+                        </li>
+                        {% else %}
+                        <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                            <span style="color: #1DB954;">🆓</span>
+                            <strong>Free Users:</strong> 2 generations per day
+                        </li>
+                        <li style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                            <span style="color: #1DB954;">⭐</span>
+                            <strong>Premium Users:</strong> Unlimited generations + file uploads
+                        </li>
+                        {% if not user_info.is_premium %}
+                        <li style="margin-bottom: 10px;">
+                            <a href="mailto:bentakaki7@gmail.com?subject=Premium%20Access%20Request" style="color: #1DB954; font-weight: bold; text-decoration: underline;">
+                                🎯 Request Premium Access for unlimited generations!
+                            </a>
+                        </li>
+                        {% endif %}
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
             
-            <h4>Usage Limits</h4>
-            <ul>
-                {% if user_info.type == 'guest' %}
-                <li><strong>Guest Users:</strong> 1 generation per day</li>
-                <li><strong>Free Account:</strong> 2 generations per day + LoRA access</li>
-                <li><strong>Premium Users:</strong> Unlimited generations + file uploads</li>
-                <li><strong>Ready to unlock more?</strong> <a href="{{ url_for('register') }}" style="color: #1DB954;">Sign up for free!</a></li>
-                {% else %}
-                <li><strong>Free Users:</strong> 2 generations per day</li>
-                <li><strong>Premium Users:</strong> Unlimited generations</li>
-                {% if not user_info.is_premium %}
-                <li>Need more generations? <a href="mailto:bentakaki7@gmail.com" style="color: #1DB954;">Contact us</a> for premium access!</li>
-                {% endif %}
-                {% endif %}
-            </ul>
-            
-            {% if user_info.type == 'user' and user_info.is_premium %}
-            <h4>Tips for Using LoRAs</h4>
-            <p>LoRAs (Low-Rank Adaptations) are specialized models that can dramatically change the visual style of generated images:</p>
-            <ul>
-                <li>Upload LoRA files directly (.safetensors, .ckpt, or .pt format)</li>
-                <li>Use the dropdown to select previously uploaded LoRAs</li>
-                <li>Different LoRAs can produce vastly different visual styles</li>
-            </ul>
+            {% if user_info and user_info.is_premium %}
+            <div style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #1DB954, #1ed760); color: #000; border-radius: 8px;">
+                <h4 style="margin: 0 0 15px 0; display: flex; align-items: center; gap: 8px;">
+                    ⭐ Premium User Benefits
+                </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div>✅ Unlimited daily generations</div>
+                    <div>✅ Custom LoRA file uploads</div>
+                    <div>✅ Priority support</div>
+                    <div>✅ Advanced customization</div>
+                </div>
+            </div>
             {% endif %}
             
-            <h4>About Negative Prompts</h4>
-            <p>Negative prompts tell the AI what you don't want in the image. The default negative prompt helps avoid common issues like extra fingers or distorted faces. You can customize this to further refine your results.</p>
+            <div style="margin-top: 30px; padding: 20px; background: #333; border-radius: 8px; border-left: 4px solid #1DB954;">
+                <h4 style="color: #1DB954; margin: 0 0 15px 0;">🚫 About Negative Prompts</h4>
+                <p style="color: #ccc; margin: 0; line-height: 1.5;">
+                    Negative prompts tell the AI what you don't want in the image. The default negative prompt helps avoid common issues like extra fingers or distorted faces. You can customize this to further refine your results and get exactly the style you want.
+                </p>
+            </div>
         </div>
     </div>
+    
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+    
+    <!-- Additional JavaScript for LoRA management -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Advanced options toggle
+            const toggleAdvanced = document.getElementById('toggle-advanced');
+            const advancedContent = document.getElementById('advanced-content');
+            
+            if (toggleAdvanced && advancedContent) {
+                toggleAdvanced.addEventListener('click', function() {
+                    if (advancedContent.style.display === 'none') {
+                        advancedContent.style.display = 'block';
+                        this.textContent = '⚙️ Hide Advanced Options';
+                    } else {
+                        advancedContent.style.display = 'none';
+                        this.textContent = '⚙️ Advanced Options';
+                    }
+                });
+            }
+            
+            // LoRA upload form handling (Premium users only)
+            const loraUploadForm = document.getElementById('lora-upload-form');
+            if (loraUploadForm) {
+                loraUploadForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(this);
+                    const uploadStatus = document.getElementById('upload-status');
+                    const fileInput = document.getElementById('lora_file');
+                    
+                    // Validate file
+                    if (!fileInput.files.length) {
+                        showUploadStatus('Please select a file to upload', 'error');
+                        return;
+                    }
+                    
+                    const file = fileInput.files[0];
+                    const validExtensions = ['.safetensors', '.ckpt', '.pt'];
+                    const fileExt = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+                    
+                    if (!validExtensions.includes(fileExt)) {
+                        showUploadStatus('Invalid file type. Please upload a .safetensors, .ckpt, or .pt file', 'error');
+                        return;
+                    }
+                    
+                    // Show loading state
+                    showUploadStatus('🚀 Uploading LoRA file...', 'loading');
+                    
+                    // Submit via AJAX
+                    fetch('/api/upload_lora', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showUploadStatus(`✅ ${data.message}`, 'success');
+                            // Clear form and refresh LoRA list
+                            this.reset();
+                            loadLorasList();
+                        } else {
+                            showUploadStatus(`❌ ${data.error}`, 'error');
+                        }
+                    })
+                    .catch(error => {
+                        showUploadStatus('❌ Upload failed: ' + error.message, 'error');
+                    });
+                });
+            }
+            
+            // Load current LoRAs list
+            function loadLorasList() {
+                const lorasList = document.getElementById('loras-list');
+                if (!lorasList) return;
+                
+                fetch('/api/loras')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.loras && data.loras.length > 0) {
+                        lorasList.innerHTML = data.loras.map(lora => `
+                            <div style="background: #333; padding: 15px; border-radius: 8px; text-align: center;">
+                                <span style="font-size: 2rem;">🎭</span>
+                                <h4 style="color: #1DB954; margin: 10px 0 5px 0;">${lora.name}</h4>
+                                <p style="color: #ccc; font-size: 0.9rem; margin: 0;">
+                                    ${lora.file_size ? `${(lora.file_size / 1024 / 1024).toFixed(1)} MB` : 'Unknown size'}
+                                </p>
+                                <p style="color: #666; font-size: 0.8rem; margin: 5px 0 0 0;">
+                                    ${lora.uploaded_at ? new Date(lora.uploaded_at).toLocaleDateString() : 'Unknown date'}
+                                </p>
+                            </div>
+                        `).join('');
+                    } else {
+                        lorasList.innerHTML = `
+                            <div style="background: #333; padding: 15px; border-radius: 8px; text-align: center; color: #666;">
+                                <span style="font-size: 2rem;">📁</span>
+                                <p style="margin: 10px 0 0 0;">No LoRAs uploaded yet</p>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading LoRAs:', error);
+                });
+            }
+            
+            function showUploadStatus(message, type) {
+                const uploadStatus = document.getElementById('upload-status');
+                if (!uploadStatus) return;
+                
+                uploadStatus.innerHTML = `
+                    <div style="padding: 15px; border-radius: 8px; ${getStatusStyle(type)}">
+                        ${message}
+                    </div>
+                `;
+                uploadStatus.style.display = 'block';
+                
+                if (type === 'success') {
+                    setTimeout(() => {
+                        uploadStatus.style.display = 'none';
+                    }, 3000);
+                }
+            }
+            
+            function getStatusStyle(type) {
+                switch(type) {
+                    case 'success':
+                        return 'background: rgba(29, 185, 84, 0.1); color: #1DB954; border-left: 4px solid #1DB954;';
+                    case 'error':
+                        return 'background: rgba(255, 82, 82, 0.1); color: #ff5252; border-left: 4px solid #ff5252;';
+                    case 'loading':
+                        return 'background: rgba(33, 150, 243, 0.1); color: #2196F3; border-left: 4px solid #2196F3;';
+                    default:
+                        return 'background: #333; color: #ccc;';
+                }
+            }
+            
+            // Load LoRAs on page load
+            loadLorasList();
+        });
+    </script>
 </body>
 </html>
