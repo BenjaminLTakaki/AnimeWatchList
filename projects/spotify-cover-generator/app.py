@@ -1,51 +1,41 @@
 import os
 import sys
-import os
 import random
 import json
 import datetime
 import traceback
 from datetime import timedelta
-from flask import Flask, request, render_template, send_from_directory, jsonify, session, redirect, url_for, flash, make_response
 from pathlib import Path
 from urllib.parse import urlparse
 from functools import wraps
+
 import requests
 import base64
-import scipy as sp
+import secrets
+from collections import Counter
+
+from flask import (Flask, request, render_template, send_from_directory, jsonify,
+                   session, redirect, url_for, flash, make_response)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import secrets
-from sqlalchemy import text
-from collections import Counter
+from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-import uuid
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-# Get the directory where app.py is located
-current_dir = os.path.dirname(os.path.abspath(__file__))
+from sqlalchemy import text
 
-# Add the current directory to Python path if it's not already there
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
-
-# Also add the parent directory in case modules are there
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-
-print(f"🔍 Current directory: {current_dir}")
-print(f"🔍 Python path: {sys.path[:3]}...")  # Show first 3 paths
-
-# Import config first (this should work)
+# Configuration imports or fallbacks
 try:
-    from config import BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY, SPOTIFY_DB_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
-    print("✓ Config imported successfully")
+    from config import (
+        BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY,
+        SPOTIFY_DB_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET,
+        SPOTIFY_REDIRECT_URI
+    )
+    print("Config imported successfully")
 except ImportError as e:
-    print(f"❌ Config import failed: {e}")
-    # Fallback - define minimal config
-    BASE_DIR = Path(current_dir)
+    print(f"Config import failed: {e}")
+    BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
     COVERS_DIR = BASE_DIR / "generated_covers"
     FLASK_SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'dev-key')
     SPOTIFY_DB_URL = os.environ.get('DATABASE_URL', 'postgresql://localhost/test')
@@ -53,146 +43,110 @@ except ImportError as e:
     SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET')
     SPOTIFY_REDIRECT_URI = os.environ.get('SPOTIFY_REDIRECT_URI', 'http://localhost:5000/spotify-callback')
 
-# Initialize Flask app first
-app = Flask(__name__, template_folder=str(BASE_DIR / "templates"), static_folder=str(BASE_DIR / "static"))
-app.secret_key = FLASK_SECRET_KEY or ''.join(random.choices('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=24))
+# Flask app initialization
+app = Flask(__name__,
+            template_folder=str(BASE_DIR / "templates"),
+            static_folder=str(BASE_DIR / "static"))
+app.secret_key = FLASK_SECRET_KEY or ''.join(random.choices(
+    'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=24))
 
-# Configure database
+# Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = SPOTIFY_DB_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Add rate limiter (optional - for additional protection)
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["100 per hour"],  
-    storage_uri="memory://"  
-)
-limiter.init_app(app)
-
-# Initialize SQLAlchemy
-from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-# Database Models
+# Rate limiter
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["100 per hour"],
+    storage_uri="memory://"
+)
+limiter.init_app(app)
+
+# Models definition
 class User(db.Model):
     __tablename__ = 'spotify_users'
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=True)
     username = db.Column(db.String(80), unique=True, nullable=True)
     password_hash = db.Column(db.String(200), nullable=True)
-    
-    # Spotify OAuth fields
     spotify_id = db.Column(db.String(100), unique=True, nullable=True)
     spotify_username = db.Column(db.String(100), nullable=True)
     spotify_access_token = db.Column(db.String(500), nullable=True)
     spotify_refresh_token = db.Column(db.String(500), nullable=True)
     spotify_token_expires = db.Column(db.DateTime, nullable=True)
-    
-    # User info
     display_name = db.Column(db.String(100), nullable=True)
     is_premium = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
-    
-    # Relationship to generations
     generations = db.relationship('GenerationResultDB', backref='user', lazy=True)
-    
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
-    
+
     def check_password(self, password):
-        if not self.password_hash:
-            return False
-        return check_password_hash(self.password_hash, password)
-    
+        return bool(self.password_hash and check_password_hash(self.password_hash, password))
+
     def is_premium_user(self):
-        """Check if user is premium - FIXED LOGIC"""
-        # Check by email first (primary method)
-        if self.email and self.email.lower() in ['bentakaki7@gmail.com']:
+        premium_emails = ['bentakaki7@gmail.com']
+        premium_usernames = ['benthegamer']
+        if self.email and self.email.lower() in premium_emails:
             return True
-        
-        # Check by Spotify username (backup method)
-        if self.spotify_username and self.spotify_username.lower() in ['benthegamer']:
+        if self.spotify_username and self.spotify_username.lower() in premium_usernames:
             return True
-        
-        # Check by Spotify ID as final fallback
-        if self.spotify_id and self.spotify_id.lower() in ['benthegamer']:
+        if self.spotify_id and self.spotify_id.lower() in premium_usernames:
             return True
-            
         return False
-    
+
     def get_daily_generation_limit(self):
         return 999 if self.is_premium_user() else 2
-    
+
     def can_generate_today(self):
         today = datetime.datetime.utcnow().date()
-        today_generations = GenerationResultDB.query.filter(
+        count = GenerationResultDB.query.filter(
             GenerationResultDB.user_id == self.id,
             db.func.date(GenerationResultDB.timestamp) == today
         ).count()
-        return today_generations < self.get_daily_generation_limit()
-    
+        return count < self.get_daily_generation_limit()
+
     def get_generations_today(self):
         today = datetime.datetime.utcnow().date()
         return GenerationResultDB.query.filter(
             GenerationResultDB.user_id == self.id,
             db.func.date(GenerationResultDB.timestamp) == today
         ).count()
-    
+
     def refresh_spotify_token_if_needed(self):
         if not self.spotify_refresh_token:
             return False
-            
-        if (self.spotify_token_expires and 
-            self.spotify_token_expires <= datetime.datetime.utcnow() + timedelta(minutes=5)):
+        if self.spotify_token_expires and \
+           self.spotify_token_expires <= datetime.datetime.utcnow() + timedelta(minutes=5):
             return self._refresh_spotify_token()
-        
         return True
-    
+
     def _refresh_spotify_token(self):
         if not self.spotify_refresh_token:
             return False
-        
-        auth_header = base64.b64encode(
-            f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}".encode()
-        ).decode()
-        
-        headers = {
-            'Authorization': f'Basic {auth_header}',
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
-        
-        data = {
-            'grant_type': 'refresh_token',
-            'refresh_token': self.spotify_refresh_token
-        }
-        
+        auth_header = base64.b64encode(f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}".encode()).decode()
+        headers = {'Authorization': f'Basic {auth_header}', 'Content-Type': 'application/x-www-form-urlencoded'}
+        data = {'grant_type': 'refresh_token', 'refresh_token': self.spotify_refresh_token}
         try:
-            response = requests.post(
-                'https://accounts.spotify.com/api/token',
-                headers=headers,
-                data=data
-            )
-            
+            response = requests.post('https://accounts.spotify.com/api/token', headers=headers, data=data)
             if response.status_code == 200:
                 token_data = response.json()
                 self.spotify_access_token = token_data['access_token']
-                self.spotify_token_expires = datetime.datetime.utcnow() + timedelta(
-                    seconds=token_data['expires_in']
-                )
-                
+                self.spotify_token_expires = datetime.datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
                 if 'refresh_token' in token_data:
                     self.spotify_refresh_token = token_data['refresh_token']
-                
                 db.session.commit()
                 return True
         except Exception as e:
             print(f"Error refreshing Spotify token: {e}")
-        
         return False
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -217,41 +171,30 @@ class LoginSession(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     ip_address = db.Column(db.String(45), nullable=True)
     user_agent = db.Column(db.String(500), nullable=True)
-    
     user = db.relationship('User', backref='sessions')
-    
+
     @staticmethod
     def create_session(user_id, ip_address=None, user_agent=None):
-        session_token = secrets.token_urlsafe(32)
-        expires_at = datetime.datetime.utcnow() + timedelta(days=30)
-        
-        session = LoginSession(
-            user_id=user_id,
-            session_token=session_token,
-            expires_at=expires_at,
-            ip_address=ip_address,
+        token = secrets.token_urlsafe(32)
+        expires = datetime.datetime.utcnow() + timedelta(days=30)
+        sess = LoginSession(
+            user_id=user_id, session_token=token,
+            expires_at=expires, ip_address=ip_address,
             user_agent=user_agent
         )
-        
-        db.session.add(session)
+        db.session.add(sess)
         db.session.commit()
-        
-        return session_token
-    
+        return token
+
     @staticmethod
     def get_user_from_session(session_token):
-        session = LoginSession.query.filter_by(
-            session_token=session_token,
-            is_active=True
-        ).first()
-        
-        if not session or session.expires_at <= datetime.datetime.utcnow():
-            if session:
-                session.is_active = False
+        sess = LoginSession.query.filter_by(session_token=session_token, is_active=True).first()
+        if not sess or sess.expires_at <= datetime.datetime.utcnow():
+            if sess:
+                sess.is_active = False
                 db.session.commit()
             return None
-        
-        return session.user
+        return sess.user
 
 class SpotifyState(db.Model):
     __tablename__ = 'spotify_oauth_states'
@@ -496,9 +439,9 @@ def migrate_lora_table():
                         connection.execute(text(migration))
                         connection.commit()
                         print(f"✓ Executed: {migration}")
-                    except Exception as e:                        print(f"⚠️ Migration failed (might already exist): {migration} - {e}")
-                        
-                # Add foreign key constraint if it doesn't exist
+                    except Exception as e:
+                        print(f"⚠️ Migration failed (might already exist): {migration} - {e}")
+                          # Add foreign key constraint if it doesn't exist
                 try:
                     # Check if constraint exists
                     constraint_exists = connection.execute(text("""
@@ -514,15 +457,16 @@ def migrate_lora_table():
                             FOREIGN KEY (uploaded_by) REFERENCES spotify_users(id) ON DELETE SET NULL
                         """))
                         connection.commit()
-                    print("✓ Foreign key constraint added/verified")
+                    print("✓ Foreign key constraint added/verified")                
                 except Exception as e:
                     print(f"⚠️ Foreign key constraint warning: {e}")
-                  print("✅ LoRA table migration completed")
+                
+                print("✅ LoRA table migration completed")
                 return True
                 
-        except Exception as e:
-            print(f"❌ LoRA table migration failed: {e}")
-            return False
+    except Exception as e:
+        print(f"❌ LoRA table migration failed: {e}")
+        return False
 
 def initialize_app():
     """Initialize the application's dependencies with better import handling"""
@@ -1553,15 +1497,13 @@ def profile():
 def serve_image(filename):
     return send_from_directory(COVERS_DIR, filename)
 
-# Keep other existing API routes (regenerate, playlist edit, etc.)
-
 if __name__ == '__main__':
-    # Initialize the app
+    print("Initializing application...")
+    # Application startup logic
+    from models import initialize_app
     if initialize_app():
-        print("✅ Application initialized successfully")
+        print("Application initialized successfully")
     else:
-        print("⚠️ Application initialization had issues, but continuing...")
-    
-    # Run the app
+        print("Application initialization had issues; continuing...")
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=False, host="0.0.0.0", port=port)
