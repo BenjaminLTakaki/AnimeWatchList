@@ -286,9 +286,8 @@
                 {% endif %}
             </div>
         </div>
-        
-        <div class="actions">
-            <a href="{{ url_for('index') }}" class="button">Generate Another Cover</a>
+          <div class="actions">
+            <a href="{{ url_for('generate') }}" class="button">Generate Another Cover</a>
             {% if user_info.can_generate %}
             <button id="regenerate-cover" class="button" 
                     data-playlist-url="{{ playlist_url }}" 
