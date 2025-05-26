@@ -4,7 +4,7 @@ import random
 import json
 import datetime
 from datetime import timedelta
-from flask import Flask, request, render_template, send_from_directory, jsonify, session, redirect, url_for, flash
+from flask import Flask, request, render_template, send_from_directory, jsonify, session, redirect, url_for, flash, make_response
 from pathlib import Path
 from urllib.parse import urlparse
 from functools import wraps
@@ -58,6 +58,7 @@ except ImportError as e:
     SPOTIFY_DB_URL = os.environ.get('DATABASE_URL', 'postgresql://localhost/test')
     SPOTIFY_CLIENT_ID = os.environ.get('SPOTIFY_CLIENT_ID')
     SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET')
+    SPOTIFY_REDIRECT_URI = os.environ.get('SPOTIFY_REDIRECT_URI', 'http://localhost:5000/spotify-callback')
 
 # Initialize Flask app first
 app = Flask(__name__, template_folder=str(BASE_DIR / "templates"), static_folder=str(BASE_DIR / "static"))
@@ -315,76 +316,74 @@ def login_required(f):
     """Decorator to require login for routes"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
+        user = get_current_user()
+        if not user:
+            # Try session token from cookie
             session_token = request.cookies.get('session_token')
             if session_token:
-                user = LoginSession.get_user_from_session(session_token)
-                if user:
-                    session['user_id'] = user.id
-                    session['username'] = user.username or user.display_name
-                else:
-                    flash("Your session has expired. Please log in again.", "info")
-                    return redirect(url_for('login'))
-            else:
-                flash("Please log in to access this page.", "info")
-                return redirect(url_for('login'))
+                login_session = LoginSession.get_user_from_session(session_token)
+                if login_session:
+                    session['user_id'] = login_session.id
+                    return f(*args, **kwargs)
+            
+            flash("Please log in to access this page.", "info")
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
 def get_current_user():
-    """Get current logged in user with better debugging"""
-    print(f"Debug - Checking session for user_id: {'user_id' in session}")
-    print(f"Debug - Checking session for user_session: {'user_session' in session}")
-    
-    # First check if we have user_id in session (from Spotify OAuth)
+    """Get current logged in user"""
+    # Method 1: Check user_id in session (most direct)
     if 'user_id' in session:
         try:
             user = User.query.get(session['user_id'])
             if user:
-                print(f"Debug - Found user via session user_id: {user.display_name}")
                 return user
         except Exception as e:
-            print(f"Debug - Error fetching user by session user_id: {e}")
+            print(f"Error fetching user by ID from session: {e}")
+            session.pop('user_id', None)
     
-    # Check if we have user_session token (from login sessions)
+    # Method 2: Check user_session token in session
     if 'user_session' in session:
         try:
             session_token = session['user_session']
-            login_session = LoginSession.query.filter_by(session_token=session_token, is_active=True).first()
+            login_session = LoginSession.query.filter_by(
+                session_token=session_token, 
+                is_active=True
+            ).first()
+            
             if login_session and login_session.expires_at > datetime.datetime.utcnow():
                 user = login_session.user
                 if user:
-                    print(f"Debug - Found user via session token: {user.display_name}")
-                    # Also set user_id in session for consistency
+                    # Cache user_id in session for faster future lookups
                     session['user_id'] = user.id
                     return user
             else:
-                print("Debug - Session token expired or invalid")
                 # Clean up expired session
-                if 'user_session' in session:
-                    session.pop('user_session', None)
+                session.pop('user_session', None)
         except Exception as e:
-            print(f"Debug - Error fetching user by session token: {e}")
+            print(f"Error fetching user by session token: {e}")
+            session.pop('user_session', None)
     
-    # Check for session_token cookie as fallback
+    # Method 3: Check session_token cookie as fallback
     session_token = request.cookies.get('session_token')
     if session_token:
         try:
-            login_session = LoginSession.query.filter_by(session_token=session_token, is_active=True).first()
+            login_session = LoginSession.query.filter_by(
+                session_token=session_token, 
+                is_active=True
+            ).first()
+            
             if login_session and login_session.expires_at > datetime.datetime.utcnow():
                 user = login_session.user
                 if user:
-                    print(f"Debug - Found user via cookie: {user.display_name}")
-                    # Set session variables
+                    # Restore session variables
                     session['user_id'] = user.id
                     session['user_session'] = session_token
                     return user
-            else:
-                print("Debug - Cookie session token expired or invalid")
         except Exception as e:
-            print(f"Debug - Error fetching user by cookie: {e}")
+            print(f"Error fetching user by cookie: {e}")
     
-    print("Debug - No valid user session found")
     return None
 
 def calculate_genre_percentages(genres_list):
@@ -935,18 +934,10 @@ def inject_template_vars():
 @app.route("/")
 def root():
     """Root route - redirect to login if not authenticated, otherwise to main app"""
-    # Debug: Print session info
-    print(f"Debug - Session contents: {dict(session)}")
-    print(f"Debug - Cookies: {dict(request.cookies)}")
-    
     user = get_current_user()
-    print(f"Debug - Current user: {user}")
-    
     if user:
-        print(f"Debug - User found: {user.display_name or user.username}")
         return redirect(url_for('generate'))
     else:
-        print("Debug - No user found, redirecting to login")
         return redirect(url_for('login'))
 
 @app.route("/generate", methods=["GET", "POST"])
@@ -1240,6 +1231,129 @@ def update_playlist_cover():
         print(f"Error updating playlist cover: {e}")
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
+@app.route('/api/generate', methods=['POST'])
+@limiter.limit("10 per hour")
+def api_generate():
+    """API endpoint for generating covers programmatically"""
+    try:
+        # Get user info for rate limiting and feature access
+        user_info = get_current_user_or_guest()
+        
+        # Check generation limits
+        if not user_info['can_generate']:
+            return jsonify({
+                "success": False, 
+                "error": f"Daily generation limit reached ({user_info['daily_limit']} per day)"
+            }), 429
+        
+        # Get request data
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "No JSON data provided"}), 400
+        
+        playlist_url = data.get('playlist_url', '').strip()
+        mood = data.get('mood', '').strip()
+        negative_prompt = data.get('negative_prompt', '').strip()
+        lora_name = data.get('lora_name', '').strip()
+        
+        # Validate required fields
+        if not playlist_url:
+            return jsonify({"success": False, "error": "playlist_url is required"}), 400
+        
+        # Restrict LoRA usage for guests
+        if user_info['type'] == 'guest' and lora_name and lora_name != "none":
+            return jsonify({
+                "success": False, 
+                "error": "LoRA styles are only available for registered users"
+            }), 403
+        
+        # Get LoRA if specified and user has access
+        lora_input = None
+        if lora_name and lora_name != "none" and user_info['can_use_loras']:
+            try:
+                if 'utils_available' in globals() and utils_available:
+                    import utils
+                    loras = utils.get_available_loras()
+                    for lora_item in loras:
+                        if hasattr(lora_item, 'name') and lora_item.name == lora_name:
+                            lora_input = lora_item
+                            break
+            except Exception as e:
+                print(f"Error getting LoRA: {e}")
+        
+        # Check if generation modules are available
+        try:
+            import generator
+        except ImportError:
+            return jsonify({
+                "success": False, 
+                "error": "Generation modules not available"
+            }), 503
+        
+        # Generate the cover
+        user_id = user_info['user'].id if user_info['type'] == 'user' else None
+        result = generator.generate_cover(
+            playlist_url, 
+            mood, 
+            lora_input, 
+            negative_prompt=negative_prompt, 
+            user_id=user_id
+        )
+        
+        if "error" in result:
+            return jsonify({"success": False, "error": result["error"]}), 400
+        
+        # Track generation
+        if user_info['type'] == 'guest':
+            track_guest_generation()
+        
+        # Prepare response data
+        response_data = {
+            "success": True,
+            "title": result["title"],
+            "image_file": os.path.basename(result["output_path"]),
+            "image_data_base64": result.get("image_data_base64", ""),
+            "genres": result.get("genres", []),
+            "all_genres": result.get("all_genres", []),
+            "mood": result.get("mood", mood),
+            "playlist_name": result.get("item_name", "Your Music"),
+            "found_genres": bool(result.get("genres", [])),
+            "lora_name": result.get("lora_name", ""),
+            "lora_type": result.get("lora_type", ""),
+            "lora_url": result.get("lora_url", ""),
+            "spotify_url": playlist_url
+        }
+        
+        # Save to database if user is logged in
+        if user_info['type'] == 'user':
+            try:
+                new_generation = GenerationResultDB(
+                    title=result["title"],
+                    output_path=result["output_path"],
+                    item_name=result.get("item_name"),
+                    genres=result.get("genres"),
+                    all_genres=result.get("all_genres"),
+                    mood=mood,
+                    spotify_url=playlist_url,
+                    lora_name=result.get("lora_name"),
+                    user_id=user_info['user'].id
+                )
+                db.session.add(new_generation)
+                db.session.commit()
+            except Exception as e:
+                print(f"⚠️ Error saving generation result to DB: {e}")
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        print(f"Error in API generate endpoint: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False, 
+            "error": "Internal server error"
+        }), 500
+
 @app.route('/api/regenerate', methods=['POST'])
 @login_required
 def regenerate_cover():
@@ -1402,18 +1516,66 @@ def add_lora_link():
         if not name or not url:
             return jsonify({"success": False, "error": "Name and URL are required"}), 400
         
-        # Use the utility function to add the LoRA
-        from utils import add_lora_link
-        success, message = add_lora_link(name, url, trigger_words, strength)
+        # Check if LoRA with this name already exists
+        existing = LoraModelDB.query.filter_by(name=name).first()
+        if existing:
+            return jsonify({"success": False, "error": f"LoRA with name '{name}' already exists"}), 400
         
-        if success:
-            return jsonify({"success": True, "message": message})
-        else:
-            return jsonify({"success": False, "error": message}), 400
+        # Validate URL format
+        try:
+            from urllib.parse import urlparse
+            result = urlparse(url)
+            if not all([result.scheme, result.netloc]):
+                return jsonify({"success": False, "error": "Invalid URL format"}), 400
+        except:
+            return jsonify({"success": False, "error": "Invalid URL format"}), 400
+          # Add to database
+        new_lora = LoraModelDB(
+            name=name,
+            source_type="link",
+            path="",
+            url=url,
+            trigger_words=trigger_words or [],
+            strength=strength
+        )
+        
+        db.session.add(new_lora)
+        db.session.commit()
+        
+        return jsonify({
+            "success": True, 
+            "message": f"LoRA '{name}' added successfully"
+        })
             
     except Exception as e:
         print(f"Error adding LoRA link: {e}")
         return jsonify({"success": False, "error": "Internal server error"}), 500
+
+@app.route('/api/loras')
+def get_loras():
+    """Get list of available LoRAs"""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"loras": []})
+        
+        loras = []
+        db_loras = LoraModelDB.query.all()
+        
+        for db_lora in db_loras:
+            loras.append({
+                "name": db_lora.name,
+                "source_type": db_lora.source_type,
+                "url": db_lora.url if db_lora.source_type == "link" else "",
+                "trigger_words": db_lora.trigger_words or [],
+                "strength": db_lora.strength
+            })
+        
+        return jsonify({"loras": loras})
+        
+    except Exception as e:
+        print(f"Error getting LoRAs: {e}")
+        return jsonify({"loras": []})
 
 @app.route("/generated_covers/<path:filename>")
 def serve_image(filename):
@@ -1669,13 +1831,13 @@ def spotify_login():
     
     # Spotify OAuth parameters
     scope = 'playlist-read-private playlist-modify-public playlist-modify-private ugc-image-upload'
+    redirect_uri = SPOTIFY_REDIRECT_URI
     
-    # Use SPOTIFY_REDIRECT_URI from config instead of dynamic construction
     auth_url = (
         'https://accounts.spotify.com/authorize?'
         f'client_id={SPOTIFY_CLIENT_ID}&'
         f'response_type=code&'
-        f'redirect_uri={SPOTIFY_REDIRECT_URI}&'
+        f'redirect_uri={redirect_uri}&'
         f'scope={scope}&'
         f'state={state}'
     )
@@ -1690,8 +1852,6 @@ def spotify_callback():
         state = request.args.get('state')
         error = request.args.get('error')
         
-        print(f"Debug - Spotify callback: code={bool(code)}, state={bool(state)}, error={error}")
-        
         if error:
             flash(f'Spotify authorization failed: {error}', 'error')
             return redirect(url_for('generate'))
@@ -1701,22 +1861,15 @@ def spotify_callback():
             return redirect(url_for('generate'))
         
         # Verify state
-        oauth_state = SpotifyState.query.filter_by(state=state, used=False).first()
-        if not oauth_state:
+        if not SpotifyState.verify_and_use_state(state):
             flash('Invalid state parameter', 'error')
             return redirect(url_for('generate'))
         
-        # Mark state as used
-        oauth_state.used = True
-        db.session.commit()
-        
         # Exchange code for tokens
-        redirect_uri = SPOTIFY_REDIRECT_URI
-        
         token_data = {
             'grant_type': 'authorization_code',
             'code': code,
-            'redirect_uri': redirect_uri,
+            'redirect_uri': SPOTIFY_REDIRECT_URI,
             'client_id': SPOTIFY_CLIENT_ID,
             'client_secret': SPOTIFY_CLIENT_SECRET
         }
@@ -1724,7 +1877,6 @@ def spotify_callback():
         response = requests.post('https://accounts.spotify.com/api/token', data=token_data)
         
         if response.status_code != 200:
-            print(f"Debug - Token exchange failed: {response.status_code} - {response.text}")
             flash('Failed to get Spotify tokens', 'error')
             return redirect(url_for('generate'))
         
@@ -1733,27 +1885,21 @@ def spotify_callback():
         refresh_token = tokens.get('refresh_token')
         expires_in = tokens.get('expires_in', 3600)
         
-        print(f"Debug - Got Spotify tokens successfully")
-        
         # Get user info from Spotify
         headers = {'Authorization': f'Bearer {access_token}'}
         user_response = requests.get('https://api.spotify.com/v1/me', headers=headers)
         
         if user_response.status_code != 200:
-            print(f"Debug - Failed to get Spotify user info: {user_response.status_code}")
             flash('Failed to get Spotify user info', 'error')
             return redirect(url_for('generate'))
         
         spotify_user = user_response.json()
         spotify_id = spotify_user['id']
         
-        print(f"Debug - Got Spotify user: {spotify_id}")
-        
         # Find or create user
         user = User.query.filter_by(spotify_id=spotify_id).first()
         
         if not user:
-            print("Debug - Creating new user")
             # Create new user
             user = User(
                 spotify_id=spotify_id,
@@ -1764,7 +1910,6 @@ def spotify_callback():
             )
             db.session.add(user)
         else:
-            print("Debug - Updating existing user")
             # Update existing user
             user.display_name = spotify_user.get('display_name', spotify_user.get('id'))
             user.email = spotify_user.get('email')
@@ -1778,44 +1923,29 @@ def spotify_callback():
         
         db.session.commit()
         
-        print(f"Debug - User saved with ID: {user.id}")
-        
         # Create login session
-        session_token = secrets.token_urlsafe(32)
-        login_session = LoginSession(
-            user_id=user.id,
-            session_token=session_token,
-            expires_at=datetime.datetime.utcnow() + timedelta(days=30),
+        session_token = LoginSession.create_session(
+            user.id,
             ip_address=request.remote_addr,
             user_agent=request.headers.get('User-Agent', '')
         )
-        db.session.add(login_session)
-        db.session.commit()
         
-        print(f"Debug - Created login session: {session_token}")
-        
-        # Set BOTH session variables for compatibility
-        session['user_session'] = session_token
+        # Set session variables (BOTH for compatibility)
         session['user_id'] = user.id
+        session['user_session'] = session_token
         session['username'] = user.display_name or user.username
         
-        print(f"Debug - Set session variables: user_id={user.id}, user_session={session_token}")
-        
-        # Also set cookie as backup
-        response = redirect(url_for('generate'))
-        response.set_cookie('session_token', session_token, max_age=30*24*60*60)  # 30 days
+        # Create response with cookie
+        resp = make_response(redirect(url_for('generate')))
+        resp.set_cookie('session_token', session_token, max_age=30*24*60*60)  # 30 days
         
         flash('Successfully connected to Spotify!', 'success')
-        
-        # Track conversion if they were a guest
         track_guest_conversion()
         
-        return response
+        return resp
         
     except Exception as e:
         print(f"Error in Spotify callback: {e}")
-        import traceback
-        print(f"Full traceback: {traceback.format_exc()}")
         flash('An error occurred during Spotify authorization', 'error')
         return redirect(url_for('generate'))
 

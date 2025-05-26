@@ -134,7 +134,9 @@
                 {% endif %}
             </button>
         </form>
-          {% if user_info.show_upload %}
+        
+        <!-- LoRA MANAGEMENT SECTION - THIS WAS MISSING! -->
+        {% if user_info.show_upload %}
         <div class="lora-upload">
             <h3>LoRA Management</h3>
             
@@ -166,13 +168,13 @@
             <div class="lora-tab-content{% if os.environ.get('RENDER') %} active{% endif %}" id="url-tab">
                 <form id="lora-url-form">
                     <div class="form-group">
-                        <label for="lora_name">LoRA Name:</label>
-                        <input type="text" id="lora_name" name="name" placeholder="Enter a name for this LoRA" required>
+                        <label for="lora_name_input">LoRA Name:</label>
+                        <input type="text" id="lora_name_input" name="name" placeholder="Enter a name for this LoRA" required>
                     </div>
                     
                     <div class="form-group">
-                        <label for="lora_url">LoRA URL:</label>
-                        <input type="url" id="lora_url" name="url" placeholder="https://civitai.com/models/12345 or https://example.com/lora.safetensors" required>
+                        <label for="lora_url_input">LoRA URL:</label>
+                        <input type="url" id="lora_url_input" name="url" placeholder="https://civitai.com/models/12345 or https://example.com/lora.safetensors" required>
                         <small>Supported: Civitai model pages, HuggingFace repos, direct file URLs</small>
                     </div>
                     
