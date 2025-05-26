@@ -1,23 +1,16 @@
-# filepath: c:\Users\benta\Personal_Website\AnimeWatchList\projects\skillstown\app.py
-"""
-SkillsTown Course Finder - Database-Integrated Application
-
-This Flask application provides course search, CV analysis, user authentication,
-and course enrollment functionality using a shared PostgreSQL database.
-"""
-
 import os
 import datetime
 import json
 import re
 import sys
 import PyPDF2
+import requests
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from sqlalchemy import inspect, text
-from jinja2 import ChoiceLoader, FileSystemLoader # ADDED
-from flask_migrate import Migrate # ADDED
+from jinja2 import ChoiceLoader, FileSystemLoader
+from flask_migrate import Migrate
 
 # Production detection
 is_production = os.environ.get('RENDER', False) or os.environ.get('FLASK_ENV') == 'production'
@@ -35,23 +28,143 @@ sys.path.insert(0, animewatchlist_path)
 from auth import init_auth, User
 from user_data import get_status_counts
 
-def create_app(config_name=None):  # MODIFIED
-    """Create and configure the Flask application"""
-    global is_production  # MODIFIED
+# Gemini API configuration
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent"
 
-    # If config_name is provided, it can influence the is_production flag
+def analyze_skills_with_gemini(cv_text, job_description=None):
+    """Use Gemini API to analyze CV and optionally match against job description"""
+    if not GEMINI_API_KEY:
+        print("Warning: GEMINI_API_KEY not set, using fallback skill extraction")
+        return extract_skills_fallback(cv_text)
+    
+    # Create the prompt based on whether we have a job description
+    if job_description and job_description.strip():
+        prompt = f"""
+Analyze this CV and job description to extract skills and provide career guidance.
+
+CV TEXT:
+{cv_text[:3000]}  # Limit CV text to avoid token limits
+
+JOB DESCRIPTION:
+{job_description[:2000]}  # Limit job description text
+
+Please provide a JSON response with:
+1. "current_skills": Array of technical and professional skills found in the CV
+2. "job_requirements": Array of skills/requirements from the job description
+3. "skill_gaps": Array of skills needed for the job but missing from CV
+4. "matching_skills": Array of skills that match between CV and job
+5. "learning_recommendations": Array of specific courses/skills to focus on
+6. "career_advice": Brief advice on how to bridge the gap
+
+Focus on technical skills, programming languages, frameworks, tools, certifications, and professional competencies.
+"""
+    else:
+        prompt = f"""
+Analyze this CV to extract skills and provide learning recommendations.
+
+CV TEXT:
+{cv_text[:4000]}  # Allow more text when no job description
+
+Please provide a JSON response with:
+1. "current_skills": Array of technical and professional skills found in the CV
+2. "skill_categories": Object categorizing skills (e.g. "programming", "data", "management")
+3. "experience_level": Estimated experience level (entry/mid/senior)
+4. "learning_recommendations": Array of suggested areas for skill development
+5. "career_paths": Array of potential career directions based on current skills
+
+Focus on technical skills, programming languages, frameworks, tools, certifications, and professional competencies.
+"""
+    
+    try:
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.3,
+                "maxOutputTokens": 2000,
+                "topP": 0.8
+            }
+        }
+        
+        url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
+        response = requests.post(url, headers=headers, json=data, timeout=30)
+        
+        if response.status_code == 200:
+            response_json = response.json()
+            if 'candidates' in response_json and len(response_json['candidates']) > 0:
+                text_content = response_json['candidates'][0]['content']['parts'][0]['text']
+                
+                # Try to extract JSON from the response
+                try:
+                    # Find JSON in the response (it might be wrapped in markdown code blocks)
+                    json_match = re.search(r'```json\s*(.*?)\s*```', text_content, re.DOTALL)
+                    if json_match:
+                        json_str = json_match.group(1)
+                    else:
+                        # Try to find JSON without code blocks
+                        json_match = re.search(r'\{.*\}', text_content, re.DOTALL)
+                        if json_match:
+                            json_str = json_match.group(0)
+                        else:
+                            json_str = text_content
+                    
+                    result = json.loads(json_str)
+                    return result
+                except json.JSONDecodeError:
+                    print(f"Failed to parse JSON from Gemini response: {text_content}")
+                    # Fallback to basic skill extraction
+                    return extract_skills_fallback(cv_text)
+        else:
+            print(f"Gemini API error: {response.status_code} - {response.text}")
+            return extract_skills_fallback(cv_text)
+            
+    except Exception as e:
+        print(f"Error calling Gemini API: {e}")
+        return extract_skills_fallback(cv_text)
+
+def extract_skills_fallback(cv_text):
+    """Fallback skill extraction when Gemini API is not available"""
+    # Basic skill patterns
+    skill_patterns = [
+        r'\b(?:Python|Java|JavaScript|C\+\+|C#|PHP|Ruby|Swift|Kotlin|Go|Rust)\b',
+        r'\b(?:HTML|CSS|React|Angular|Vue|Node\.js|Express|Django|Flask)\b',
+        r'\b(?:SQL|MySQL|PostgreSQL|MongoDB|SQLite|Oracle|Redis)\b',
+        r'\b(?:Git|Docker|Kubernetes|AWS|Azure|GCP|Jenkins|CI/CD)\b',
+        r'\b(?:Machine Learning|AI|Data Science|Analytics|TensorFlow|PyTorch)\b',
+        r'\b(?:Project Management|Agile|Scrum|Leadership|Communication)\b',
+    ]
+    
+    skills = []
+    for pattern in skill_patterns:
+        matches = re.finditer(pattern, cv_text, re.IGNORECASE)
+        for match in matches:
+            skill = match.group().strip()
+            if skill not in skills:
+                skills.append(skill)
+    
+    return {
+        "current_skills": skills,
+        "skill_categories": {"technical": skills},
+        "experience_level": "unknown",
+        "learning_recommendations": ["Based on your skills, consider learning complementary technologies"],
+        "career_paths": ["Continue developing in your current domain"]
+    }
+
+def create_app(config_name=None):
+    """Create and configure the Flask application"""
+    global is_production
+
     if config_name == 'production':
         is_production = True
-    elif config_name is not None:  # For any other explicit config_name like 'development'
+    elif config_name is not None:
         is_production = False
-    # If config_name is None, is_production retains its value from environment variables (already set globally)
 
     # Create the Flask app
     app = Flask(__name__)
 
     # Configure the Jinja2 loader to look in both skillstown and animewatchlist template folders
     skillstown_template_dir = os.path.join(os.path.dirname(__file__), 'templates')
-    # animewatchlist_path is already defined globally and points to the animewatchlist project directory
     animewatchlist_template_dir = os.path.join(animewatchlist_path, 'templates')
     
     app.jinja_loader = ChoiceLoader([
@@ -64,7 +177,7 @@ def create_app(config_name=None):  # MODIFIED
     app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
 
     # Set up static folder for production
-    if is_production: # This now uses the (potentially) updated global is_production
+    if is_production:
         app.static_url_path = '/skillstown/static'
     
     @app.context_processor
@@ -74,10 +187,9 @@ def create_app(config_name=None):  # MODIFIED
             'get_url_for': get_url_for
         }
 
-    # Function to get SkillsTown user statistics (will be properly defined after models)
+    # Function to get SkillsTown user statistics
     def get_skillstown_stats(user_id):
         """Get user statistics for SkillsTown courses"""
-        # Placeholder function - will be redefined after models are created
         return {
             'total': 0,
             'enrolled': 0,
@@ -89,7 +201,7 @@ def create_app(config_name=None):  # MODIFIED
     # Initialize auth with skillstown-specific functions
     db = init_auth(app, get_url_for, lambda user_id: get_skillstown_stats(user_id))
 
-    Migrate(app, db) # Initialize Flask-Migrate
+    Migrate(app, db)
 
     # Create base tables
     with app.app_context():
@@ -104,9 +216,10 @@ def create_app(config_name=None):  # MODIFIED
         description = db.Column(db.Text)
         url = db.Column(db.String(500))
         provider = db.Column(db.String(100), default='SkillsTown')
-        skills_taught = db.Column(db.Text)  # JSON string of skills
-        difficulty_level = db.Column(db.String(20))  # Beginner, Intermediate, Advanced        duration = db.Column(db.String(50))
-        keywords = db.Column(db.Text)  # For search functionality
+        skills_taught = db.Column(db.Text)
+        difficulty_level = db.Column(db.String(20))
+        duration = db.Column(db.String(50))
+        keywords = db.Column(db.Text)
         created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 
     class UserCourse(db.Model):
@@ -115,9 +228,8 @@ def create_app(config_name=None):  # MODIFIED
         user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
         category = db.Column(db.String(100), nullable=False)
         course_name = db.Column(db.String(255), nullable=False)
-        status = db.Column(db.String(50), default='enrolled')  # enrolled, in_progress, completed
+        status = db.Column(db.String(50), default='enrolled')
         created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-          # Define relationship
         user = db.relationship('User', backref='skillstown_courses')
         
         __table_args__ = (
@@ -129,10 +241,10 @@ def create_app(config_name=None):  # MODIFIED
         id = db.Column(db.Integer, primary_key=True)
         user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
         cv_text = db.Column(db.Text)
-        skills = db.Column(db.Text)  # JSON string of extracted skills
+        job_description = db.Column(db.Text)  # New field for job descriptions
+        skills = db.Column(db.Text)
+        skill_analysis = db.Column(db.Text)  # Store full Gemini analysis as JSON
         uploaded_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-        
-        # Define relationship
         user = db.relationship('User', backref='skillstown_profile')
 
     # Create SkillsTown tables
@@ -215,34 +327,12 @@ def create_app(config_name=None):  # MODIFIED
             raise Exception(f"Error reading PDF: {str(e)}")
         return text
     
-    def extract_skills_from_text(text):
-        # Common technical skills to look for
-        skill_patterns = [
-            r'\b(?:Python|Java|JavaScript|C\+\+|C#|PHP|Ruby|Swift|Kotlin)\b',
-            r'\b(?:HTML|CSS|React|Angular|Vue|Node\.js|Express)\b',
-            r'\b(?:SQL|MySQL|PostgreSQL|MongoDB|SQLite)\b',
-            r'\b(?:Git|Docker|Kubernetes|AWS|Azure|GCP)\b',
-            r'\b(?:Machine Learning|AI|Data Science|Analytics)\b',
-            r'\b(?:Project Management|Agile|Scrum|Leadership)\b',
-        ]
-        
-        skills = []
-        
-        for pattern in skill_patterns:
-            matches = re.finditer(pattern, text, re.IGNORECASE)
-            for match in matches:
-                skill = match.group().strip()
-                if skill not in skills:
-                    skills.append(skill)
-        
-        return skills
-    
     # Routes
     @app.route("/")
     def index():
         """Main SkillsTown index page"""
         catalog = load_course_catalog()
-        categories = catalog.get("categories", [])[:6]  # Show first 6 categories
+        categories = catalog.get("categories", [])[:6]
         
         return render_template('index.html', categories=categories, get_url_for=get_url_for)
 
@@ -269,13 +359,15 @@ def create_app(config_name=None):  # MODIFIED
     @app.route("/upload-cv", methods=['GET', 'POST'])
     @login_required
     def upload_cv():
-        """Handle CV upload and analysis"""
+        """Handle CV upload and analysis with optional job description"""
         if request.method == 'POST':
             if 'cv_file' not in request.files:
                 flash('No file selected.', 'danger')
                 return redirect(request.url)
             
             file = request.files['cv_file']
+            job_description = request.form.get('job_description', '').strip()
+            
             if file.filename == '':
                 flash('No file selected.', 'danger')
                 return redirect(request.url)
@@ -291,19 +383,28 @@ def create_app(config_name=None):  # MODIFIED
                 # Extract text from PDF
                 try:
                     cv_text = extract_text_from_pdf(filepath)
-                    skills = extract_skills_from_text(cv_text)
+                    
+                    # Analyze with Gemini API
+                    analysis_result = analyze_skills_with_gemini(cv_text, job_description)
+                    
+                    # Extract skills for backward compatibility
+                    skills = analysis_result.get('current_skills', [])
                     
                     # Save or update user profile
                     profile = UserProfile.query.filter_by(user_id=current_user.id).first()
                     if profile:
                         profile.cv_text = cv_text
+                        profile.job_description = job_description
                         profile.skills = json.dumps(skills)
+                        profile.skill_analysis = json.dumps(analysis_result)
                         profile.uploaded_at = db.func.current_timestamp()
                     else:
                         profile = UserProfile(
                             user_id=current_user.id,
                             cv_text=cv_text,
-                            skills=json.dumps(skills)
+                            job_description=job_description,
+                            skills=json.dumps(skills),
+                            skill_analysis=json.dumps(analysis_result)
                         )
                     db.session.add(profile)
                     
@@ -312,11 +413,14 @@ def create_app(config_name=None):  # MODIFIED
                     # Clean up uploaded file
                     os.remove(filepath)
                     
-                    flash('CV uploaded and analyzed successfully!', 'success')
+                    success_msg = 'CV uploaded and analyzed successfully!'
+                    if job_description:
+                        success_msg += ' Job description analysis included.'
+                    flash(success_msg, 'success')
                     return redirect(url_for('cv_analysis'))
                 except Exception as e:
                     flash(f'Error processing CV: {str(e)}', 'danger')
-                    if os.path.exists(filepath): # Ensure cleanup on error
+                    if os.path.exists(filepath):
                         os.remove(filepath)
             else:
                 flash('Please upload a PDF file.', 'danger')
@@ -326,7 +430,7 @@ def create_app(config_name=None):  # MODIFIED
     @app.route("/cv-analysis")
     @login_required
     def cv_analysis():
-        """Show CV analysis results"""
+        """Show CV analysis results with enhanced job matching"""
         profile = UserProfile.query.filter_by(user_id=current_user.id).first()
         
         if not profile:
@@ -335,11 +439,13 @@ def create_app(config_name=None):  # MODIFIED
         
         try:
             skills = json.loads(profile.skills) if profile.skills else []
+            full_analysis = json.loads(profile.skill_analysis) if profile.skill_analysis else {}
         except:
             skills = []
+            full_analysis = {}
 
-        # Perform skill matching for categories
-        skills_text = " ".join(skills).lower() # Join skills into a single string for easier regex matching
+        # Enhanced skill matching for categories
+        skills_text = " ".join(skills).lower()
 
         has_programming_skills = bool(re.search(r'(python|java|javascript)', skills_text, re.IGNORECASE))
         has_data_skills = bool(re.search(r'(python|data|sql)', skills_text, re.IGNORECASE))
@@ -349,6 +455,7 @@ def create_app(config_name=None):  # MODIFIED
         return render_template('assessment/results.html',
                              profile=profile,
                              skills=skills,
+                             full_analysis=full_analysis,
                              has_programming_skills=has_programming_skills,
                              has_data_skills=has_data_skills,
                              has_web_skills=has_web_skills,
@@ -420,7 +527,7 @@ def create_app(config_name=None):  # MODIFIED
 
     @app.route("/profile")
     @login_required
-    def skillstown_user_profile():  # Renamed from 'profile'
+    def skillstown_user_profile():
         """User profile page"""
         stats = get_skillstown_stats(current_user.id)
         recent_courses = UserCourse.query.filter_by(user_id=current_user.id).order_by(UserCourse.created_at.desc()).limit(5).all()
@@ -441,24 +548,13 @@ def create_app(config_name=None):  # MODIFIED
         """Manual route to create database tables."""
         try:
             with app.app_context():
-                # Create auth tables
                 db.create_all()
-                
-                # Create SkillsTown tables explicitly if needed
-                inspector = inspect(db.engine)
-                if 'skillstown_courses' not in inspector.get_table_names():
-                    SkillsTownCourse.__table__.create(db.engine)
-                if 'skillstown_user_courses' not in inspector.get_table_names():
-                    UserCourse.__table__.create(db.engine)
-                if 'skillstown_user_profiles' not in inspector.get_table_names():
-                    UserProfile.__table__.create(db.engine)
                     
             flash("Database tables created successfully!")
         except Exception as e:
             flash(f"Error creating tables: {e}")
         return redirect(url_for('index'))
 
-    # Add this new route INSIDE create_app
     @app.route("/admin/reset-skillstown-tables", methods=['POST'])
     @login_required
     def reset_skillstown_tables_route():
@@ -467,10 +563,6 @@ def create_app(config_name=None):  # MODIFIED
             return redirect(get_url_for('skillstown_user_profile'))
 
         try:
-            # Logic from reset_skillstown_db.py, adapted for a route
-            # Ensure db is available here, it should be if init_auth was called
-            
-            # Drop tables in reverse order of dependencies
             drop_commands = [
                 "DROP TABLE IF EXISTS skillstown_user_courses CASCADE;",
                 "DROP TABLE IF EXISTS skillstown_user_profiles CASCADE;", 
@@ -481,23 +573,17 @@ def create_app(config_name=None):  # MODIFIED
                 db.session.execute(text(command))
             
             db.session.commit()
-            
-            # Recreate all tables (this will create SkillsTown tables with correct foreign keys)
-            # Ensure all relevant models are imported and known to db instance before calling create_all
-            # For example, User, SkillsTownCourse, UserCourse, UserProfile
             db.create_all() 
             
             flash('SkillsTown tables have been reset successfully!', 'success')
         except Exception as e:
-            db.session.rollback() # Rollback in case of error
+            db.session.rollback()
             flash(f'Error resetting tables: {str(e)}', 'danger')
             current_app.logger.error(f"Error resetting tables: {e}")
 
         return redirect(get_url_for('skillstown_user_profile'))
 
     return app
-
-# The route definition that was here previously has been moved inside create_app
 
 if __name__ == '__main__':
     app = create_app()
