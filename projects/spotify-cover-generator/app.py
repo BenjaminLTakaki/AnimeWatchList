@@ -1110,7 +1110,7 @@ def generate():
         return render_template("index.html", loras=loras)
 
 # LoRA UPLOAD ROUTE (FIXED FOR FILE UPLOADS ONLY)
-@app.route('/api/upload_lora', methods=['POST'])
+@app.route('/spotify/api/upload_lora', methods=['POST'])
 @login_required
 @limiter.limit("5 per hour")
 def upload_lora():
@@ -1187,7 +1187,7 @@ def upload_lora():
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 # Add new LoRA management and upload info routes
-@app.route('/api/delete_lora', methods=['DELETE'])
+@app.route('/spotify/api/delete_lora', methods=['DELETE'])
 @login_required
 @limiter.limit("10 per hour")
 def delete_lora():
@@ -1228,7 +1228,7 @@ def get_user_lora_upload_info(user):
         return {"can_upload": True, "current_count": current_count, "limit": "unlimited", "is_premium": True}
     return {"can_upload": current_count < 2, "current_count": current_count, "limit": 2, "is_premium": False}
 
-@app.route('/api/upload_info')
+@app.route('/spotify/api/upload_info')
 @login_required
 def get_upload_info():
     """Get user's upload information"""
@@ -1237,7 +1237,7 @@ def get_upload_info():
         return jsonify({"error": "Not authenticated"}), 401
     return jsonify(get_user_lora_upload_info(user))
 
-@app.route('/api/loras')
+@app.route('/spotify/api/loras')
 def get_loras():
     """Get list of available LoRAs (file uploads only) with ownership info"""
     try:

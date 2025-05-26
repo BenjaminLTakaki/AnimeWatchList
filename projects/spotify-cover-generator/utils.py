@@ -144,14 +144,13 @@ def get_available_loras():
                 # Skip if we already have this from the file system
                 if db_lora.source_type == "local" and db_lora.name in local_lora_names:
                     continue
-                
-                loras.append(LoraModel(
+                  loras.append(LoraModel(
                     name=db_lora.name,
                     source_type=db_lora.source_type,
                     path=db_lora.path,
-                    url=db_lora.url,
-                    trigger_words=db_lora.trigger_words or [],
-                    strength=db_lora.strength
+                    url="",  # No URL attribute in LoraModelDB
+                    trigger_words=[],  # No trigger_words attribute in LoraModelDB
+                    strength=0.7  # Default strength
                 ))
         
         # Sort by name

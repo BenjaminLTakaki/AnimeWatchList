@@ -577,7 +577,7 @@
                     showUploadStatus('Uploading LoRA file...', 'loading');
                     
                     // Submit via AJAX
-                    fetch('/api/upload_lora', {
+                    fetch('/spotify/api/upload_lora', {
                         method: 'POST',
                         body: formData
                     })
@@ -605,8 +605,7 @@
                 });
             }
             
-            function checkLoraNameConflict(loraName) {
-                fetch('/api/loras')
+            function checkLoraNameConflict(loraName) {                fetch('/spotify/api/loras')
                 .then(response => response.json())
                 .then(data => {
                     const exists = data.loras && data.loras.some(lora => lora.name === loraName);
@@ -621,9 +620,8 @@
                     console.error('Error checking LoRA name conflict:', error);
                 });
             }
-            
-            function loadUploadInfo() {
-                fetch('/api/upload_info')
+              function loadUploadInfo() {
+                fetch('/spotify/api/upload_info')
                 .then(response => response.json())
                 .then(data => {
                     const statusText = document.getElementById('upload-status-text');
@@ -660,9 +658,8 @@
             
             function loadLorasList() {
                 const lorasList = document.getElementById('loras-list');
-                const loraDropdown = document.getElementById('lora_name');
-                
-                fetch('/api/loras')
+                const loraDropdown = document.getElementById('lora_name');                
+                fetch('/spotify/api/loras')
                 .then(response => response.json())
                 .then(data => {
                     // Update the visual list
@@ -728,10 +725,9 @@
             // Make deleteLora function global
             window.deleteLora = function(loraName) {
                 if (!confirm(`Are you sure you want to delete the LoRA "${loraName}"? This action cannot be undone.`)) {
-                    return;
-                }
+                    return;                }
                 
-                fetch('/api/delete_lora', {
+                fetch('/spotify/api/delete_lora', {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
