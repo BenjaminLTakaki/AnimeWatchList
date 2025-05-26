@@ -140,11 +140,11 @@ def get_available_loras():
         # Get LoRAs from database (primarily link-type LoRAs)
         with app.app_context():
             db_loras = LoraModelDB.query.all()
-            for db_lora in db_loras:
-                # Skip if we already have this from the file system
+            for db_lora in db_loras:                # Skip if we already have this from the file system
                 if db_lora.source_type == "local" and db_lora.name in local_lora_names:
                     continue
-                  loras.append(LoraModel(
+                
+                loras.append(LoraModel(
                     name=db_lora.name,
                     source_type=db_lora.source_type,
                     path=db_lora.path,

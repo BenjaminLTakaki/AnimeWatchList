@@ -499,22 +499,21 @@ def migrate_lora_table():
                     except Exception as e:
                         print(f"⚠️ Migration failed (might already exist): {migration} - {e}")
                         
-                # Add foreign key constraint if it doesn't exist
-                try:
-                    connection.execute(text("""
-                        DO $
-                        BEGIN
-                            IF NOT EXISTS (
-                                SELECT 1 FROM information_schema.table_constraints 
-                                WHERE constraint_name = 'fk_lora_models_uploaded_by'
-                            ) THEN
-                                ALTER TABLE spotify_lora_models 
-                                ADD CONSTRAINT fk_lora_models_uploaded_by 
-                                FOREIGN KEY (uploaded_by) REFERENCES spotify_users(id) ON DELETE SET NULL;
-                            END IF;
-                        END $;
-                    """))
-                    connection.commit()
+                # Add foreign key constraint if it doesn't exist                try:
+                    # Check if constraint exists
+                    constraint_exists = connection.execute(text("""
+                        SELECT 1 FROM information_schema.table_constraints 
+                        WHERE constraint_name = 'fk_lora_models_uploaded_by'
+                    """)).fetchone()
+                    
+                    # Add constraint if it doesn't exist
+                    if not constraint_exists:
+                        connection.execute(text("""
+                            ALTER TABLE spotify_lora_models 
+                            ADD CONSTRAINT fk_lora_models_uploaded_by 
+                            FOREIGN KEY (uploaded_by) REFERENCES spotify_users(id) ON DELETE SET NULL
+                        """))
+                        connection.commit()
                     print("✓ Foreign key constraint added/verified")
                 except Exception as e:
                     print(f"⚠️ Foreign key constraint warning: {e}")
