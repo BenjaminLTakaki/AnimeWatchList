@@ -1201,33 +1201,56 @@ def upload_lora():
         print(f"Error uploading LoRA: {e}")
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
-# API ROUTES (keep existing ones but remove lora link route)
-@app.route('/api/loras')
-def get_loras():
-    """Get list of available LoRAs (file uploads only)"""
+# Add new LoRA management and upload info routes
+@app.route('/api/delete_lora', methods=['DELETE'])
+@login_required
+@limiter.limit("10 per hour")
+def delete_lora():
+    """Delete LoRA file (All users can delete their own uploads)"""
     try:
         user = get_current_user()
         if not user:
-            return jsonify({"loras": []})
-        
-        loras = []
-        db_loras = LoraModelDB.query.filter_by(source_type="local").all()
-        
-        for db_lora in db_loras:
-            # Check if file still exists
-            if os.path.exists(db_lora.path):
-                loras.append({
-                    "name": db_lora.name,
-                    "source_type": "local",
-                    "file_size": db_lora.file_size,
-                    "uploaded_at": db_lora.uploaded_at.isoformat() if db_lora.uploaded_at else None
-                })
-        
-        return jsonify({"loras": loras})
-        
+            return jsonify({"success": False, "error": "User not authenticated"}), 401
+        data = request.get_json()
+        lora_name = data.get('name', '').strip()
+        if not lora_name:
+            return jsonify({"success": False, "error": "LoRA name is required"}), 400
+        lora_record = LoraModelDB.query.filter_by(name=lora_name).first()
+        if not lora_record:
+            return jsonify({"success": False, "error": "LoRA not found"}), 404
+        if not user.is_premium_user() and lora_record.uploaded_by != user.id:
+            return jsonify({"success": False, "error": "You can only delete LoRAs you uploaded"}), 403
+        if lora_record.path and os.path.exists(lora_record.path):
+            try:
+                os.remove(lora_record.path)
+                print(f"Deleted LoRA file: {lora_record.path}")
+            except Exception as e:
+                print(f"Could not delete file {lora_record.path}: {e}")
+        db.session.delete(lora_record)
+        db.session.commit()
+        return jsonify({"success": True, "message": f"LoRA '{lora_name}' deleted successfully"})
     except Exception as e:
-        print(f"Error getting LoRAs: {e}")
-        return jsonify({"loras": []})
+        print(f"Error deleting LoRA: {e}")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+
+
+def get_user_lora_upload_info(user):
+    """Get user's LoRA upload info"""
+    if not user:
+        return {"can_upload": False, "current_count": 0, "limit": 0}
+    current_count = LoraModelDB.query.filter_by(source_type="local", uploaded_by=user.id).count()
+    if user.is_premium_user():
+        return {"can_upload": True, "current_count": current_count, "limit": "unlimited", "is_premium": True}
+    return {"can_upload": current_count < 2, "current_count": current_count, "limit": 2, "is_premium": False}
+
+@app.route('/api/upload_info')
+@login_required
+def get_upload_info():
+    """Get user's upload information"""
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
+    return jsonify(get_user_lora_upload_info(user))
 
 # SPOTIFY AUTH ROUTES (FIXED)
 @app.route('/spotify-login')
