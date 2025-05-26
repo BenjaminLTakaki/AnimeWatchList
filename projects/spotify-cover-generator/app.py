@@ -1,8 +1,10 @@
 import os
 import sys
+import os
 import random
 import json
 import datetime
+import traceback
 from datetime import timedelta
 from flask import Flask, request, render_template, send_from_directory, jsonify, session, redirect, url_for, flash, make_response
 from pathlib import Path
@@ -790,38 +792,21 @@ def create_tables_manually():
             user_id INTEGER
         );
         """,
-        
-        # Add foreign keys
+          # Add foreign keys (simplified for better PostgreSQL compatibility)
         """
-        DO $$
-        BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM information_schema.table_constraints 
-                WHERE constraint_name = 'fk_login_sessions_user_id'
-            ) THEN
-                ALTER TABLE spotify_login_sessions 
-                ADD CONSTRAINT fk_login_sessions_user_id 
-                FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE CASCADE;
-            END IF;
-            
-            IF NOT EXISTS (
-                SELECT 1 FROM information_schema.table_constraints 
-                WHERE constraint_name = 'fk_generation_results_user_id'
-            ) THEN
-                ALTER TABLE spotify_generation_results 
-                ADD CONSTRAINT fk_generation_results_user_id 
-                FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE SET NULL;
-            END IF;
-            
-            IF NOT EXISTS (
-                SELECT 1 FROM information_schema.table_constraints 
-                WHERE constraint_name = 'fk_lora_models_uploaded_by'
-            ) THEN
-                ALTER TABLE spotify_lora_models 
-                ADD CONSTRAINT fk_lora_models_uploaded_by 
-                FOREIGN KEY (uploaded_by) REFERENCES spotify_users(id) ON DELETE SET NULL;
-            END IF;
-        END $$;
+        ALTER TABLE spotify_login_sessions 
+        ADD CONSTRAINT IF NOT EXISTS fk_login_sessions_user_id 
+        FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE CASCADE;
+        """,
+        """
+        ALTER TABLE spotify_generation_results 
+        ADD CONSTRAINT IF NOT EXISTS fk_generation_results_user_id 
+        FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE SET NULL;
+        """,
+        """
+        ALTER TABLE spotify_lora_models 
+        ADD CONSTRAINT IF NOT EXISTS fk_lora_models_uploaded_by 
+        FOREIGN KEY (uploaded_by) REFERENCES spotify_users(id) ON DELETE SET NULL;
         """,
         
         # Create indexes
@@ -1251,6 +1236,44 @@ def get_upload_info():
     if not user:
         return jsonify({"error": "Not authenticated"}), 401
     return jsonify(get_user_lora_upload_info(user))
+
+@app.route('/api/loras')
+def get_loras():
+    """Get list of available LoRAs (file uploads only) with ownership info"""
+    try:
+        user = get_current_user()
+        
+        loras = []
+        db_loras = LoraModelDB.query.filter_by(source_type="local").all()
+        
+        for db_lora in db_loras:
+            # Check if file still exists
+            if db_lora.path and os.path.exists(db_lora.path):
+                lora_data = {
+                    "name": db_lora.name,
+                    "source_type": "local",
+                    "file_size": db_lora.file_size or 0,
+                    "uploaded_at": db_lora.uploaded_at.isoformat() if db_lora.uploaded_at else None,
+                    "can_delete": False,
+                    "uploaded_by_current_user": False
+                }
+                
+                # Add ownership info if user is logged in
+                if user:
+                    lora_data["uploaded_by_current_user"] = (db_lora.uploaded_by == user.id)
+                    # User can delete if: they uploaded it, or they're premium
+                    lora_data["can_delete"] = (
+                        db_lora.uploaded_by == user.id or 
+                        user.is_premium_user()
+                    )
+                
+                loras.append(lora_data)
+        
+        return jsonify({"loras": loras})
+        
+    except Exception as e:
+        print(f"Error getting LoRAs: {e}")
+        return jsonify({"loras": []})
 
 # SPOTIFY AUTH ROUTES (FIXED)
 @app.route('/spotify-login')
