@@ -185,9 +185,6 @@ def create_app(config_name=None):
 
     db = init_auth(app, get_url_for, get_skillstown_stats)
     Migrate(app, db)
-    
-    with app.app_context(): 
-        db.create_all()
 
     # Models
     class SkillsTownCourse(db.Model):
@@ -221,13 +218,40 @@ def create_app(config_name=None):
         id = db.Column(db.Integer, primary_key=True)
         user_id = db.Column(db.Integer, nullable=False)
         cv_text = db.Column(db.Text)
-        job_description = db.Column(db.Text)
+        job_description = db.Column(db.Text)  # This column should exist
         skills = db.Column(db.Text)
         skill_analysis = db.Column(db.Text)
         uploaded_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 
+    # Database migration function
+    def migrate_database():
+        """Add missing columns to existing tables"""
+        try:
+            # Check if job_description column exists
+            result = db.session.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name='skillstown_user_profiles' 
+                AND column_name='job_description'
+            """))
+            
+            if not result.fetchone():
+                # Add job_description column
+                db.session.execute(text("""
+                    ALTER TABLE skillstown_user_profiles 
+                    ADD COLUMN job_description TEXT
+                """))
+                db.session.commit()
+                print("Added job_description column to skillstown_user_profiles")
+                
+        except Exception as e:
+            # For SQLite or if table doesn't exist yet
+            print(f"Migration note: {e}")
+            db.session.rollback()
+
     with app.app_context(): 
         db.create_all()
+        migrate_database()
 
     # Helpers
     COURSE_CATALOG_PATH = os.path.join(os.path.dirname(__file__), 'static', 'data', 'course_catalog.json')
@@ -279,7 +303,8 @@ def create_app(config_name=None):
     # Routes
     @app.route('/')
     def index():
-        return render_template('index.html')
+        """Landing page with overview and getting started"""
+        return render_template('skillstown_landing.html')
 
     @app.route('/about')
     def about():
@@ -293,14 +318,10 @@ def create_app(config_name=None):
             results = search_courses(query)
         return render_template('courses/search.html', query=query, results=results)
 
-    @app.route('/assessment')
+    @app.route('/assessment', methods=['GET', 'POST'])
     @login_required
     def assessment():
-        return render_template('assessment/assessment.html')
-
-    @app.route('/upload-cv', methods=['GET', 'POST'])
-    @login_required
-    def upload_cv():
+        """Main CV analysis page with upload and job description"""
         if request.method == 'POST':
             if 'cv_file' not in request.files:
                 flash('No file selected', 'error')
@@ -354,7 +375,7 @@ def create_app(config_name=None):
             else:
                 flash('Please upload a PDF file only', 'error')
         
-        return render_template('assessment/upload.html')
+        return render_template('skillstown_assessment.html')
 
     @app.route('/analysis-results/<int:profile_id>')
     @login_required
@@ -472,6 +493,7 @@ def create_app(config_name=None):
                 db.session.execute(text(cmd))
             db.session.commit()
             db.create_all()
+            migrate_database()
             flash('Tables reset successfully', 'success')
         except Exception as e:
             db.session.rollback()
