@@ -227,7 +227,7 @@ def create_app(config_name=None):
     def migrate_database():
         """Add missing columns to existing tables"""
         try:
-            # Check if job_description column exists
+            # Check and add job_description column
             result = db.session.execute(text("""
                 SELECT column_name 
                 FROM information_schema.columns 
@@ -236,16 +236,30 @@ def create_app(config_name=None):
             """))
             
             if not result.fetchone():
-                # Add job_description column
                 db.session.execute(text("""
                     ALTER TABLE skillstown_user_profiles 
                     ADD COLUMN job_description TEXT
                 """))
-                db.session.commit()
                 print("Added job_description column to skillstown_user_profiles")
+            
+            # Check and add skill_analysis column
+            result = db.session.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name='skillstown_user_profiles' 
+                AND column_name='skill_analysis'
+            """))
+            
+            if not result.fetchone():
+                db.session.execute(text("""
+                    ALTER TABLE skillstown_user_profiles 
+                    ADD COLUMN skill_analysis TEXT
+                """))
+                print("Added skill_analysis column to skillstown_user_profiles")
                 
+            db.session.commit()
+            
         except Exception as e:
-            # For SQLite or if table doesn't exist yet
             print(f"Migration note: {e}")
             db.session.rollback()
 
