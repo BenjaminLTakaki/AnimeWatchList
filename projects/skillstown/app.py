@@ -25,8 +25,19 @@ def get_url_for(*args, **kwargs):
 animewatchlist_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'animewatchlist')
 sys.path.insert(0, animewatchlist_path)
 
-from auth import init_auth, User
-from user_data import get_status_counts
+try:
+    from auth import init_auth, User
+    from user_data import get_status_counts
+except ImportError as e:
+    print(f"Warning: Could not import auth system: {e}")
+    # Create fallback classes
+    class User:
+        pass
+    def init_auth(app, url_func, stats_func):
+        from flask_sqlalchemy import SQLAlchemy
+        return SQLAlchemy(app)
+    def get_status_counts(user_id):
+        return {'total': 0, 'watching': 0, 'completed': 0, 'on_hold': 0, 'dropped': 0, 'plan_to_watch': 0}
 
 # Gemini API configuration
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
@@ -179,16 +190,33 @@ def create_app(config_name=None):
 
     # Configure the Jinja2 loader
     skillstown_template_dir = os.path.join(os.path.dirname(__file__), 'templates')
-    animewatchlist_template_dir = os.path.join(animewatchlist_path, 'templates')
     
-    app.jinja_loader = ChoiceLoader([
-        FileSystemLoader(skillstown_template_dir),
-        FileSystemLoader(animewatchlist_template_dir)
-    ])
+    # Only add animewatchlist templates if the path exists
+    loaders = [FileSystemLoader(skillstown_template_dir)]
+    if os.path.exists(animewatchlist_path):
+        animewatchlist_template_dir = os.path.join(animewatchlist_path, 'templates')
+        if os.path.exists(animewatchlist_template_dir):
+            loaders.append(FileSystemLoader(animewatchlist_template_dir))
+    
+    app.jinja_loader = ChoiceLoader(loaders)
 
     # Configure the app
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
     app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
+    
+    # Database configuration
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url:
+        # Fix postgres:// to postgresql:// for SQLAlchemy
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://')
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    else:
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///skillstown.db'
+      app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    # Add file upload size limit
+    app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB limit
 
     # Set up static folder for production
     if is_production:
@@ -204,13 +232,27 @@ def create_app(config_name=None):
     # Function to get SkillsTown user statistics
     def get_skillstown_stats(user_id):
         """Get user statistics for SkillsTown courses"""
-        return {
-            'total': 0,
-            'enrolled': 0,
-            'in_progress': 0,
-            'completed': 0,
-            'completion_percentage': 0
-        }
+        try:
+            total = UserCourse.query.filter_by(user_id=user_id).count()
+            enrolled = UserCourse.query.filter_by(user_id=user_id, status='enrolled').count()
+            in_progress = UserCourse.query.filter_by(user_id=user_id, status='in_progress').count()
+            completed = UserCourse.query.filter_by(user_id=user_id, status='completed').count()
+            
+            return {
+                'total': total,
+                'enrolled': enrolled,
+                'in_progress': in_progress,
+                'completed': completed,
+                'completion_percentage': (completed / total * 100) if total > 0 else 0
+            }
+        except:
+            return {
+                'total': 0,
+                'enrolled': 0,
+                'in_progress': 0,
+                'completed': 0,
+                'completion_percentage': 0
+            }
     
     # Initialize auth with skillstown-specific functions
     db = init_auth(app, get_url_for, lambda user_id: get_skillstown_stats(user_id))
@@ -218,7 +260,10 @@ def create_app(config_name=None):
 
     # Create base tables
     with app.app_context():
-        db.create_all()
+        try:
+            db.create_all()
+        except Exception as e:
+            print(f"Warning: Could not create base tables: {e}")
 
     # Define SkillsTown-specific models
     class SkillsTownCourse(db.Model):
@@ -238,12 +283,11 @@ def create_app(config_name=None):
     class UserCourse(db.Model):
         __tablename__ = 'skillstown_user_courses'
         id = db.Column(db.Integer, primary_key=True)
-        user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+        user_id = db.Column(db.Integer, nullable=False)  # Remove foreign key constraint
         category = db.Column(db.String(100), nullable=False)
         course_name = db.Column(db.String(255), nullable=False)
         status = db.Column(db.String(50), default='enrolled')
         created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-        user = db.relationship('User', backref='skillstown_courses')
         
         __table_args__ = (
             db.UniqueConstraint('user_id', 'course_name', name='skillstown_user_course_unique'),
@@ -252,34 +296,20 @@ def create_app(config_name=None):
     class UserProfile(db.Model):
         __tablename__ = 'skillstown_user_profiles'
         id = db.Column(db.Integer, primary_key=True)
-        user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+        user_id = db.Column(db.Integer, nullable=False)  # Remove foreign key constraint
         cv_text = db.Column(db.Text)
         job_description = db.Column(db.Text)
         skills = db.Column(db.Text)
         skill_analysis = db.Column(db.Text)
         uploaded_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-        user = db.relationship('User', backref='skillstown_profile')
 
     # Create SkillsTown tables
     with app.app_context():
-        db.create_all()
+        try:
+            db.create_all()
+        except Exception as e:
+            print(f"Warning: Could not create SkillsTown tables: {e}")
 
-    # Redefine the stats function
-    def get_skillstown_stats(user_id):
-        """Get user statistics for SkillsTown courses"""
-        total = UserCourse.query.filter_by(user_id=user_id).count()
-        enrolled = UserCourse.query.filter_by(user_id=user_id, status='enrolled').count()
-        in_progress = UserCourse.query.filter_by(user_id=user_id, status='in_progress').count()
-        completed = UserCourse.query.filter_by(user_id=user_id, status='completed').count()
-        
-        return {
-            'total': total,
-            'enrolled': enrolled,
-            'in_progress': in_progress,
-            'completed': completed,
-            'completion_percentage': (completed / total * 100) if total > 0 else 0
-        }
-    
     # Course service functions
     COURSE_CATALOG_PATH = os.path.join(os.path.dirname(__file__), 'static', 'data', 'course_catalog.json')
 
@@ -288,6 +318,10 @@ def create_app(config_name=None):
             with open(COURSE_CATALOG_PATH, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except FileNotFoundError:
+            print(f"Course catalog not found at {COURSE_CATALOG_PATH}")
+            return {"categories": []}
+        except json.JSONDecodeError as e:
+            print(f"Error parsing course catalog: {e}")
             return {"categories": []}
 
     def search_courses(query, catalog=None):
@@ -335,10 +369,57 @@ def create_app(config_name=None):
             with open(file_path, 'rb') as file:
                 pdf_reader = PyPDF2.PdfReader(file)
                 for page in pdf_reader.pages:
-                    text += page.extract_text()
+                    try:
+                        text += page.extract_text() + "\n"
+                    except Exception as e:
+                        print(f"Warning: Could not extract text from page: {e}")
+                        continue
         except Exception as e:
             raise Exception(f"Error reading PDF: {str(e)}")
-        return text
+        return text.strip()
+    
+    # Error handlers
+    @app.errorhandler(404)
+    def not_found_error(error):
+        return render_template('errors/404.html'), 404
+
+    @app.errorhandler(500)
+    def internal_error(error):
+        db.session.rollback()
+        return render_template('errors/500.html'), 500
+
+    @app.errorhandler(413)
+    def too_large(error):
+        return render_template('errors/413.html'), 413
+
+    # Security headers
+    @app.after_request
+    def after_request(response):
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        if request.is_secure:
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        return response
+
+    # Health check endpoint
+    @app.route("/health")
+    def health_check():
+        try:
+            # Test database connection
+            db.session.execute(text('SELECT 1'))
+            return jsonify({
+                'status': 'healthy',
+                'timestamp': datetime.datetime.utcnow().isoformat(),
+                'database': 'connected'
+            }), 200
+        except Exception as e:
+            return jsonify({
+                'status': 'unhealthy',
+                'timestamp': datetime.datetime.utcnow().isoformat(),
+                'database': 'disconnected',
+                'error': str(e)
+            }), 500
     
     # Routes
     @app.route("/")
@@ -400,6 +481,9 @@ def create_app(config_name=None):
                     # Extract text from PDF
                     cv_text = extract_text_from_pdf(filepath)
                     
+                    if not cv_text.strip():
+                        raise Exception("No text could be extracted from the PDF. Please ensure the PDF contains readable text.")
+                    
                     # Analyze with Gemini API
                     analysis_result = analyze_skills_with_gemini(cv_text, job_description)
                     
@@ -407,27 +491,32 @@ def create_app(config_name=None):
                     skills = analysis_result.get('current_skills', [])
                     
                     # Save or update user profile
-                    profile = UserProfile.query.filter_by(user_id=current_user.id).first()
-                    if profile:
-                        profile.cv_text = cv_text
-                        profile.job_description = job_description
-                        profile.skills = json.dumps(skills)
-                        profile.skill_analysis = json.dumps(analysis_result)
-                        profile.uploaded_at = datetime.datetime.utcnow()
-                    else:
-                        profile = UserProfile(
-                            user_id=current_user.id,
-                            cv_text=cv_text,
-                            job_description=job_description,
-                            skills=json.dumps(skills),
-                            skill_analysis=json.dumps(analysis_result)
-                        )
-                        db.session.add(profile)
-                    
-                    db.session.commit()
+                    try:
+                        profile = UserProfile.query.filter_by(user_id=current_user.id).first()
+                        if profile:
+                            profile.cv_text = cv_text
+                            profile.job_description = job_description
+                            profile.skills = json.dumps(skills)
+                            profile.skill_analysis = json.dumps(analysis_result)
+                            profile.uploaded_at = datetime.datetime.utcnow()
+                        else:
+                            profile = UserProfile(
+                                user_id=current_user.id,
+                                cv_text=cv_text,
+                                job_description=job_description,
+                                skills=json.dumps(skills),
+                                skill_analysis=json.dumps(analysis_result)
+                            )
+                            db.session.add(profile)
+                        
+                        db.session.commit()
+                    except Exception as e:
+                        print(f"Database error: {e}")
+                        db.session.rollback()
                     
                     # Clean up uploaded file
-                    os.remove(filepath)
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
                     
                     success_msg = 'CV uploaded and analyzed successfully!'
                     if job_description:
@@ -441,7 +530,7 @@ def create_app(config_name=None):
                     if os.path.exists(filepath):
                         os.remove(filepath)
                     flash(f'Error processing CV: {str(e)}', 'danger')
-                    return render_template('assessment/upload.html', get_url_for=get_url_for)
+                    return render_template('assessment/assessment.html', get_url_for=get_url_for)
             else:
                 flash('Please upload a PDF file.', 'danger')
         
@@ -451,7 +540,10 @@ def create_app(config_name=None):
     @login_required
     def cv_analysis():
         """Show CV analysis results with enhanced job matching"""
-        profile = UserProfile.query.filter_by(user_id=current_user.id).first()
+        try:
+            profile = UserProfile.query.filter_by(user_id=current_user.id).first()
+        except:
+            profile = None
         
         if not profile:
             flash('Please upload your CV first.', 'info')
@@ -486,8 +578,12 @@ def create_app(config_name=None):
     @login_required
     def my_courses():
         """User's enrolled courses"""
-        courses = UserCourse.query.filter_by(user_id=current_user.id).order_by(UserCourse.created_at.desc()).all()
-        stats = get_skillstown_stats(current_user.id)
+        try:
+            courses = UserCourse.query.filter_by(user_id=current_user.id).order_by(UserCourse.created_at.desc()).all()
+            stats = get_skillstown_stats(current_user.id)
+        except:
+            courses = []
+            stats = {'total': 0, 'enrolled': 0, 'in_progress': 0, 'completed': 0, 'completion_percentage': 0}
         
         return render_template('courses/my_courses.html', 
                              courses=courses,
@@ -504,25 +600,30 @@ def create_app(config_name=None):
         if not category or not course_name:
             return jsonify({'success': False, 'message': 'Missing course information'})
         
-        # Check if already enrolled
-        existing = UserCourse.query.filter_by(
-            user_id=current_user.id,
-            course_name=course_name
-        ).first()
-        
-        if existing:
-            return jsonify({'success': True, 'message': f'Already enrolled in {course_name}'})
-        
-        # Enroll
-        course = UserCourse(
-            user_id=current_user.id,
-            category=category,
-            course_name=course_name
-        )
-        db.session.add(course)
-        db.session.commit()
-        
-        return jsonify({'success': True, 'message': f'Successfully enrolled in {course_name}!'})
+        try:
+            # Check if already enrolled
+            existing = UserCourse.query.filter_by(
+                user_id=current_user.id,
+                course_name=course_name
+            ).first()
+            
+            if existing:
+                return jsonify({'success': True, 'message': f'Already enrolled in {course_name}'})
+            
+            # Enroll
+            course = UserCourse(
+                user_id=current_user.id,
+                category=category,
+                course_name=course_name
+            )
+            db.session.add(course)
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': f'Successfully enrolled in {course_name}!'})
+        except Exception as e:
+            print(f"Enrollment error: {e}")
+            db.session.rollback()
+            return jsonify({'success': False, 'message': 'Error enrolling in course'})
 
     @app.route("/update-course-status/<int:course_id>", methods=['POST'])
     @login_required
@@ -530,19 +631,25 @@ def create_app(config_name=None):
         """Update course status"""
         status = request.form.get('status')
         
-        course = UserCourse.query.filter_by(
-            id=course_id,
-            user_id=current_user.id
-        ).first()
-        
-        if not course:
-            flash('Course not found', 'error')
-            return redirect(url_for('my_courses'))
-        
-        course.status = status
-        db.session.commit()
-        
-        flash(f'Course status updated to {status}', 'success')
+        try:
+            course = UserCourse.query.filter_by(
+                id=course_id,
+                user_id=current_user.id
+            ).first()
+            
+            if not course:
+                flash('Course not found', 'error')
+                return redirect(url_for('my_courses'))
+            
+            course.status = status
+            db.session.commit()
+            
+            flash(f'Course status updated to {status}', 'success')
+        except Exception as e:
+            print(f"Status update error: {e}")
+            db.session.rollback()
+            flash('Error updating course status', 'error')
+            
         return redirect(url_for('my_courses'))
 
     @app.route("/profile")
@@ -550,7 +657,10 @@ def create_app(config_name=None):
     def skillstown_user_profile():
         """User profile page"""
         stats = get_skillstown_stats(current_user.id)
-        recent_courses = UserCourse.query.filter_by(user_id=current_user.id).order_by(UserCourse.created_at.desc()).limit(5).all()
+        try:
+            recent_courses = UserCourse.query.filter_by(user_id=current_user.id).order_by(UserCourse.created_at.desc()).limit(5).all()
+        except:
+            recent_courses = []
         
         return render_template('profile.html', 
                              stats=stats,

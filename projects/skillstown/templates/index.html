@@ -7,35 +7,131 @@
 <section class="hero-section">
     <div class="container text-center">
         <h1>Discover Your Perfect SkillsTown Courses</h1>
+        <p class="lead">Upload your CV and get AI-powered course recommendations tailored to your skills and career goals.</p>
     </div>
 </section>
 
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-md-8">
+            {% if current_user and current_user.is_authenticated %}
             <div class="card">
                 <div class="card-header">
-                    <i class="fas fa-upload me-2"></i>Upload Your CV
+                    <i class="fas fa-upload me-2"></i>Upload Your CV for Analysis
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ get_url_for('upload_cv') }}" enctype="multipart/form-data" id="upload-form">
+                    <form method="POST" action="{{ get_url_for('upload_cv') if get_url_for else url_for('upload_cv') }}" enctype="multipart/form-data" id="upload-form">
                         <div class="mb-4" id="upload-container">
                             <div class="upload-area" id="dropzone" onclick="document.getElementById('file').click();">
                                 <i class="fas fa-file-upload upload-icon"></i>
                                 <h4>Drag & Drop or Click to Upload</h4>
-                                <p class="text-muted">Accepted formats: PDF, DOCX, TXT</p>
+                                <p class="text-muted">Accepted formats: PDF only</p>
                                 <div id="file-name" class="mt-3"></div>
                             </div>
-                            <input type="file" name="file" id="file" accept=".pdf,.docx,.txt" style="display: none;" onchange="updateFileName()">
+                            <input type="file" name="cv_file" id="file" accept=".pdf" style="display: none;" onchange="updateFileName()">
                         </div>
+                        
+                        <!-- Job Description Section -->
+                        <div class="mb-4">
+                            <label for="job_description" class="form-label">
+                                <i class="fas fa-briefcase me-2"></i>Job Description (Optional)
+                            </label>
+                            <textarea class="form-control" id="job_description" name="job_description" rows="4" 
+                                placeholder="Paste a job description here to get targeted skill gap analysis and learning recommendations..."></textarea>
+                            <div class="form-text">
+                                <i class="fas fa-lightbulb me-1"></i>
+                                Adding a job description helps identify skill gaps and prioritize learning paths!
+                            </div>
+                        </div>
+                        
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submit-btn" disabled>
                                 <i class="fas fa-search me-2"></i>Analyze CV & Recommend Courses
                             </button>
                         </div>
                     </form>
                 </div>
             </div>
+            {% else %}
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-info-circle me-2"></i>Get Started with SkillsTown CV Analyzer
+                </div>
+                <div class="card-body text-center">
+                    <i class="fas fa-user-lock fa-3x text-muted mb-3"></i>
+                    <h4>Login Required</h4>
+                    <p class="text-muted">Please login or create an account to upload your CV and get personalized course recommendations.</p>
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                        <a href="{{ get_url_for('login') if get_url_for else url_for('login') }}" class="btn btn-primary me-md-2">
+                            <i class="fas fa-sign-in-alt me-1"></i>Login
+                        </a>
+                        <a href="{{ get_url_for('register') if get_url_for else url_for('register') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-user-plus me-1"></i>Create Account
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- How It Works Section -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <i class="fas fa-question-circle me-2"></i>How It Works
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 text-center mb-3">
+                            <div class="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" 
+                                 style="width: 80px; height: 80px; background-color: var(--light-blue);">
+                                <i class="fas fa-upload fa-2x" style="color: var(--skillstown-blue);"></i>
+                            </div>
+                            <h5>1. Upload CV</h5>
+                            <p class="text-muted">Upload your CV in PDF format for AI-powered analysis.</p>
+                        </div>
+                        <div class="col-md-4 text-center mb-3">
+                            <div class="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" 
+                                 style="width: 80px; height: 80px; background-color: var(--light-blue);">
+                                <i class="fas fa-brain fa-2x" style="color: var(--skillstown-blue);"></i>
+                            </div>
+                            <h5>2. AI Analysis</h5>
+                            <p class="text-muted">Our AI extracts your skills and analyzes your experience level.</p>
+                        </div>
+                        <div class="col-md-4 text-center mb-3">
+                            <div class="rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" 
+                                 style="width: 80px; height: 80px; background-color: var(--light-blue);">
+                                <i class="fas fa-graduation-cap fa-2x" style="color: var(--skillstown-blue);"></i>
+                            </div>
+                            <h5>3. Get Recommendations</h5>
+                            <p class="text-muted">Receive personalized course recommendations and learning paths.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Featured Categories -->
+            {% if categories %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <i class="fas fa-star me-2"></i>Featured Course Categories
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for category in categories %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100 border-0 bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">{{ category.name }}</h6>
+                                    <p class="card-text small text-muted">{{ category.courses|length }} courses available</p>
+                                    <a href="{{ get_url_for('search') if get_url_for else url_for('search') }}?query={{ category.name }}" 
+                                       class="btn btn-sm btn-outline-primary">Explore</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -47,61 +143,100 @@
     function updateFileName() {
         const fileInput = document.getElementById('file');
         const fileNameContainer = document.getElementById('file-name');
+        const submitBtn = document.getElementById('submit-btn');
         
         if (fileInput.files.length > 0) {
-            const fileName = fileInput.files[0].name;
+            const file = fileInput.files[0];
+            const fileName = file.name;
+            
+            // Validate file type
+            if (file.type !== 'application/pdf') {
+                fileNameContainer.innerHTML = `<div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>Please select a PDF file only.
+                </div>`;
+                submitBtn.disabled = true;
+                return;
+            }
+            
+            // Validate file size (10MB limit)
+            if (file.size > 10 * 1024 * 1024) {
+                fileNameContainer.innerHTML = `<div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>File size must be less than 10MB.
+                </div>`;
+                submitBtn.disabled = true;
+                return;
+            }
+            
             fileNameContainer.innerHTML = `<div class="alert alert-success">
                 <i class="fas fa-check-circle me-2"></i>Selected file: <strong>${fileName}</strong>
             </div>`;
-            document.getElementById('submit-btn').removeAttribute('disabled');
+            submitBtn.disabled = false;
         } else {
             fileNameContainer.innerHTML = '';
+            submitBtn.disabled = true;
         }
     }
     
     // Drag and drop functionality
-    const dropzone = document.getElementById('dropzone');
-    
-    dropzone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropzone.classList.add('bg-light');
-    });
-    
-    dropzone.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('bg-light');
-    });
-    
-    dropzone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('bg-light');
+    document.addEventListener('DOMContentLoaded', function() {
+        const dropzone = document.getElementById('dropzone');
         
-        const files = e.dataTransfer.files;
-        const fileInput = document.getElementById('file');
-        
-        if (files.length > 0) {
-            const fileName = files[0].name;
-            const fileExt = fileName.split('.').pop().toLowerCase();
+        if (dropzone) {
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('bg-light');
+            });
             
-            if (['pdf', 'docx', 'txt'].includes(fileExt)) {
-                fileInput.files = files;
-                updateFileName();
-            } else {
-                document.getElementById('file-name').innerHTML = `<div class="alert alert-danger">
-                    <i class="fas fa-exclamation-circle me-2"></i>Invalid file format. Please upload PDF, DOCX, or TXT files.
-                </div>`;
-            }
+            dropzone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('bg-light');
+            });
+            
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('bg-light');
+                
+                const files = e.dataTransfer.files;
+                const fileInput = document.getElementById('file');
+                
+                if (files.length > 0) {
+                    const file = files[0];
+                    const fileName = file.name;
+                    const fileExt = fileName.split('.').pop().toLowerCase();
+                    
+                    if (fileExt === 'pdf') {
+                        fileInput.files = files;
+                        updateFileName();
+                    } else {
+                        document.getElementById('file-name').innerHTML = `<div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i>Please upload PDF files only.
+                        </div>`;
+                    }
+                }
+            });
         }
-    });
-    
-    // Form validation
-    document.getElementById('upload-form').addEventListener('submit', function(event) {
-        const fileInput = document.getElementById('file');
-        if (fileInput.files.length === 0) {
-            event.preventDefault();
-            document.getElementById('file-name').innerHTML = `<div class="alert alert-danger">
-                <i class="fas fa-exclamation-circle me-2"></i>Please select a file to upload.
-            </div>`;
+        
+        // Form validation
+        const uploadForm = document.getElementById('upload-form');
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', function(event) {
+                const fileInput = document.getElementById('file');
+                const submitBtn = document.getElementById('submit-btn');
+                
+                if (fileInput.files.length === 0) {
+                    event.preventDefault();
+                    document.getElementById('file-name').innerHTML = `<div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>Please select a file to upload.
+                    </div>`;
+                } else {
+                    // Show loading state
+                    const hasJobDesc = document.getElementById('job_description').value.trim();
+                    submitBtn.innerHTML = hasJobDesc ? 
+                        '<i class="fas fa-spinner fa-spin me-2"></i>Analyzing CV & Job Match...' : 
+                        '<i class="fas fa-spinner fa-spin me-2"></i>Analyzing CV...';
+                    submitBtn.disabled = true;
+                }
+            });
         }
     });
 </script>
