@@ -30,11 +30,55 @@
                             <input type="file" name="file" id="file" accept=".pdf,.docx,.txt" style="display: none;" onchange="updateFileName()">
                         </div>
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submit-btn" disabled>
                                 <i class="fas fa-search me-2"></i>Analyze CV & Recommend Courses
                             </button>
                         </div>
-                        {% endfor %}
+                    </form>
+                    
+                    <!-- Quick Actions -->
+                    <div class="mt-4">
+                        <h6><i class="fas fa-rocket me-2"></i>Quick Actions</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <a href="{{ get_url_for('search') }}" class="btn btn-outline-primary w-100">
+                                    <i class="fas fa-search me-2"></i>Browse Courses
+                                </a>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <a href="{{ get_url_for('about') }}" class="btn btn-outline-info w-100">
+                                    <i class="fas fa-info-circle me-2"></i>Learn More
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- How it Works -->
+                    <div class="mt-4">
+                        <h6><i class="fas fa-cogs me-2"></i>How It Works</h6>
+                        <div class="row text-center">
+                            <div class="col-md-4 mb-3">
+                                <div class="p-3">
+                                    <i class="fas fa-upload fa-2x text-primary mb-2"></i>
+                                    <h6>1. Upload CV</h6>
+                                    <small class="text-muted">Upload your CV in PDF format</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="p-3">
+                                    <i class="fas fa-brain fa-2x text-primary mb-2"></i>
+                                    <h6>2. AI Analysis</h6>
+                                    <small class="text-muted">Our AI analyzes your skills</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="p-3">
+                                    <i class="fas fa-graduation-cap fa-2x text-primary mb-2"></i>
+                                    <h6>3. Get Recommendations</h6>
+                                    <small class="text-muted">Receive personalized course suggestions</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -49,61 +93,87 @@
     function updateFileName() {
         const fileInput = document.getElementById('file');
         const fileNameContainer = document.getElementById('file-name');
+        const submitBtn = document.getElementById('submit-btn');
         
         if (fileInput.files.length > 0) {
             const fileName = fileInput.files[0].name;
-            fileNameContainer.innerHTML = `<div class="alert alert-success">
-                <i class="fas fa-check-circle me-2"></i>Selected file: <strong>${fileName}</strong>
-            </div>`;
-            document.getElementById('submit-btn').removeAttribute('disabled');
+            const fileExt = fileName.split('.').pop().toLowerCase();
+            
+            if (['pdf', 'docx', 'txt'].includes(fileExt)) {
+                fileNameContainer.innerHTML = `<div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>Selected file: <strong>${fileName}</strong>
+                </div>`;
+                submitBtn.removeAttribute('disabled');
+            } else {
+                fileNameContainer.innerHTML = `<div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>Invalid file format. Please upload PDF, DOCX, or TXT files.
+                </div>`;
+                submitBtn.setAttribute('disabled', 'disabled');
+            }
         } else {
             fileNameContainer.innerHTML = '';
+            submitBtn.setAttribute('disabled', 'disabled');
         }
     }
     
     // Drag and drop functionality
-    const dropzone = document.getElementById('dropzone');
-    
-    dropzone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropzone.classList.add('bg-light');
-    });
-    
-    dropzone.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('bg-light');
-    });
-    
-    dropzone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('bg-light');
+    document.addEventListener('DOMContentLoaded', function() {
+        const dropzone = document.getElementById('dropzone');
         
-        const files = e.dataTransfer.files;
-        const fileInput = document.getElementById('file');
-        
-        if (files.length > 0) {
-            const fileName = files[0].name;
-            const fileExt = fileName.split('.').pop().toLowerCase();
+        if (dropzone) {
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('bg-light');
+            });
             
-            if (['pdf', 'docx', 'txt'].includes(fileExt)) {
-                fileInput.files = files;
-                updateFileName();
-            } else {
-                document.getElementById('file-name').innerHTML = `<div class="alert alert-danger">
-                    <i class="fas fa-exclamation-circle me-2"></i>Invalid file format. Please upload PDF, DOCX, or TXT files.
-                </div>`;
-            }
+            dropzone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('bg-light');
+            });
+            
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('bg-light');
+                
+                const files = e.dataTransfer.files;
+                const fileInput = document.getElementById('file');
+                
+                if (files.length > 0) {
+                    const fileName = files[0].name;
+                    const fileExt = fileName.split('.').pop().toLowerCase();
+                    
+                    if (['pdf', 'docx', 'txt'].includes(fileExt)) {
+                        fileInput.files = files;
+                        updateFileName();
+                    } else {
+                        document.getElementById('file-name').innerHTML = `<div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i>Invalid file format. Please upload PDF, DOCX, or TXT files.
+                        </div>`;
+                    }
+                }
+            });
         }
-    });
-    
-    // Form validation
-    document.getElementById('upload-form').addEventListener('submit', function(event) {
-        const fileInput = document.getElementById('file');
-        if (fileInput.files.length === 0) {
-            event.preventDefault();
-            document.getElementById('file-name').innerHTML = `<div class="alert alert-danger">
-                <i class="fas fa-exclamation-circle me-2"></i>Please select a file to upload.
-            </div>`;
+        
+        // Form validation
+        const uploadForm = document.getElementById('upload-form');
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', function(event) {
+                const fileInput = document.getElementById('file');
+                const submitBtn = document.getElementById('submit-btn');
+                
+                if (fileInput.files.length === 0) {
+                    event.preventDefault();
+                    document.getElementById('file-name').innerHTML = `<div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>Please select a file to upload.
+                    </div>`;
+                } else {
+                    submitBtn.innerHTML = `
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Analyzing CV...
+                    `;
+                    submitBtn.disabled = true;
+                }
+            });
         }
     });
 </script>
