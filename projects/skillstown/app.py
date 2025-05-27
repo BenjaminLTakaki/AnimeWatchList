@@ -304,7 +304,7 @@ def create_app(config_name=None):
     @app.route('/')
     def index():
         """Landing page with overview and getting started"""
-        return render_template('skillstown_landing.html')
+        return render_template('index.html')
 
     @app.route('/about')
     def about():
