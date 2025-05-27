@@ -3,56 +3,39 @@ import sys
 import random
 import json
 import datetime
+import traceback
 from datetime import timedelta
-from flask import Flask, request, render_template, send_from_directory, jsonify, session, redirect, url_for, flash, make_response
 from pathlib import Path
 from urllib.parse import urlparse
 from functools import wraps
+
 import requests
 import base64
-import scipy as sp
+import secrets
+from collections import Counter
+
+from flask import (Flask, request, render_template, send_from_directory, jsonify,
+                   session, redirect, url_for, flash, make_response)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import secrets
-from sqlalchemy import text
-from collections import Counter
+from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-import uuid
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-# Get the directory where app.py is located
-current_dir = os.path.dirname(os.path.abspath(__file__))
+from sqlalchemy import text
 
-# Add the current directory to Python path if it's not already there
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
-
-# Also add the parent directory in case modules are there
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-
-print(f"🔍 Current directory: {current_dir}")
-print(f"🔍 Python path: {sys.path[:3]}...")  # Show first 3 paths
-
-# Ensure all required modules can be imported by adding the current directory to sys.path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
-
-print(f"🔍 Current directory: {current_dir}")
-print(f"🔍 Directory contents: {os.listdir(current_dir)}")
-print(f"🔍 Python path includes current dir: {current_dir in sys.path}")
-
-# Import config first (this should work)
+# Configuration imports or fallbacks
 try:
-    from config import BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY, SPOTIFY_DB_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
-    print("✓ Config imported successfully")
+    from config import (
+        BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY,
+        SPOTIFY_DB_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET,
+        SPOTIFY_REDIRECT_URI
+    )
+    print("Config imported successfully")
 except ImportError as e:
-    print(f"❌ Config import failed: {e}")
-    # Fallback - define minimal config
-    BASE_DIR = Path(current_dir)
+    print(f"Config import failed: {e}")
+    BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
     COVERS_DIR = BASE_DIR / "generated_covers"
     FLASK_SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'dev-key')
     SPOTIFY_DB_URL = os.environ.get('DATABASE_URL', 'postgresql://localhost/test')
@@ -60,134 +43,110 @@ except ImportError as e:
     SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET')
     SPOTIFY_REDIRECT_URI = os.environ.get('SPOTIFY_REDIRECT_URI', 'http://localhost:5000/spotify-callback')
 
-# Initialize Flask app first
-app = Flask(__name__, template_folder=str(BASE_DIR / "templates"), static_folder=str(BASE_DIR / "static"))
-app.secret_key = FLASK_SECRET_KEY or ''.join(random.choices('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=24))
+# Flask app initialization
+app = Flask(__name__,
+            template_folder=str(BASE_DIR / "templates"),
+            static_folder=str(BASE_DIR / "static"))
+app.secret_key = FLASK_SECRET_KEY or ''.join(random.choices(
+    'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=24))
 
-# Configure database
+# Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = SPOTIFY_DB_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Add rate limiter (optional - for additional protection)
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["100 per hour"],  
-    storage_uri="memory://"  
-)
-limiter.init_app(app)
-
-# Initialize SQLAlchemy
-from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-# Database Models
+# Rate limiter
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["100 per hour"],
+    storage_uri="memory://"
+)
+limiter.init_app(app)
+
+# Models definition
 class User(db.Model):
     __tablename__ = 'spotify_users'
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=True)
     username = db.Column(db.String(80), unique=True, nullable=True)
     password_hash = db.Column(db.String(200), nullable=True)
-    
-    # Spotify OAuth fields
     spotify_id = db.Column(db.String(100), unique=True, nullable=True)
     spotify_username = db.Column(db.String(100), nullable=True)
     spotify_access_token = db.Column(db.String(500), nullable=True)
     spotify_refresh_token = db.Column(db.String(500), nullable=True)
     spotify_token_expires = db.Column(db.DateTime, nullable=True)
-    
-    # User info
     display_name = db.Column(db.String(100), nullable=True)
     is_premium = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
-    
-    # Relationship to generations
     generations = db.relationship('GenerationResultDB', backref='user', lazy=True)
-    
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
-    
+
     def check_password(self, password):
-        if not self.password_hash:
-            return False
-        return check_password_hash(self.password_hash, password)
-    
+        return bool(self.password_hash and check_password_hash(self.password_hash, password))
+
     def is_premium_user(self):
-        return (self.email == 'bentakaki7@gmail.com' or 
-                self.spotify_username == 'Benthegamer')
-    
+        premium_emails = ['bentakaki7@gmail.com']
+        premium_usernames = ['benthegamer']
+        if self.email and self.email.lower() in premium_emails:
+            return True
+        if self.spotify_username and self.spotify_username.lower() in premium_usernames:
+            return True
+        if self.spotify_id and self.spotify_id.lower() in premium_usernames:
+            return True
+        return False
+
     def get_daily_generation_limit(self):
         return 999 if self.is_premium_user() else 2
-    
+
     def can_generate_today(self):
         today = datetime.datetime.utcnow().date()
-        today_generations = GenerationResultDB.query.filter(
+        count = GenerationResultDB.query.filter(
             GenerationResultDB.user_id == self.id,
             db.func.date(GenerationResultDB.timestamp) == today
         ).count()
-        return today_generations < self.get_daily_generation_limit()
-    
+        return count < self.get_daily_generation_limit()
+
     def get_generations_today(self):
         today = datetime.datetime.utcnow().date()
         return GenerationResultDB.query.filter(
             GenerationResultDB.user_id == self.id,
             db.func.date(GenerationResultDB.timestamp) == today
         ).count()
-    
+
     def refresh_spotify_token_if_needed(self):
         if not self.spotify_refresh_token:
             return False
-            
-        if (self.spotify_token_expires and 
-            self.spotify_token_expires <= datetime.datetime.utcnow() + timedelta(minutes=5)):
+        if self.spotify_token_expires and \
+           self.spotify_token_expires <= datetime.datetime.utcnow() + timedelta(minutes=5):
             return self._refresh_spotify_token()
-        
         return True
-    
+
     def _refresh_spotify_token(self):
         if not self.spotify_refresh_token:
             return False
-        
-        auth_header = base64.b64encode(
-            f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}".encode()
-        ).decode()
-        
-        headers = {
-            'Authorization': f'Basic {auth_header}',
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
-        
-        data = {
-            'grant_type': 'refresh_token',
-            'refresh_token': self.spotify_refresh_token
-        }
-        
+        auth_header = base64.b64encode(f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}".encode()).decode()
+        headers = {'Authorization': f'Basic {auth_header}', 'Content-Type': 'application/x-www-form-urlencoded'}
+        data = {'grant_type': 'refresh_token', 'refresh_token': self.spotify_refresh_token}
         try:
-            response = requests.post(
-                'https://accounts.spotify.com/api/token',
-                headers=headers,
-                data=data
-            )
-            
+            response = requests.post('https://accounts.spotify.com/api/token', headers=headers, data=data)
             if response.status_code == 200:
                 token_data = response.json()
                 self.spotify_access_token = token_data['access_token']
-                self.spotify_token_expires = datetime.datetime.utcnow() + timedelta(
-                    seconds=token_data['expires_in']
-                )
-                
+                self.spotify_token_expires = datetime.datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
                 if 'refresh_token' in token_data:
                     self.spotify_refresh_token = token_data['refresh_token']
-                
                 db.session.commit()
                 return True
         except Exception as e:
             print(f"Error refreshing Spotify token: {e}")
-        
         return False
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -212,41 +171,30 @@ class LoginSession(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     ip_address = db.Column(db.String(45), nullable=True)
     user_agent = db.Column(db.String(500), nullable=True)
-    
     user = db.relationship('User', backref='sessions')
-    
+
     @staticmethod
     def create_session(user_id, ip_address=None, user_agent=None):
-        session_token = secrets.token_urlsafe(32)
-        expires_at = datetime.datetime.utcnow() + timedelta(days=30)
-        
-        session = LoginSession(
-            user_id=user_id,
-            session_token=session_token,
-            expires_at=expires_at,
-            ip_address=ip_address,
+        token = secrets.token_urlsafe(32)
+        expires = datetime.datetime.utcnow() + timedelta(days=30)
+        sess = LoginSession(
+            user_id=user_id, session_token=token,
+            expires_at=expires, ip_address=ip_address,
             user_agent=user_agent
         )
-        
-        db.session.add(session)
+        db.session.add(sess)
         db.session.commit()
-        
-        return session_token
-    
+        return token
+
     @staticmethod
     def get_user_from_session(session_token):
-        session = LoginSession.query.filter_by(
-            session_token=session_token,
-            is_active=True
-        ).first()
-        
-        if not session or session.expires_at <= datetime.datetime.utcnow():
-            if session:
-                session.is_active = False
+        sess = LoginSession.query.filter_by(session_token=session_token, is_active=True).first()
+        if not sess or sess.expires_at <= datetime.datetime.utcnow():
+            if sess:
+                sess.is_active = False
                 db.session.commit()
             return None
-        
-        return session.user
+        return sess.user
 
 class SpotifyState(db.Model):
     __tablename__ = 'spotify_oauth_states'
@@ -276,11 +224,11 @@ class LoraModelDB(db.Model):
     __tablename__ = 'spotify_lora_models'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
-    source_type = db.Column(db.String(20), default='local')
+    source_type = db.Column(db.String(20), default='local')  # Only 'local' now
     path = db.Column(db.String(500), default='')
-    url = db.Column(db.String(500), default='')
-    trigger_words = db.Column(db.JSON, default=list)
-    strength = db.Column(db.Float, default=0.7)
+    file_size = db.Column(db.Integer, default=0)  # File size in bytes
+    uploaded_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    uploaded_by = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=True)
     
     def to_lora_model(self):
         from models import LoraModel
@@ -288,30 +236,29 @@ class LoraModelDB(db.Model):
             name=self.name,
             source_type=self.source_type,
             path=self.path,
-            url=self.url,
-            trigger_words=self.trigger_words or [],
-           
+            trigger_words=[],  # Can be extended later
+            strength=0.7
         )
 
 class GenerationResultDB(db.Model):
     __tablename__ = 'spotify_generation_results'
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(500), nullable=False)  # Was 200
-    output_path = db.Column(db.String(1000), nullable=False)  # Was 500
-    item_name = db.Column(db.String(500))  # Was 200
+    title = db.Column(db.String(500), nullable=False)
+    output_path = db.Column(db.String(1000), nullable=False)
+    item_name = db.Column(db.String(500))
     genres = db.Column(db.JSON)
     all_genres = db.Column(db.JSON)
     style_elements = db.Column(db.JSON)
-    mood = db.Column(db.String(1000))  # Was 50 - THE MAIN FIX!
+    mood = db.Column(db.String(1000))
     energy_level = db.Column(db.String(50))
     timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
-    spotify_url = db.Column(db.String(1000))  # Was 500
-    lora_name = db.Column(db.String(200))  # Was 100
+    spotify_url = db.Column(db.String(1000))
+    lora_name = db.Column(db.String(200))
     lora_type = db.Column(db.String(20))
-    lora_url = db.Column(db.String(1000))  # Was 500
+    lora_url = db.Column(db.String(1000))
     user_id = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=True)
 
-# HELPER FUNCTIONS - ADD THESE HERE, BEFORE ANY ROUTES
+# HELPER FUNCTIONS
 def login_required(f):
     """Decorator to require login for routes"""
     @wraps(f)
@@ -399,7 +346,7 @@ def calculate_genre_percentages(genres_list):
     except ImportError:
         # Fallback if models.py or GenreAnalysis is not available
         print("⚠️ models.GenreAnalysis not found, using fallback for calculate_genre_percentages.")
-        if not isinstance(genres_list, list): # Ensure it's a list
+        if not isinstance(genres_list, list):
             return []
             
         genre_counter = Counter(genres_list)
@@ -415,7 +362,7 @@ def calculate_genre_percentages(genres_list):
             percentages.append({
                 "name": genre,
                 "percentage": percentage,
-                "count": count  # Keep the count for potential display
+                "count": count
             })
         return percentages
 
@@ -424,8 +371,6 @@ def extract_playlist_id(playlist_url):
     if not playlist_url or "playlist/" not in playlist_url:
         return None
     try:
-        # Example: https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=...
-        #          -> 37i9dQZF1DXcBWIGoYBM5M
         path_part = urlparse(playlist_url).path
         if "/playlist/" in path_part:
             return path_part.split("/playlist/")[-1].split("/")[0]
@@ -434,32 +379,94 @@ def extract_playlist_id(playlist_url):
     return None
 
 def ensure_tables_exist():
-    """Ensure tables exist before any database operation.
-       Uses app_context for database operations.
-    """
+    """Ensure tables exist before any database operation."""
     try:
-        with app.app_context(): # Ensure operations are within app context
-            # Quick check if a critical table exists
+        with app.app_context():
             with db.engine.connect() as connection:
                 connection.execute(text("SELECT 1 FROM spotify_oauth_states LIMIT 1"))
-        # print("✓ Tables appear to exist.") # Optional: for debugging
-    except Exception: # Broad exception because specific DB errors can vary
+    except Exception:
         print("⚠️ Tables missing or DB connection issue, attempting to create...")
         try:
-            with app.app_context(): # Ensure db.create_all() is in app context
+            with app.app_context():
                 db.create_all()
-                # If you have a manual creation script and want to run it here:
-                # create_tables_manually() 
                 print("✓ Tables created/verified on-demand.")
         except Exception as e_create:
             print(f"❌ On-demand table creation failed: {e_create}")
-            # Depending on the application, you might want to raise this
-            # or handle it more gracefully, e.g., by preventing app startup.
-            # For now, just printing the error.
-            # raise # Uncomment to make table creation failure critical
 
 # Global initialization flag
 initialized = False
+
+def migrate_lora_table():
+    """Migrate LoRA table to add missing columns"""
+    try:
+        with app.app_context():
+            with db.engine.connect() as connection:
+                # Check if columns exist first
+                result = connection.execute(text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'spotify_lora_models'
+                """))
+                existing_columns = [row[0] for row in result]
+                
+                print(f"Existing columns in spotify_lora_models: {existing_columns}")
+                
+                # Add missing columns if they don't exist
+                migrations = []
+                
+                if 'file_size' not in existing_columns:
+                    migrations.append("ALTER TABLE spotify_lora_models ADD COLUMN file_size INTEGER DEFAULT 0")
+                    
+                if 'uploaded_at' not in existing_columns:
+                    migrations.append("ALTER TABLE spotify_lora_models ADD COLUMN uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+                    
+                if 'uploaded_by' not in existing_columns:
+                    migrations.append("ALTER TABLE spotify_lora_models ADD COLUMN uploaded_by INTEGER")
+                
+                # Remove old URL-related columns if they exist
+                if 'url' in existing_columns:
+                    migrations.append("ALTER TABLE spotify_lora_models DROP COLUMN IF EXISTS url CASCADE")
+                    
+                if 'trigger_words' in existing_columns:
+                    migrations.append("ALTER TABLE spotify_lora_models DROP COLUMN IF EXISTS trigger_words CASCADE")
+                    
+                if 'strength' in existing_columns:
+                    migrations.append("ALTER TABLE spotify_lora_models DROP COLUMN IF EXISTS strength CASCADE")
+                
+                # Execute migrations
+                for migration in migrations:
+                    try:
+                        connection.execute(text(migration))
+                        connection.commit()
+                        print(f"✓ Executed: {migration}")
+                    except Exception as e:
+                        print(f"⚠️ Migration failed (might already exist): {migration} - {e}")
+                          # Add foreign key constraint if it doesn't exist
+                try:
+                    # Check if constraint exists
+                    constraint_exists = connection.execute(text("""
+                        SELECT 1 FROM information_schema.table_constraints 
+                        WHERE constraint_name = 'fk_lora_models_uploaded_by'
+                    """)).fetchone()
+                    
+                    # Add constraint if it doesn't exist
+                    if not constraint_exists:
+                        connection.execute(text("""
+                            ALTER TABLE spotify_lora_models 
+                            ADD CONSTRAINT fk_lora_models_uploaded_by 
+                            FOREIGN KEY (uploaded_by) REFERENCES spotify_users(id) ON DELETE SET NULL
+                        """))
+                        connection.commit()
+                    print("✓ Foreign key constraint added/verified")                
+                except Exception as e:
+                    print(f"⚠️ Foreign key constraint warning: {e}")
+                
+                print("✅ LoRA table migration completed")
+                return True
+                
+    except Exception as e:
+        print(f"❌ LoRA table migration failed: {e}")
+        return False
 
 def initialize_app():
     """Initialize the application's dependencies with better import handling"""
@@ -470,11 +477,14 @@ def initialize_app():
     # Make sure necessary directories exist first
     try:
         os.makedirs(COVERS_DIR, exist_ok=True)
+        # Create LoRA directory for file uploads
+        lora_dir = BASE_DIR / "loras"
+        os.makedirs(lora_dir, exist_ok=True)
         print("✓ Created directories")
     except Exception as e:
         print(f"⚠️ Directory creation warning: {e}")
     
-    # Database setup (keep your existing database code)
+    # Database setup
     try:
         with app.app_context():
             print("📊 Setting up database...")
@@ -495,6 +505,9 @@ def initialize_app():
             
             db.create_all()
             print("✓ db.create_all() executed")
+            
+            # Run LoRA table migration
+            migrate_lora_table()
             
             # Verify required tables exist
             new_tables = inspector.get_table_names()
@@ -528,7 +541,7 @@ def initialize_app():
         print(f"❌ Database setup failed: {e}")
         return False
     
-    # Import modules with better error handling - TRY RELATIVE IMPORTS FIRST
+    # Import modules with better error handling
     print("📦 Importing modules...")
     
     # Global variables to track what's available
@@ -540,14 +553,13 @@ def initialize_app():
     
     # Get the current working directory for imports
     original_cwd = os.getcwd()
-    # current_dir for os.chdir should be the script's directory, defined globally earlier
     module_level_current_dir = os.path.dirname(os.path.abspath(__file__))
 
     try:
         # Change to the spotify app directory for imports
         os.chdir(module_level_current_dir)
         
-        # Try importing spotify_client
+        # Try importing modules
         try:
             import spotify_client
             print("✓ spotify_client imported")
@@ -555,7 +567,6 @@ def initialize_app():
         except ImportError as e:
             print(f"⚠️ spotify_client import failed: {e}")
             
-        # Try importing models
         try:
             import models
             print("✓ models imported")
@@ -563,7 +574,6 @@ def initialize_app():
         except ImportError as e:
             print(f"⚠️ models import failed: {e}")
             
-        # Try importing utils
         try:
             import utils
             print("✓ utils imported")
@@ -571,7 +581,6 @@ def initialize_app():
         except ImportError as e:
             print(f"⚠️ utils import failed: {e}")
         
-        # Try importing generator
         try:
             import generator
             print("✓ generator imported")
@@ -579,7 +588,6 @@ def initialize_app():
         except ImportError as e:
             print(f"⚠️ generator import failed: {e}")
         
-        # Try importing other required modules
         try:
             import title_generator
             import image_generator
@@ -589,10 +597,9 @@ def initialize_app():
             print(f"⚠️ Some generation modules unavailable: {e}")
             
     finally:
-        # Always restore the original working directory
         os.chdir(original_cwd)
     
-    print("✓ Module imports completed (with fallbacks if needed)")
+    print("✓ Module imports completed")
     
     # Initialize Spotify client if available
     if spotify_client_available:
@@ -635,7 +642,7 @@ def initialize_app():
     else:
         print("✓ All environment variables present")
     
-    # Set initialization status based on what we have
+    # Set initialization status
     initialized = env_vars_present and (spotify_client_available or models_available)
     
     if initialized:
@@ -694,58 +701,67 @@ def create_tables_manually():
         );
         """,
         
-        # Update generation results table
+        # LoRA models table (UPDATED for file uploads only)
         """
-        DO $$ 
-        BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM information_schema.columns 
-                WHERE table_name = 'spotify_generation_results' 
-                AND column_name = 'user_id'
-            ) THEN
-                ALTER TABLE spotify_generation_results 
-                ADD COLUMN user_id INTEGER;
-            END IF;
-        END $$;
+        CREATE TABLE IF NOT EXISTS spotify_lora_models (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) UNIQUE NOT NULL,
+            source_type VARCHAR(20) DEFAULT 'local',
+            path VARCHAR(500) DEFAULT '',
+            file_size INTEGER DEFAULT 0,
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            uploaded_by INTEGER
+        );
         """,
         
-        # Add foreign keys after tables exist
+        # Generation results table
         """
-        DO $$
-        BEGIN
-            -- Add foreign key for login_sessions if it doesn't exist
-            IF NOT EXISTS (
-                SELECT 1 FROM information_schema.table_constraints 
-                WHERE constraint_name = 'fk_login_sessions_user_id'
-            ) THEN
-                ALTER TABLE spotify_login_sessions 
-                ADD CONSTRAINT fk_login_sessions_user_id 
-                FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE CASCADE;
-            END IF;
-            
-            -- Add foreign key for generation_results if it doesn't exist
-            IF NOT EXISTS (
-                SELECT 1 FROM information_schema.table_constraints 
-                WHERE constraint_name = 'fk_generation_results_user_id'
-            ) THEN
-                ALTER TABLE spotify_generation_results 
-                ADD CONSTRAINT fk_generation_results_user_id 
-                FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE SET NULL;
-            END IF;
-        END $$;
+        CREATE TABLE IF NOT EXISTS spotify_generation_results (
+            id SERIAL PRIMARY KEY,
+            title VARCHAR(500) NOT NULL,
+            output_path VARCHAR(1000) NOT NULL,
+            item_name VARCHAR(500),
+            genres JSON,
+            all_genres JSON,
+            style_elements JSON,
+            mood VARCHAR(1000),
+            energy_level VARCHAR(50),
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            spotify_url VARCHAR(1000),
+            lora_name VARCHAR(200),
+            lora_type VARCHAR(20),
+            lora_url VARCHAR(1000),
+            user_id INTEGER
+        );
+        """,
+          # Add foreign keys (simplified for better PostgreSQL compatibility)
+        """
+        ALTER TABLE spotify_login_sessions 
+        ADD CONSTRAINT IF NOT EXISTS fk_login_sessions_user_id 
+        FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE CASCADE;
+        """,
+        """
+        ALTER TABLE spotify_generation_results 
+        ADD CONSTRAINT IF NOT EXISTS fk_generation_results_user_id 
+        FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE SET NULL;
+        """,
+        """
+        ALTER TABLE spotify_lora_models 
+        ADD CONSTRAINT IF NOT EXISTS fk_lora_models_uploaded_by 
+        FOREIGN KEY (uploaded_by) REFERENCES spotify_users(id) ON DELETE SET NULL;
         """,
         
         # Create indexes
         """
         CREATE INDEX IF NOT EXISTS idx_users_email ON spotify_users(email);
         CREATE INDEX IF NOT EXISTS idx_users_spotify_id ON spotify_users(spotify_id);
+        CREATE INDEX IF NOT EXISTS idx_users_spotify_username ON spotify_users(spotify_username);
         CREATE INDEX IF NOT EXISTS idx_sessions_token ON spotify_login_sessions(session_token);
         CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON spotify_login_sessions(user_id);
         CREATE INDEX IF NOT EXISTS idx_oauth_state ON spotify_oauth_states(state);
         """
     ]
     
-    # Use SQLAlchemy 2.0+ syntax
     with db.engine.connect() as connection:
         for i, sql in enumerate(sql_commands):
             try:
@@ -756,6 +772,7 @@ def create_tables_manually():
                 print(f"❌ SQL command {i+1} failed: {e}")
                 raise
 
+# Guest session functions (unchanged)
 def get_or_create_guest_session():
     """Get or create a guest session for anonymous users"""
     if 'guest_session_id' not in session:
@@ -770,7 +787,6 @@ def get_guest_generations_today():
     if 'guest_session_id' not in session:
         return 0
     
-    # Check if it's a new day
     if 'guest_last_generation' in session and session['guest_last_generation']:
         last_gen = datetime.datetime.fromisoformat(session['guest_last_generation'])
         if last_gen.date() != datetime.datetime.utcnow().date():
@@ -787,89 +803,8 @@ def can_guest_generate():
     """Check if guest can generate (limit: 1 per day)"""
     return get_guest_generations_today() < 1
 
-# Enhanced guest session cleanup (run periodically)
-def cleanup_expired_guest_sessions():
-    """Clean up old guest session data (call this periodically)"""
-    try:
-        # This would be more robust with Redis or database storage
-        # For now, sessions auto-expire with Flask's built-in session management
-        pass
-    except Exception as e:
-        print(f"Error cleaning up guest sessions: {e}")
-
-# IP-based rate limiting for guests (alternative approach)
-def check_ip_generation_limit(ip_address):
-    """Check if IP has exceeded daily generation limit"""
-    try:
-        import datetime
-        from datetime import timedelta
-        import json
-        from pathlib import Path
-        
-        # Simple file-based tracking (use Redis in production)
-        ip_log_file = Path("ip_generations.json")
-        
-        today = datetime.datetime.now().date().isoformat()
-        
-        # Load existing data
-        ip_data = {}
-        if ip_log_file.exists():
-            with open(ip_log_file, 'r') as f:
-                ip_data = json.load(f)
-        
-        # Clean old data
-        for ip in list(ip_data.keys()):
-            if ip_data[ip].get('date') != today:
-                del ip_data[ip]
-        
-        # Check current IP
-        if ip_address not in ip_data:
-            ip_data[ip_address] = {'date': today, 'count': 0}
-        
-        current_count = ip_data[ip_address]['count']
-        
-        # Save data
-        with open(ip_log_file, 'w') as f:
-            json.dump(ip_data, f)
-        
-        return current_count < 3  # Max 3 per IP per day
-        
-    except Exception as e:
-        print(f"Error checking IP limit: {e}")
-        return True  # Allow on error
-
-def increment_ip_generation_count(ip_address):
-    """Increment generation count for IP"""
-    try:
-        import json
-        from pathlib import Path
-        import datetime
-        
-        ip_log_file = Path("ip_generations.json")
-        today = datetime.datetime.now().date().isoformat()
-        
-        # Load existing data
-        ip_data = {}
-        if ip_log_file.exists():
-            with open(ip_log_file, 'r') as f:
-                ip_data = json.load(f)
-        
-        # Update count
-        if ip_address not in ip_data:
-            ip_data[ip_address] = {'date': today, 'count': 0}
-        
-        ip_data[ip_address]['count'] += 1
-        
-        # Save data
-        with open(ip_log_file, 'w') as f:
-            json.dump(ip_data, f)
-            
-    except Exception as e:
-        print(f"Error incrementing IP count: {e}")
-
-# Updated get_current_user_or_guest with IP limiting
 def get_current_user_or_guest():
-    """Get current logged in user or return guest info with IP-based limiting"""
+    """Get current logged in user or return guest info"""
     user = get_current_user()
     if user:
         return {
@@ -882,42 +817,27 @@ def get_current_user_or_guest():
             'can_generate': user.can_generate_today(),
             'can_use_loras': True,
             'can_edit_playlists': bool(user.spotify_access_token),
-            'show_upload': user.is_premium_user()
+            'show_upload': user.is_premium_user()  # ONLY premium users can upload files
         }
     else:
-        # Guest user with combined session + IP limiting
         get_or_create_guest_session()
-        ip_address = request.remote_addr or '127.0.0.1'
-        
-        # Check both session and IP limits
-        session_can_generate = can_guest_generate()
-        ip_can_generate = check_ip_generation_limit(ip_address)
-        
         return {
             'type': 'guest',
             'user': None,
             'display_name': 'Guest',
             'is_premium': False,
-            'daily_limit': 1, # Guest session limit
+            'daily_limit': 1,
             'generations_today': get_guest_generations_today(),
-            'can_generate': session_can_generate and ip_can_generate,
+            'can_generate': can_guest_generate(),
             'can_use_loras': False,
             'can_edit_playlists': False,
-            'show_upload': False,
-            'ip_address': ip_address
+            'show_upload': False
         }
 
-# Enhanced generation tracking for guests
 def track_guest_generation():
-    """Track generation for both session and IP"""
+    """Track generation for guest"""
     try:
-        # Session tracking
         increment_guest_generations()
-        
-        # IP tracking
-        ip_address = request.remote_addr or '127.0.0.1'
-        increment_ip_generation_count(ip_address)
-        
     except Exception as e:
         print(f"Error tracking guest generation: {e}")
 
@@ -930,7 +850,7 @@ def inject_template_vars():
         'user_info': get_current_user_or_guest()
     }
 
-# Update the root route
+# ROUTES
 @app.route("/")
 def root():
     """Root route - redirect to login if not authenticated, otherwise to main app"""
@@ -941,10 +861,11 @@ def root():
         return redirect(url_for('login'))
 
 @app.route("/generate", methods=["GET", "POST"])
-@limiter.limit("10 per hour", methods=["POST"]) # Limit POST requests specifically for this route
-def generate(): # Renamed from 'index' to 'generate'
+@limiter.limit("10 per hour", methods=["POST"])
+def generate():
+    """Main generation route"""
     global initialized
-      # Get user or guest info
+    
     user_info = get_current_user_or_guest()
     
     if request.method == "POST" and not user_info['can_generate']:
@@ -957,9 +878,9 @@ def generate(): # Renamed from 'index' to 'generate'
     
     if not initialized:
         if initialize_app():
-            print("Application initialized successfully from index route")
+            print("Application initialized successfully from generate route")
         else:
-            print("Failed to initialize application from index route")
+            print("Failed to initialize application from generate route")
             return render_template(
                 "index.html", 
                 error="Application is still initializing or encountered an issue. Please try again in a moment.",
@@ -1040,7 +961,6 @@ def generate(): # Renamed from 'index' to 'generate'
             
             # Increment generation count
             if user_info['type'] == 'guest':
-                # Use the new enhanced tracking
                 track_guest_generation()
             
             img_filename = os.path.basename(result["output_path"])
@@ -1064,7 +984,9 @@ def generate(): # Renamed from 'index' to 'generate'
                 else:
                     genre_percentages_data = calculate_genre_percentages(result.get("all_genres", []))
             except Exception as e:
-                print(f"⚠️ Error calculating genre percentages: {e}")            # Extract playlist ID with fallback
+                print(f"⚠️ Error calculating genre percentages: {e}")
+            
+            # Extract playlist ID with fallback
             playlist_id = None
             try:
                 if 'utils_available' in globals() and utils_available:
@@ -1092,7 +1014,7 @@ def generate(): # Renamed from 'index' to 'generate'
                 "lora_type": result.get("lora_type", ""),
                 "lora_url": result.get("lora_url", ""),
                 "user_info": user_info,
-                "user": user_info.get('user'),  # Add user object for template compatibility
+                "user": user_info.get('user'),
                 "can_edit_playlist": user_info['can_edit_playlists'],
                 "playlist_id": playlist_id
             }
@@ -1129,305 +1051,10 @@ def generate(): # Renamed from 'index' to 'generate'
     else:
         return render_template("index.html", loras=loras)
 
-@app.route('/api/playlist/edit', methods=['POST'])
+# LoRA UPLOAD ROUTE (FIXED FOR FILE UPLOADS ONLY)
+@app.route('/spotify/api/upload_lora', methods=['POST'])
 @login_required
-def edit_playlist():
-    """Edit Spotify playlist title and description"""
-    try:
-        user = get_current_user()
-        if not user or not user.spotify_access_token:
-            return jsonify({"success": False, "error": "Spotify not connected"}), 401
-        
-        # Refresh token if needed
-        if not user.refresh_spotify_token_if_needed():
-            return jsonify({"success": False, "error": "Failed to refresh Spotify token"}), 401
-        
-        data = request.get_json()
-        playlist_id = data.get('playlist_id')
-        name = data.get('name')
-        description = data.get('description', '')
-        
-        if not playlist_id or not name:
-            return jsonify({"success": False, "error": "Missing playlist ID or name"}), 400
-        
-        # Update playlist using Spotify API
-        headers = {'Authorization': f'Bearer {user.spotify_access_token}'}
-        url = f'https://api.spotify.com/v1/playlists/{playlist_id}'
-        
-        payload = {
-            'name': name,
-            'description': description
-        }
-        
-        response = requests.put(url, headers=headers, json=payload)
-        
-        if response.status_code == 200:
-            return jsonify({"success": True, "message": "Playlist updated successfully"})
-        else:
-            error_msg = "Failed to update playlist"
-            if response.status_code == 403:
-                error_msg = "You don\'t have permission to edit this playlist"
-            elif response.status_code == 404:
-                error_msg = "Playlist not found"
-            
-            return jsonify({"success": False, "error": error_msg}), response.status_code
-    
-    except Exception as e:
-        print(f"Error editing playlist: {e}")
-        return jsonify({"success": False, "error": "Internal server error"}), 500
-
-@app.route('/api/playlist/cover', methods=['POST']) 
-@login_required
-def update_playlist_cover():
-    """Update Spotify playlist cover image"""
-    try:
-        user = get_current_user()
-        if not user or not user.spotify_access_token:
-            return jsonify({"success": False, "error": "Spotify not connected"}), 401
-        
-        # Refresh token if needed
-        if not user.refresh_spotify_token_if_needed():
-            return jsonify({"success": False, "error": "Failed to refresh Spotify token"}), 401
-        
-        data = request.get_json()
-        playlist_id = data.get('playlist_id')
-        image_data = data.get('image_data')
-        
-        if not playlist_id or not image_data:
-            return jsonify({"success": False, "error": "Missing playlist ID or image data"}), 400
-        
-        # Extract base64 data from data URL
-        if image_data.startswith('data:image'):
-            # Remove data URL prefix
-            image_data = image_data.split(',')[1]
-        
-        # Update playlist cover using Spotify API
-        headers = {
-            'Authorization': f'Bearer {user.spotify_access_token}',
-            'Content-Type': 'image/jpeg'
-        }
-        url = f'https://api.spotify.com/v1/playlists/{playlist_id}/images'
-        
-        # Decode base64 image
-        import base64
-        image_bytes = base64.b64decode(image_data)
-        
-        response = requests.put(url, headers=headers, data=image_bytes)
-        
-        if response.status_code == 202:  # Spotify returns 202 for successful image upload
-            return jsonify({"success": True, "message": "Playlist cover updated successfully"})
-        else:
-            error_msg = "Failed to update playlist cover"
-            if response.status_code == 403:
-                error_msg = "You don\'t have permission to edit this playlist"
-            elif response.status_code == 404:
-                error_msg = "Playlist not found"
-            elif response.status_code == 413:
-                error_msg = "Image too large (max 256KB)"
-            
-            return jsonify({"success": False, "error": error_msg}), response.status_code
-    
-    except Exception as e:
-        print(f"Error updating playlist cover: {e}")
-        return jsonify({"success": False, "error": "Internal server error"}), 500
-
-@app.route('/api/generate', methods=['POST'])
-@limiter.limit("10 per hour")
-def api_generate():
-    """API endpoint for generating covers programmatically"""
-    try:
-        # Get user info for rate limiting and feature access
-        user_info = get_current_user_or_guest()
-        
-        # Check generation limits
-        if not user_info['can_generate']:
-            return jsonify({
-                "success": False, 
-                "error": f"Daily generation limit reached ({user_info['daily_limit']} per day)"
-            }), 429
-        
-        # Get request data
-        data = request.get_json()
-        if not data:
-            return jsonify({"success": False, "error": "No JSON data provided"}), 400
-        
-        playlist_url = data.get('playlist_url', '').strip()
-        mood = data.get('mood', '').strip()
-        negative_prompt = data.get('negative_prompt', '').strip()
-        lora_name = data.get('lora_name', '').strip()
-        
-        # Validate required fields
-        if not playlist_url:
-            return jsonify({"success": False, "error": "playlist_url is required"}), 400
-        
-        # Restrict LoRA usage for guests
-        if user_info['type'] == 'guest' and lora_name and lora_name != "none":
-            return jsonify({
-                "success": False, 
-                "error": "LoRA styles are only available for registered users"
-            }), 403
-        
-        # Get LoRA if specified and user has access
-        lora_input = None
-        if lora_name and lora_name != "none" and user_info['can_use_loras']:
-            try:
-                if 'utils_available' in globals() and utils_available:
-                    import utils
-                    loras = utils.get_available_loras()
-                    for lora_item in loras:
-                        if hasattr(lora_item, 'name') and lora_item.name == lora_name:
-                            lora_input = lora_item
-                            break
-            except Exception as e:
-                print(f"Error getting LoRA: {e}")
-        
-        # Check if generation modules are available
-        try:
-            import generator
-        except ImportError:
-            return jsonify({
-                "success": False, 
-                "error": "Generation modules not available"
-            }), 503
-        
-        # Generate the cover
-        user_id = user_info['user'].id if user_info['type'] == 'user' else None
-        result = generator.generate_cover(
-            playlist_url, 
-            mood, 
-            lora_input, 
-            negative_prompt=negative_prompt, 
-            user_id=user_id
-        )
-        
-        if "error" in result:
-            return jsonify({"success": False, "error": result["error"]}), 400
-        
-        # Track generation
-        if user_info['type'] == 'guest':
-            track_guest_generation()
-        
-        # Prepare response data
-        response_data = {
-            "success": True,
-            "title": result["title"],
-            "image_file": os.path.basename(result["output_path"]),
-            "image_data_base64": result.get("image_data_base64", ""),
-            "genres": result.get("genres", []),
-            "all_genres": result.get("all_genres", []),
-            "mood": result.get("mood", mood),
-            "playlist_name": result.get("item_name", "Your Music"),
-            "found_genres": bool(result.get("genres", [])),
-            "lora_name": result.get("lora_name", ""),
-            "lora_type": result.get("lora_type", ""),
-            "lora_url": result.get("lora_url", ""),
-            "spotify_url": playlist_url
-        }
-        
-        # Save to database if user is logged in
-        if user_info['type'] == 'user':
-            try:
-                new_generation = GenerationResultDB(
-                    title=result["title"],
-                    output_path=result["output_path"],
-                    item_name=result.get("item_name"),
-                    genres=result.get("genres"),
-                    all_genres=result.get("all_genres"),
-                    mood=mood,
-                    spotify_url=playlist_url,
-                    lora_name=result.get("lora_name"),
-                    user_id=user_info['user'].id
-                )
-                db.session.add(new_generation)
-                db.session.commit()
-            except Exception as e:
-                print(f"⚠️ Error saving generation result to DB: {e}")
-        
-        return jsonify(response_data)
-        
-    except Exception as e:
-        print(f"Error in API generate endpoint: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            "success": False, 
-            "error": "Internal server error"
-        }), 500
-
-@app.route('/api/regenerate', methods=['POST'])
-@login_required
-def regenerate_cover():
-    """Regenerate cover with same playlist"""
-    try:
-        user = get_current_user()
-        if not user:
-            return jsonify({"success": False, "error": "User not authenticated"}), 401
-        
-        if not user.can_generate_today():
-            return jsonify({"success": False, "error": "Daily generation limit reached"}), 429
-        
-        data = request.get_json()
-        playlist_url = data.get('playlist_url')
-        mood = data.get('mood', '')
-        negative_prompt = data.get('negative_prompt', '')
-        lora_name = data.get('lora_name', '')
-        
-        if not playlist_url:
-            return jsonify({"success": False, "error": "Missing playlist URL"}), 400
-        
-        # Get LoRA if specified
-        lora_input = None
-        if lora_name and lora_name != "none":
-            try:
-                import utils
-                loras = utils.get_available_loras()
-                for lora_item in loras:
-                    if hasattr(lora_item, 'name') and lora_item.name == lora_name:
-                        lora_input = lora_item
-                        break
-            except Exception as e:
-                print(f"Error getting LoRA: {e}")
-        
-        # Generate new cover
-        try:
-            import generator
-            result = generator.generate_cover(
-                playlist_url, 
-                mood, 
-                lora_input, 
-                negative_prompt=negative_prompt, 
-                user_id=user.id
-            )
-            
-            if "error" in result:
-                return jsonify({"success": False, "error": result["error"]}), 400
-            
-            # Return all relevant data for the frontend to update
-            return jsonify({
-                "success": True, 
-                "message": "Cover regenerated successfully",
-                "title": result["title"],
-                "image_file": os.path.basename(result["output_path"]),
-                "image_data_base64": result.get("image_data_base64", ""),
-                "genres": ", ".join(result.get("genres", [])),
-                "mood": result.get("mood", ""),
-                "playlist_name": result.get("item_name", "Your Music"),
-                "found_genres": bool(result.get("genres", [])),
-                "lora_name": result.get("lora_name", ""),
-                "lora_type": result.get("lora_type", ""),
-                "lora_url": result.get("lora_url", "")            })
-            
-        except Exception as e:
-            print(f"Error generating cover: {e}")
-            return jsonify({"success": False, "error": "Failed to generate cover"}), 500
-            
-    except Exception as e:
-        print(f"Error in regenerate endpoint: {e}")
-        return jsonify({"success": False, "error": "Internal server error"}), 500
-
-@app.route('/api/upload_lora', methods=['POST'])
-@login_required
-@limiter.limit("5 per hour")  # Limit uploads
+@limiter.limit("5 per hour")
 def upload_lora():
     """Upload LoRA file (Premium users only)"""
     try:
@@ -1437,7 +1064,10 @@ def upload_lora():
         
         # Check if user is premium (only premium users can upload files)
         if not user.is_premium_user():
-            return jsonify({"success": False, "error": "File uploads are only available for premium users. Use URL-based LoRAs instead."}), 403
+            return jsonify({
+                "success": False, 
+                "error": "File uploads are only available for premium users. Premium access is granted to bentakaki7@gmail.com and Spotify user 'benthegamer'."
+            }), 403
         
         # Check if file was uploaded
         if 'file' not in request.files:
@@ -1450,7 +1080,10 @@ def upload_lora():
         # Validate file extension
         filename = secure_filename(file.filename)
         if not filename.lower().endswith(('.safetensors', '.ckpt', '.pt')):
-            return jsonify({"success": False, "error": "Invalid file type. Only .safetensors, .ckpt, and .pt files are allowed."}), 400
+            return jsonify({
+                "success": False, 
+                "error": "Invalid file type. Only .safetensors, .ckpt, and .pt files are allowed."
+            }), 400
         
         # Get name without extension for database
         lora_name = filename.rsplit('.', 1)[0]
@@ -1458,31 +1091,29 @@ def upload_lora():
         # Check if LoRA with this name already exists
         existing = LoraModelDB.query.filter_by(name=lora_name).first()
         if existing:
-            return jsonify({"success": False, "error": f"LoRA with name '{lora_name}' already exists"}), 400
-        
-        # Handle file storage based on environment
-        if os.getenv("RENDER"):
-            # On Render, files are ephemeral - return error with suggestion
             return jsonify({
                 "success": False, 
-                "error": "File uploads are not supported on this hosting platform. Please use URL-based LoRAs from Civitai or HuggingFace instead."
+                "error": f"LoRA with name '{lora_name}' already exists"
             }), 400
         
-        # Save file locally (for local development)
-        from config import LORA_DIR
-        LORA_DIR.mkdir(exist_ok=True)
+        # Create LoRA directory if it doesn't exist
+        lora_dir = BASE_DIR / "loras"
+        lora_dir.mkdir(exist_ok=True)
         
-        file_path = LORA_DIR / filename
+        # Save file
+        file_path = lora_dir / filename
         file.save(str(file_path))
+        
+        # Get file size
+        file_size = os.path.getsize(str(file_path))
         
         # Add to database
         new_lora = LoraModelDB(
             name=lora_name,
             source_type="local",
             path=str(file_path),
-            url="",
-            trigger_words=[],
-            strength=0.7
+            file_size=file_size,
+            uploaded_by=user.id
         )
         
         db.session.add(new_lora)
@@ -1490,86 +1121,95 @@ def upload_lora():
         
         return jsonify({
             "success": True, 
-            "message": f"LoRA '{lora_name}' uploaded successfully"
+            "message": f"LoRA '{lora_name}' uploaded successfully ({file_size} bytes)"
         })
         
     except Exception as e:
         print(f"Error uploading LoRA: {e}")
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
-@app.route('/api/add_lora_link', methods=['POST'])
+# Add new LoRA management and upload info routes
+@app.route('/spotify/api/delete_lora', methods=['DELETE'])
 @login_required
-@limiter.limit("10 per hour")  # Allow more URL-based additions
-def add_lora_link():
-    """Add LoRA via URL (available for all registered users)"""
+@limiter.limit("10 per hour")
+def delete_lora():
+    """Delete LoRA file (All users can delete their own uploads)"""
     try:
         user = get_current_user()
         if not user:
             return jsonify({"success": False, "error": "User not authenticated"}), 401
-        
         data = request.get_json()
-        name = data.get('name', '').strip()
-        url = data.get('url', '').strip()
-        trigger_words = data.get('trigger_words', [])
-        strength = float(data.get('strength', 0.7))
-        
-        if not name or not url:
-            return jsonify({"success": False, "error": "Name and URL are required"}), 400
-        
-        # Check if LoRA with this name already exists
-        existing = LoraModelDB.query.filter_by(name=name).first()
-        if existing:
-            return jsonify({"success": False, "error": f"LoRA with name '{name}' already exists"}), 400
-        
-        # Validate URL format
-        try:
-            from urllib.parse import urlparse
-            result = urlparse(url)
-            if not all([result.scheme, result.netloc]):
-                return jsonify({"success": False, "error": "Invalid URL format"}), 400
-        except:
-            return jsonify({"success": False, "error": "Invalid URL format"}), 400
-          # Add to database
-        new_lora = LoraModelDB(
-            name=name,
-            source_type="link",
-            path="",
-            url=url,
-            trigger_words=trigger_words or [],
-            strength=strength
-        )
-        
-        db.session.add(new_lora)
+        lora_name = data.get('name', '').strip()
+        if not lora_name:
+            return jsonify({"success": False, "error": "LoRA name is required"}), 400
+        lora_record = LoraModelDB.query.filter_by(name=lora_name).first()
+        if not lora_record:
+            return jsonify({"success": False, "error": "LoRA not found"}), 404
+        if not user.is_premium_user() and lora_record.uploaded_by != user.id:
+            return jsonify({"success": False, "error": "You can only delete LoRAs you uploaded"}), 403
+        if lora_record.path and os.path.exists(lora_record.path):
+            try:
+                os.remove(lora_record.path)
+                print(f"Deleted LoRA file: {lora_record.path}")
+            except Exception as e:
+                print(f"Could not delete file {lora_record.path}: {e}")
+        db.session.delete(lora_record)
         db.session.commit()
-        
-        return jsonify({
-            "success": True, 
-            "message": f"LoRA '{name}' added successfully"
-        })
-            
+        return jsonify({"success": True, "message": f"LoRA '{lora_name}' deleted successfully"})
     except Exception as e:
-        print(f"Error adding LoRA link: {e}")
+        print(f"Error deleting LoRA: {e}")
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
-@app.route('/api/loras')
+
+def get_user_lora_upload_info(user):
+    """Get user's LoRA upload info"""
+    if not user:
+        return {"can_upload": False, "current_count": 0, "limit": 0}
+    current_count = LoraModelDB.query.filter_by(source_type="local", uploaded_by=user.id).count()
+    if user.is_premium_user():
+        return {"can_upload": True, "current_count": current_count, "limit": "unlimited", "is_premium": True}
+    return {"can_upload": current_count < 2, "current_count": current_count, "limit": 2, "is_premium": False}
+
+@app.route('/spotify/api/upload_info')
+@login_required
+def get_upload_info():
+    """Get user's upload information"""
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "Not authenticated"}), 401
+    return jsonify(get_user_lora_upload_info(user))
+
+@app.route('/spotify/api/loras')
 def get_loras():
-    """Get list of available LoRAs"""
+    """Get list of available LoRAs (file uploads only) with ownership info"""
     try:
         user = get_current_user()
-        if not user:
-            return jsonify({"loras": []})
         
         loras = []
-        db_loras = LoraModelDB.query.all()
+        db_loras = LoraModelDB.query.filter_by(source_type="local").all()
         
         for db_lora in db_loras:
-            loras.append({
-                "name": db_lora.name,
-                "source_type": db_lora.source_type,
-                "url": db_lora.url if db_lora.source_type == "link" else "",
-                "trigger_words": db_lora.trigger_words or [],
-                "strength": db_lora.strength
-            })
+            # Check if file still exists
+            if db_lora.path and os.path.exists(db_lora.path):
+                lora_data = {
+                    "name": db_lora.name,
+                    "source_type": "local",
+                    "file_size": db_lora.file_size or 0,
+                    "uploaded_at": db_lora.uploaded_at.isoformat() if db_lora.uploaded_at else None,
+                    "can_delete": False,
+                    "uploaded_by_current_user": False
+                }
+                
+                # Add ownership info if user is logged in
+                if user:
+                    lora_data["uploaded_by_current_user"] = (db_lora.uploaded_by == user.id)
+                    # User can delete if: they uploaded it, or they're premium
+                    lora_data["can_delete"] = (
+                        db_lora.uploaded_by == user.id or 
+                        user.is_premium_user()
+                    )
+                
+                loras.append(lora_data)
         
         return jsonify({"loras": loras})
         
@@ -1577,245 +1217,7 @@ def get_loras():
         print(f"Error getting LoRAs: {e}")
         return jsonify({"loras": []})
 
-@app.route("/generated_covers/<path:filename>")
-def serve_image(filename):
-    return send_from_directory(COVERS_DIR, filename)
-
-# Add this route for checking generation status
-@app.route('/api/generation-status')
-def generation_status():
-    """API endpoint to check generation status"""
-    user_info = get_current_user_or_guest()
-    
-    return jsonify({
-        'type': user_info['type'],
-        'can_generate': user_info['can_generate'],
-        'generations_today': user_info['generations_today'],
-        'daily_limit': user_info['daily_limit'],
-        'display_name': user_info['display_name']
-    })
-
-# Guest conversion tracking
-def track_guest_conversion():
-    """Track when guests sign up (for analytics)"""
-    try:
-        if 'guest_session_id' in session:
-            guest_id = session['guest_session_id']
-            # Log conversion event (implement your analytics here)
-            print(f"Guest {guest_id} converted to user account")
-            
-            # Clear guest session
-            session.pop('guest_session_id', None)
-            session.pop('guest_generations_today', None)
-            session.pop('guest_last_generation', None)
-            
-    except Exception as e:
-        print(f"Error tracking conversion: {e}")
-
-# Update the register route
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    """Updated register route with conversion tracking"""
-    if request.method == 'POST':
-        email = request.form.get('email')
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        if not email or not username or not password:
-            flash('All fields are required.', 'error')
-            return redirect(url_for('register'))
-
-        if User.query.filter_by(email=email).first():
-            flash('Email already registered.', 'error')
-            return redirect(url_for('register'))
-        
-        if User.query.filter_by(username=username).first():
-            flash('Username already taken.', 'error')
-            return redirect(url_for('register'))
-
-        # Create new user
-        password_hash = generate_password_hash(password)
-        new_user = User(
-            email=email, 
-            username=username, 
-            display_name=username,
-            password_hash=password_hash
-        )
-        
-        try:
-            db.session.add(new_user)
-            db.session.commit()
-            
-            # After successful user creation, track conversion
-            track_guest_conversion()
-            
-            flash('Registration successful! Please log in.', 'success')
-            return redirect(url_for('login'))
-        except Exception as e:
-            db.session.rollback()
-            print(f"Error creating user: {e}")
-            flash('Registration failed. Please try again.', 'error')
-            return redirect(url_for('register'))
-        
-    return render_template('register.html')
-
-# Optional: Analytics tracking
-def log_generation_analytics(user_info, success=True):
-    """Log generation analytics"""
-    try:
-        analytics_data = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'user_type': user_info['type'],
-            'success': success,
-            'ip_address': request.remote_addr,
-            'user_agent': request.headers.get('User-Agent', '')[:200],  # Truncate
-        }
-        
-        # Add to your analytics system here
-        # For now, just log to console
-        print(f"Analytics: {analytics_data}")
-        
-    except Exception as e:
-        print(f"Error logging analytics: {e}")
-
-# Add this function to check system health
-@app.route('/api/system-status')
-def system_status():
-    """Check system status and availability"""
-    try:
-        # Check if core systems are working
-        # Ensure config variables are loaded, use os.environ.get as fallback
-        SPOTIFY_CLIENT_ID_STATUS = bool(os.environ.get('SPOTIFY_CLIENT_ID') or (globals().get('SPOTIFY_CLIENT_ID')))
-        SPOTIFY_CLIENT_SECRET_STATUS = bool(os.environ.get('SPOTIFY_CLIENT_SECRET') or (globals().get('SPOTIFY_CLIENT_SECRET')))
-        GEMINI_API_KEY_STATUS = bool(os.environ.get('GEMINI_API_KEY') or (globals().get('GEMINI_API_KEY')))
-        STABILITY_API_KEY_STATUS = bool(os.environ.get('STABILITY_API_KEY') or (globals().get('STABILITY_API_KEY')))
-
-        status = {
-            'status': 'healthy',
-            'spotify_api': SPOTIFY_CLIENT_ID_STATUS and SPOTIFY_CLIENT_SECRET_STATUS,
-            'gemini_api': GEMINI_API_KEY_STATUS,
-            'stability_api': STABILITY_API_KEY_STATUS,
-            'database': False,
-            'guest_mode': True # Assuming guest mode is always enabled
-        }
-        
-        # Test database connection
-        try:
-            with db.engine.connect() as connection:
-                connection.execute(text('SELECT 1'))
-            status['database'] = True
-        except Exception as db_err:
-            print(f"Database connection test failed: {db_err}")
-            status['database'] = False
-        
-        # Overall health check
-        if not (status['spotify_api'] and status['gemini_api'] and status['stability_api'] and status['database']):
-            status['status'] = 'degraded'
-            if not status['database']:
-                 print("System status degraded: Database connection failed.")
-            if not (status['spotify_api'] and status['gemini_api'] and status['stability_api']):
-                 print("System status degraded: One or more API keys are missing.")
-
-        return jsonify(status)
-        
-    except Exception as e:
-        print(f"Error in system_status: {e}")
-        return jsonify({
-            'status': 'error',
-            'error': str(e)
-        }), 500
-
-# Authentication Routes
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    """Login route - handle both form login and Spotify OAuth"""
-    if request.method == 'POST':
-        # Handle form-based login (if you have username/password)
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        if username and password:
-            user = User.query.filter_by(username=username).first()
-            if user and check_password_hash(user.password_hash, password):
-                # Create session
-                session_token = secrets.token_urlsafe(32)
-                login_session = LoginSession(
-                    user_id=user.id,
-                    session_token=session_token,
-                    expires_at=datetime.datetime.utcnow() + timedelta(days=30),
-                    ip_address=request.remote_addr,
-                    user_agent=request.headers.get('User-Agent', '')
-                )
-                db.session.add(login_session)
-                user.last_login = datetime.datetime.utcnow()
-                db.session.commit()
-                
-                session['user_session'] = session_token
-                flash('Logged in successfully!', 'success')
-                return redirect(url_for('generate'))
-            else:
-                flash('Invalid username or password', 'error')
-        else:
-            flash('Please enter both username and password', 'error')
-    
-    # For GET requests or failed login, show login page
-    return render_template('login.html')
-
-@app.route('/logout')
-def logout():
-    """Logout route"""
-    if 'user_session' in session:
-        # Mark session as inactive
-        session_token = session['user_session']
-        login_session = LoginSession.query.filter_by(session_token=session_token).first()
-        if login_session:
-            login_session.is_active = False
-            db.session.commit()
-        
-        session.pop('user_session', None)
-    
-    # Clear guest session data as well
-    session.pop('guest_session_id', None)
-    session.pop('guest_created', None) 
-    session.pop('guest_generations_today', None)
-    session.pop('guest_last_generation', None)
-    
-    flash('You have been logged out', 'info')
-    return redirect(url_for('login'))
-
-@app.route('/profile')
-@login_required
-def profile():
-    """User profile page"""
-    user = get_current_user()
-    if not user:
-        return redirect(url_for('login'))
-    
-    # Get user statistics
-    total_generations = GenerationResultDB.query.filter_by(user_id=user.id).count()
-    generations_today = user.get_generations_today()
-    daily_limit = user.get_daily_generation_limit()
-    
-    # Get recent generations
-    recent_generations = (GenerationResultDB.query
-                         .filter_by(user_id=user.id)
-                         .order_by(GenerationResultDB.created_at.desc())
-                         .limit(10)
-                         .all())
-    
-    profile_data = {
-        'user': user,
-        'total_generations': total_generations,
-        'generations_today': generations_today,
-        'daily_limit': daily_limit,
-        'can_generate': user.can_generate_today(),
-        'recent_generations': recent_generations,
-        'spotify_connected': bool(user.spotify_access_token),
-        'is_premium': user.is_premium_user()
-    }
-    
-    return render_template('profile.html', **profile_data)
-
+# SPOTIFY AUTH ROUTES (FIXED)
 @app.route('/spotify-login')
 def spotify_login():
     """Initiate Spotify OAuth flow"""
@@ -1830,7 +1232,7 @@ def spotify_login():
     db.session.commit()
     
     # Spotify OAuth parameters
-    scope = 'playlist-read-private playlist-modify-public playlist-modify-private ugc-image-upload'
+    scope = 'playlist-read-private playlist-modify-public playlist-modify-private ugc-image-upload user-read-email user-read-private'
     redirect_uri = SPOTIFY_REDIRECT_URI
     
     auth_url = (
@@ -1846,7 +1248,7 @@ def spotify_login():
 
 @app.route('/spotify-callback')
 def spotify_callback():
-    """Handle Spotify OAuth callback"""
+    """Handle Spotify OAuth callback - FIXED PREMIUM DETECTION"""
     try:
         code = request.args.get('code')
         state = request.args.get('state')
@@ -1896,6 +1298,8 @@ def spotify_callback():
         spotify_user = user_response.json()
         spotify_id = spotify_user['id']
         
+        print(f"🔍 Spotify user data: {spotify_user}")  # Debug log
+        
         # Find or create user
         user = User.query.filter_by(spotify_id=spotify_id).first()
         
@@ -1906,14 +1310,15 @@ def spotify_callback():
                 spotify_username=spotify_user.get('id'),
                 display_name=spotify_user.get('display_name', spotify_user.get('id')),
                 email=spotify_user.get('email'),
-                is_premium=spotify_user.get('product') == 'premium'
+                is_premium=False  # Will be determined by is_premium_user() method
             )
             db.session.add(user)
+            print(f"✓ Created new user with email: {user.email}, spotify_username: {user.spotify_username}")
         else:
             # Update existing user
             user.display_name = spotify_user.get('display_name', spotify_user.get('id'))
             user.email = spotify_user.get('email')
-            user.is_premium = spotify_user.get('product') == 'premium'
+            print(f"✓ Updated existing user with email: {user.email}, spotify_username: {user.spotify_username}")
         
         # Update tokens
         user.spotify_access_token = access_token
@@ -1923,6 +1328,10 @@ def spotify_callback():
         
         db.session.commit()
         
+        # Check if user is premium AFTER saving to database
+        is_premium = user.is_premium_user()
+        print(f"🔍 Premium check result: {is_premium} for email: {user.email}, spotify_username: {user.spotify_username}")
+        
         # Create login session
         session_token = LoginSession.create_session(
             user.id,
@@ -1930,7 +1339,7 @@ def spotify_callback():
             user_agent=request.headers.get('User-Agent', '')
         )
         
-        # Set session variables (BOTH for compatibility)
+        # Set session variables
         session['user_id'] = user.id
         session['user_session'] = session_token
         session['username'] = user.display_name or user.username
@@ -1939,32 +1348,162 @@ def spotify_callback():
         resp = make_response(redirect(url_for('generate')))
         resp.set_cookie('session_token', session_token, max_age=30*24*60*60)  # 30 days
         
-        flash('Successfully connected to Spotify!', 'success')
-        track_guest_conversion()
+        # Show different flash messages based on premium status
+        if is_premium:
+            flash('🌟 Welcome back, Premium user! You have unlimited generations and file upload access.', 'success')
+        else:
+            flash('Successfully connected to Spotify! You have 2 daily generations.', 'success')
         
         return resp
         
     except Exception as e:
         print(f"Error in Spotify callback: {e}")
+        import traceback
+        traceback.print_exc()
         flash('An error occurred during Spotify authorization', 'error')
         return redirect(url_for('generate'))
 
-# Fix the result template reference to 'index'
-@app.route('/index')
-def index():
-    """Redirect /index to /generate for backward compatibility"""
-    return redirect(url_for('generate'))
+# OTHER ROUTES (login, logout, profile, etc. - keep existing)
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login route - handle both form login and Spotify OAuth"""
+    if request.method == 'POST':
+        # Handle form-based login
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if username and password:
+            user = User.query.filter_by(username=username).first()
+            if user and check_password_hash(user.password_hash, password):
+                # Create session
+                session_token = secrets.token_urlsafe(32)
+                login_session = LoginSession(
+                    user_id=user.id,
+                    session_token=session_token,
+                    expires_at=datetime.datetime.utcnow() + timedelta(days=30),
+                    ip_address=request.remote_addr,
+                    user_agent=request.headers.get('User-Agent', '')
+                )
+                db.session.add(login_session)
+                user.last_login = datetime.datetime.utcnow()
+                db.session.commit()
+                
+                session['user_session'] = session_token
+                flash('Logged in successfully!', 'success')
+                return redirect(url_for('generate'))
+            else:
+                flash('Invalid username or password', 'error')
+        else:
+            flash('Please enter both username and password', 'error')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    """Logout route"""
+    if 'user_session' in session:
+        # Mark session as inactive
+        session_token = session['user_session']
+        login_session = LoginSession.query.filter_by(session_token=session_token).first()
+        if login_session:
+            login_session.is_active = False
+            db.session.commit()
+        
+        session.pop('user_session', None)
+    
+    # clear all session data
+    session.clear()
+    
+    flash('You have been logged out', 'info')
+    return redirect(url_for('login'))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Register route"""
+    if request.method == 'POST':
+        email = request.form.get('email')
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if not email or not username or not password:
+            flash('All fields are required.', 'error')
+            return redirect(url_for('register'))
+
+        if User.query.filter_by(email=email).first():
+            flash('Email already registered.', 'error')
+            return redirect(url_for('register'))
+        
+        if User.query.filter_by(username=username).first():
+            flash('Username already taken.', 'error')
+            return redirect(url_for('register'))
+
+        # Create new user
+        password_hash = generate_password_hash(password)
+        new_user = User(
+            email=email, 
+            username=username, 
+            display_name=username,
+            password_hash=password_hash
+        )
+        
+        try:
+            db.session.add(new_user)
+            db.session.commit()
+            
+            flash('Registration successful! Please log in.', 'success')
+            return redirect(url_for('login'))
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error creating user: {e}")
+            flash('Registration failed. Please try again.', 'error')
+            return redirect(url_for('register'))
+        
+    return render_template('register.html')
+
+@app.route('/profile')
+@login_required
+def profile():
+    """User profile page"""
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('login'))
+    
+    # Get user statistics
+    total_generations = GenerationResultDB.query.filter_by(user_id=user.id).count()
+    generations_today = user.get_generations_today()
+    daily_limit = user.get_daily_generation_limit()
+    
+    # Get recent generations
+    recent_generations = (GenerationResultDB.query
+                         .filter_by(user_id=user.id)
+                         .order_by(GenerationResultDB.timestamp.desc())
+                         .limit(10)
+                         .all())
+    
+    profile_data = {
+        'user': user,
+        'total_generations': total_generations,
+        'generations_today': generations_today,
+        'daily_limit': daily_limit,
+        'can_generate': user.can_generate_today(),
+        'recent_generations': recent_generations,
+        'spotify_connected': bool(user.spotify_access_token),
+        'is_premium': user.is_premium_user()
+    }
+    
+    return render_template('profile.html', **profile_data)
+
+@app.route("/generated_covers/<path:filename>")
+def serve_image(filename):
+    return send_from_directory(COVERS_DIR, filename)
 
 if __name__ == '__main__':
-    # For Render deployment
-    print("🚀 Starting Spotify Cover Generator for Render")
-    
-    # Initialize the app
+    print("Initializing application...")
+    # Application startup logic
+    from models import initialize_app
     if initialize_app():
-        print("✅ Application initialized successfully")
+        print("Application initialized successfully")
     else:
-        print("⚠️ Application initialization had issues, but continuing...")
-    
-    # Render uses the PORT environment variable
+        print("Application initialization had issues; continuing...")
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=False, host="0.0.0.0", port=port)

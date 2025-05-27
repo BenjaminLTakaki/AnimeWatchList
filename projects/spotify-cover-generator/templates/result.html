@@ -286,9 +286,8 @@
                 {% endif %}
             </div>
         </div>
-        
-        <div class="actions">
-            <a href="{{ url_for('index') }}" class="button">Generate Another Cover</a>
+          <div class="actions">
+            <a href="{{ url_for('generate') }}" class="button">Generate Another Cover</a>
             {% if user_info.can_generate %}
             <button id="regenerate-cover" class="button" 
                     data-playlist-url="{{ playlist_url }}" 
@@ -377,10 +376,9 @@
                     showStatus('Please enter a title', 'error');
                     return;
                 }
+                  showStatus('Updating playlist...', 'info');
                 
-                showStatus('Updating playlist...', 'info');
-                
-                fetch('/api/playlist/edit', {
+                fetch('/spotify/api/playlist/edit', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -427,10 +425,9 @@
                     canvas.width = coverImg.naturalWidth;
                     canvas.height = coverImg.naturalHeight;
                     ctx.drawImage(coverImg, 0, 0);
-                    imageData = canvas.toDataURL('image/jpeg', 0.8);
-                }
+                    imageData = canvas.toDataURL('image/jpeg', 0.8);                }
                 
-                fetch('/api/playlist/cover', {
+                fetch('/spotify/api/playlist/cover', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -465,9 +462,8 @@
                     showStatus('Please enter a title', 'error');
                     return;
                 }
-                
-                // Update playlist info
-                fetch('/api/playlist/edit', {
+                  // Update playlist info
+                fetch('/spotify/api/playlist/edit', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

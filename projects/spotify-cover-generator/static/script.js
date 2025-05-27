@@ -124,9 +124,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create loading state
             uploadStatus.textContent = 'Uploading...';
             uploadStatus.className = '';
-            
-            // Submit via AJAX
-            fetch('/api/upload_lora', {
+              // Submit via AJAX
+            fetch('/spotify/api/upload_lora', {
                 method: 'POST',
                 body: formData
             })
@@ -201,9 +200,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // Create loading state
             urlStatus.textContent = 'Adding LoRA...';
             urlStatus.className = '';
-            
-            // Submit via AJAX
-            fetch('/api/add_lora_link', {
+              // Submit via AJAX
+            fetch('/spotify/api/add_lora_link', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -353,9 +351,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             `;
             document.body.appendChild(loadingOverlay);
-            
-            // Make AJAX request to regenerate endpoint
-            fetch('/api/regenerate', {
+              // Make AJAX request to regenerate endpoint
+            fetch('/spotify/api/regenerate', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
