@@ -375,7 +375,7 @@ def create_app(config_name=None):
             else:
                 flash('Please upload a PDF file only', 'error')
         
-        return render_template('skillstown_assessment.html')
+        return render_template('assessment/assessment.html')
 
     @app.route('/analysis-results/<int:profile_id>')
     @login_required
