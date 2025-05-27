@@ -213,7 +213,8 @@ def create_app(config_name=None):
         app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     else:
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///skillstown.db'
-      app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     # Add file upload size limit
     app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB limit
