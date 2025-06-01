@@ -118,18 +118,27 @@ class LiveSpotifyTitleGenerator:
         
         for artist_id in artist_ids[:5]:  # Limit to avoid quota issues
             try:
-                # Get related artists
+                # Get related artists with better error handling
                 related = self.sp.artist_related_artists(artist_id)
                 related_artist_ids = [artist['id'] for artist in related.get('artists', [])[:5]]
                 
                 # Fetch albums from related artists
-                related_albums = self.fetch_albums_for_artists(related_artist_ids, limit_per_artist=8)
-                similar_albums.extend(related_albums)
-                
+                if related_artist_ids:  # Only if we found related artists
+                    related_albums = self.fetch_albums_for_artists(related_artist_ids, limit_per_artist=8)
+                    similar_albums.extend(related_albums)
+                    
+            except spotipy.exceptions.SpotifyException as e:
+                if e.http_status == 404:
+                    print(f"⚠️ Artist {artist_id} not found or no related artists available - skipping")
+                elif e.http_status == 403:
+                    print(f"⚠️ Access forbidden for artist {artist_id} - may be region restricted")
+                else:
+                    print(f"⚠️ Spotify API error for artist {artist_id}: {e}")
+                continue  # Skip this artist and continue with others
             except Exception as e:
-                print(f"Error fetching related artists for {artist_id}: {e}")
+                print(f"⚠️ Unexpected error fetching related artists for {artist_id}: {e}")
                 continue
-                
+                    
         return list(set(similar_albums))
 
     def fetch_genre_albums(self, genres: List[str], limit: int = 30) -> List[str]:
