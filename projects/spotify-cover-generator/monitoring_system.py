@@ -412,7 +412,7 @@ class AlertManager:
             return
             
         try:
-            msg = MimeMultipart()
+            msg = MIMEMultipart()
             msg['From'] = self.email_config['email_user']
             msg['To'] = ', '.join(self.email_config['alert_recipients'])
             msg['Subject'] = f"[{severity.upper()}] Spotify Cover Gen: {subject}"
@@ -428,7 +428,7 @@ class AlertManager:
             Deployed on Render
             """
             
-            msg.attach(MimeText(body, 'plain'))
+            msg.attach(MIMEText(body, 'plain'))
             
             server = smtplib.SMTP(self.email_config['smtp_server'], self.email_config['smtp_port'])
             server.starttls()
