@@ -16,6 +16,21 @@ except ImportError:
 
 from config import GEMINI_API_KEY, GEMINI_API_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
 
+# Monitoring imports with fallback
+try:
+    from monitoring_system import monitor_api_calls, fault_tolerant_api_call
+except ImportError:
+    # Fallback decorators if monitoring not available
+    def monitor_api_calls(service):
+        def decorator(func):
+            return func
+        return decorator
+    
+    def fault_tolerant_api_call(service):
+        def decorator(func):
+            return func
+        return decorator
+
 class LiveSpotifyTitleGenerator:
     def __init__(self):
         """Initialize with Spotify client and caching"""
@@ -436,6 +451,8 @@ Respond with ONLY the title, no quotes or explanation:"""
             ])
 
 # Updated main function
+@monitor_api_calls("gemini")
+@fault_tolerant_api_call("gemini")
 def generate_title(playlist_data, mood=""):
     """Generate title using live Spotify album data"""
     generator = LiveSpotifyTitleGenerator()

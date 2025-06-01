@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error - Spotify Cover Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .error-container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 40px;
+            background: #1e1e1e;
+            border-radius: 10px;
+            text-align: center;
+            border-left: 5px solid #ff5252;
+        }
+        
+        .error-icon {
+            font-size: 4rem;
+            color: #ff5252;
+            margin-bottom: 20px;
+        }
+        
+        .error-title {
+            color: #ff5252;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+        
+        .error-message {
+            color: #cccccc;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        
+        .error-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .retry-info {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+
+        .button {
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+            color: white;
+            background: #1db954;
+            display: inline-block;
+        }
+
+        .button:hover {
+            background: #1ed760;
+            transform: translateY(-2px);
+        }
+
+        .button.secondary {
+            background: #333;
+            color: #ccc;
+        }
+
+        .button.secondary:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="error-container">
+            <div class="error-icon">⚠️</div>
+            <h2 class="error-title">Something went wrong</h2>
+            <p class="error-message">{{ error_message }}</p>
+            
+            <div class="error-actions">
+                {% if show_retry %}
+                <button onclick="history.back()" class="button">
+                    ← Try Again
+                </button>
+                {% endif %}
+                
+                <a href="{{ url_for('generate') if url_for else '/' }}" class="button">
+                    🏠 Start Over
+                </a>
+                
+                <a href="mailto:support@yourapp.com?subject=Error Report" class="button secondary">
+                    📧 Contact Support
+                </a>
+            </div>
+            
+            {% if show_retry %}
+            <div class="retry-info">
+                <strong>💡 Troubleshooting Tips:</strong><br>
+                • Make sure your Spotify URL is correct and the playlist is public<br>
+                • Try using different mood keywords<br>
+                • Check your internet connection<br>
+                • If the problem persists, our team has been automatically notified
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

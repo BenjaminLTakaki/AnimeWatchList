@@ -26,6 +26,31 @@ from flask_limiter.util import get_remote_address
 
 from sqlalchemy import text
 
+# Monitoring and fault handling imports
+try:
+    from monitoring_system import (
+        setup_monitoring, monitor_performance, monitor_api_calls,
+        app_logger, alert_manager, system_monitor
+    )
+    from fault_handling import (
+        fault_tolerant_api_call, GracefulDegradation, db_failover,
+        create_user_friendly_error_messages, FaultContext, http_client
+    )
+    print("✅ Monitoring system imported successfully")
+except ImportError as e:
+    print(f"⚠️ Monitoring system import failed: {e}")
+    # Define dummy decorators as fallback
+    def monitor_performance(func):
+        return func
+    def monitor_api_calls(service_name):
+        def decorator(func):
+            return func
+        return decorator
+    def fault_tolerant_api_call(service_name, fallback_func):
+        def decorator(func):
+            return func
+        return decorator
+
 # Configuration imports or fallbacks
 try:
     from config import (
@@ -1497,6 +1522,84 @@ def profile():
 @app.route("/generated_covers/<path:filename>")
 def serve_image(filename):
     return send_from_directory(COVERS_DIR, filename)
+
+# Enhanced error handlers with monitoring
+@app.errorhandler(404)
+def handle_404_error(e):
+    try:
+        app_logger.log_structured(
+            "info",
+            "page_not_found",
+            path=request.path,
+            method=request.method,
+            user_agent=request.headers.get('User-Agent', '')
+        )
+    except:
+        pass  # Fallback if monitoring not available
+    return "Page not found", 404
+
+@app.errorhandler(403)
+def handle_403_error(e):
+    try:
+        app_logger.log_structured(
+            "warning",
+            "access_forbidden", 
+            path=request.path,
+            method=request.method,
+            user_id=session.get('user_id')
+        )
+    except:
+        pass  # Fallback if monitoring not available
+    return "Access forbidden", 403
+
+@app.errorhandler(Exception)
+def handle_generic_error(e):
+    """Enhanced error handler with user-friendly messages"""
+    try:
+        # Log the error
+        app_logger.log_structured(
+            "error",
+            "unhandled_exception",
+            error=str(e),
+            error_type=type(e).__name__,
+            path=request.path,
+            method=request.method,
+            user_id=session.get('user_id'),
+            traceback=traceback.format_exc()
+        )
+        
+        # Alert on critical errors
+        alert_manager.alert(
+            "unhandled_exception",
+            f"Unhandled exception on {request.method} {request.path}: {str(e)}",
+            severity="critical"
+        )
+        
+        # Create user-friendly error message
+        user_info = get_current_user_or_guest()
+        context = FaultContext(
+            function_name="web_request",
+            attempt_number=1,
+            error=e,
+            user_id=str(user_info.get('user', {}).get('id', '')),
+            is_guest=user_info.get('type') == 'guest'
+        )
+        
+        user_message = create_user_friendly_error_messages(e, context)
+        
+        return render_template('error.html', 
+                             error_message=user_message,
+                             show_retry=True), 500
+    except:
+        # Ultimate fallback if monitoring system fails
+        return "An error occurred. Please try again.", 500
+
+# Set up monitoring when app starts
+try:
+    setup_monitoring(app)
+    print("✅ Monitoring system setup complete")
+except Exception as e:
+    print(f"⚠️ Monitoring setup failed: {e}")
 
 if __name__ == '__main__':
     print("Initializing application...")
