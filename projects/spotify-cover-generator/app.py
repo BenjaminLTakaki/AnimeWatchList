@@ -1525,39 +1525,40 @@ def profile():
 def serve_image(filename):
     return send_from_directory(COVERS_DIR, filename)
 
-@app.route('/health')
-def health_check():
-    """Health check endpoint for monitoring"""
-    try:
-        from monitoring_system import health_checker
-        health_results = health_checker.run_all_checks()
-        all_healthy = all(result.healthy for result in health_results.values())
-        
-        response_data = {
-            "status": "healthy" if all_healthy else "degraded",
-            "timestamp": datetime.datetime.utcnow().isoformat(),
-            "services": {name: {
-                "healthy": result.healthy,
-                "response_time_ms": result.response_time_ms,
-                "error": result.error
-            } for name, result in health_results.items()}
-        }
-        
-        return jsonify(response_data), 200 if all_healthy else 503
-        
-    except ImportError:
-        # Fallback health check if monitoring system not available
-        return jsonify({
-            "status": "healthy",
-            "timestamp": datetime.datetime.utcnow().isoformat(),
-            "message": "Basic health check - monitoring system not available"
-        }), 200
-    except Exception as e:
-        return jsonify({
-            "status": "error", 
-            "error": str(e),
-            "timestamp": datetime.datetime.utcnow().isoformat()
-        }), 500
+if not any(rule.endpoint == 'health_check' for rule in app.url_map.iter_rules()):
+    @app.route('/health')
+    def health_check():
+        """Health check endpoint for monitoring"""
+        try:
+            from monitoring_system import health_checker
+            health_results = health_checker.run_all_checks()
+            all_healthy = all(result.healthy for result in health_results.values())
+            
+            response_data = {
+                "status": "healthy" if all_healthy else "degraded",
+                "timestamp": datetime.datetime.utcnow().isoformat(),
+                "services": {name: {
+                    "healthy": result.healthy,
+                    "response_time_ms": result.response_time_ms,
+                    "error": result.error
+                } for name, result in health_results.items()}
+            }
+            
+            return jsonify(response_data), 200 if all_healthy else 503
+            
+        except ImportError:
+            # Fallback health check if monitoring system not available
+            return jsonify({
+                "status": "healthy",
+                "timestamp": datetime.datetime.utcnow().isoformat(),
+                "message": "Basic health check - monitoring system not available"
+            }), 200
+        except Exception as e:
+            return jsonify({
+                "status": "error", 
+                "error": str(e),
+                "timestamp": datetime.datetime.utcnow().isoformat()
+            }), 500
 
 @app.route('/metrics')
 def metrics_endpoint():

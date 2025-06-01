@@ -750,39 +750,43 @@ def setup_monitoring(app):
         
         return "Internal Server Error", 500
         
-    @app.route('/health')
-    def health_check():
-        """Health check endpoint for uptime monitoring"""
-        try:
-            health_results = health_checker.run_all_checks()
-            all_healthy = all(result.healthy for result in health_results.values())
-            
-            response_data = {
-                "status": "healthy" if all_healthy else "degraded",
-                "timestamp": datetime.utcnow().isoformat(),
-                "uptime_hours": (datetime.utcnow() - app_logger.start_time).total_seconds() / 3600,
-                "services": {name: asdict(result) for name, result in health_results.items()},
-                "performance": app_logger.get_performance_summary()
-            }
-            
-            return response_data, 200 if all_healthy else 503
-            
-        except Exception as e:
-            app_logger.log_structured("error", "health_check_failed", error=str(e))
-            return {"status": "error", "error": str(e)}, 500
-            
-    @app.route('/metrics')
-    def metrics_endpoint():
-        """Detailed metrics endpoint"""
-        try:
-            return {
-                "performance": app_logger.get_performance_summary(),
-                "error_counts": dict(app_logger.error_counts),
-                "uptime_hours": (datetime.utcnow() - app_logger.start_time).total_seconds() / 3600,
-                "last_health_check": health_checker.last_check_time.isoformat() if health_checker.last_check_time else None
-            }
-        except Exception as e:
-            return {"error": str(e)}, 500
+    # FIXED: Check if health route already exists before adding it
+    if not any(rule.endpoint == 'health_check' for rule in app.url_map.iter_rules()):
+        @app.route('/health')
+        def health_check():
+            """Health check endpoint for uptime monitoring"""
+            try:
+                health_results = health_checker.run_all_checks()
+                all_healthy = all(result.healthy for result in health_results.values())
+                
+                response_data = {
+                    "status": "healthy" if all_healthy else "degraded",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "uptime_hours": (datetime.utcnow() - app_logger.start_time).total_seconds() / 3600,
+                    "services": {name: asdict(result) for name, result in health_results.items()},
+                    "performance": app_logger.get_performance_summary()
+                }
+                
+                return response_data, 200 if all_healthy else 503
+                
+            except Exception as e:
+                app_logger.log_structured("error", "health_check_failed", error=str(e))
+                return {"status": "error", "error": str(e)}, 500
+    
+    # FIXED: Check if metrics route already exists before adding it        
+    if not any(rule.endpoint == 'metrics_endpoint' for rule in app.url_map.iter_rules()):
+        @app.route('/metrics')
+        def metrics_endpoint():
+            """Detailed metrics endpoint"""
+            try:
+                return {
+                    "performance": app_logger.get_performance_summary(),
+                    "error_counts": dict(app_logger.error_counts),
+                    "uptime_hours": (datetime.utcnow() - app_logger.start_time).total_seconds() / 3600,
+                    "last_health_check": health_checker.last_check_time.isoformat() if health_checker.last_check_time else None
+                }
+            except Exception as e:
+                return {"error": str(e)}, 500
     
     # Start background monitoring
     system_monitor.start()
