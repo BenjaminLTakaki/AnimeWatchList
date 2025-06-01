@@ -39,19 +39,18 @@ class LiveSpotifyTitleGenerator:
         self._initialize_spotify()
         
     def _initialize_spotify(self):
-        """Initialize Spotify client"""
+        """Use the global Spotify client instead of creating a new one"""
         try:
-            if SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET:
-                auth_manager = SpotifyClientCredentials(
-                    client_id=SPOTIFY_CLIENT_ID,
-                    client_secret=SPOTIFY_CLIENT_SECRET
-                )
-                self.sp = spotipy.Spotify(auth_manager=auth_manager)
-                print("✓ Spotify client initialized for live album titles")
+            from spotify_client import sp
+            if sp:
+                self.sp = sp
+                print("✓ Using global Spotify client for title generation")
             else:
-                print("⚠️ Spotify credentials missing - AI generation only")
+                print("⚠️ Global Spotify client not available")
+                self.sp = None
         except Exception as e:
-            print(f"⚠️ Spotify initialization failed: {e}")
+            print(f"⚠️ Could not access global Spotify client: {e}")
+            self.sp = None
 
     def extract_artist_ids_from_playlist_data(self, playlist_data: Dict) -> List[str]:
         """Extract artist IDs from playlist data"""
