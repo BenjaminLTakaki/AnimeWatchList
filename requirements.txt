@@ -27,3 +27,8 @@ alembic==1.13.1
 greenlet==3.0.1
 six==1.16.0
 urllib3==2.1.0
+psutil==5.9.6
+structlog==23.2.0
+python-json-logger==2.0.7
+retrying==1.3.4
+tenacity==8.2.3

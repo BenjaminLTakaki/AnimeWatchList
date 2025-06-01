@@ -91,8 +91,7 @@ class LiveSpotifyTitleGenerator:
                 results = self.sp.artist_albums(
                     artist_id, 
                     album_type='album,single', 
-                    limit=limit_per_artist,
-                    market='US'
+                    limit=limit_per_artist
                 )
                 
                 artist_albums = []
@@ -160,8 +159,7 @@ class LiveSpotifyTitleGenerator:
                         results = self.sp.search(
                             q=search_term, 
                             type='album', 
-                            limit=10,
-                            market='US'
+                            limit=10
                         )
                         
                         for album in results.get('albums', {}).get('items', []):

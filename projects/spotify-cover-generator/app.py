@@ -1525,56 +1525,106 @@ def profile():
 def serve_image(filename):
     return send_from_directory(COVERS_DIR, filename)
 
-# Monitoring endpoints
-@app.route("/health")
+@app.route('/health')
 def health_check():
     """Health check endpoint for monitoring"""
     try:
-        from monitoring_system import system_monitor
-        health_status = system_monitor.get_health_status()
-        return jsonify(health_status), 200 if health_status["status"] == "healthy" else 503
+        from monitoring_system import health_checker
+        health_results = health_checker.run_all_checks()
+        all_healthy = all(result.healthy for result in health_results.values())
+        
+        response_data = {
+            "status": "healthy" if all_healthy else "degraded",
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "services": {name: {
+                "healthy": result.healthy,
+                "response_time_ms": result.response_time_ms,
+                "error": result.error
+            } for name, result in health_results.items()}
+        }
+        
+        return jsonify(response_data), 200 if all_healthy else 503
+        
     except ImportError:
-        # Fallback health check
+        # Fallback health check if monitoring system not available
         return jsonify({
             "status": "healthy",
             "timestamp": datetime.datetime.utcnow().isoformat(),
             "message": "Basic health check - monitoring system not available"
         }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error", 
+            "error": str(e),
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }), 500
 
-@app.route("/metrics")
+@app.route('/metrics')
 def metrics_endpoint():
     """Metrics endpoint for performance monitoring"""
     try:
-        from monitoring_system import system_monitor
-        metrics = system_monitor.get_performance_metrics()
-        return jsonify(metrics), 200
+        from monitoring_system import app_logger
+        
+        metrics_data = {
+            "performance": app_logger.get_performance_summary(),
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }
+        
+        return jsonify(metrics_data), 200
+        
     except ImportError:
         # Fallback metrics
         return jsonify({
             "status": "monitoring_unavailable",
             "timestamp": datetime.datetime.utcnow().isoformat(),
-            "message": "Monitoring system not available"        }), 200
-
-@app.route('/metrics')
-def metrics():
-    """Application metrics endpoint"""
-    try:
-        from monitoring_system import system_monitor
-        
-        metrics_data = {
-            "performance": system_monitor.get_performance_metrics(),
-            "system": system_monitor.get_system_metrics(),
-            "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
-        }
-        
-        return jsonify(metrics_data), 200
-        
+            "message": "Monitoring system not available"
+        }), 200
     except Exception as e:
         return jsonify({
             "error": "Metrics not available",
             "message": str(e),
-            "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.datetime.utcnow().isoformat()
         }), 500
+
+# 5. FIX monitoring_system.py initialization
+"""
+In your app.py, around the end of the file, UPDATE this section:
+
+FIND:
+try:
+    setup_monitoring(app)
+    print("✅ Monitoring system setup complete")
+except Exception as e:
+    print(f"⚠️ Monitoring setup failed: {e}")
+
+REPLACE with:
+"""
+
+def setup_basic_monitoring(app):
+    """Setup basic monitoring if full system unavailable"""
+    @app.before_request
+    def log_request():
+        request.start_time = time.time()
+    
+    @app.after_request  
+    def log_response(response):
+        if hasattr(request, 'start_time'):
+            duration = time.time() - request.start_time
+            print(f"REQUEST: {request.method} {request.path} - {response.status_code} ({duration:.3f}s)")
+        return response
+
+try:
+    from monitoring_system import setup_monitoring
+    setup_monitoring(app)
+    print("✅ Full monitoring system setup complete")
+except ImportError as e:
+    print(f"⚠️ Full monitoring not available: {e}")
+    setup_basic_monitoring(app)
+    print("✅ Basic monitoring setup complete")
+except Exception as e:
+    print(f"⚠️ Monitoring setup failed: {e}")
+    setup_basic_monitoring(app)
+    print("✅ Fallback monitoring setup complete")
 
 # Enhanced error handlers with monitoring
 @app.errorhandler(404)
