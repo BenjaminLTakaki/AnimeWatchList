@@ -9,7 +9,6 @@ try:
     from monitoring_system import monitor_api_calls
     from fault_handling import fault_tolerant_api_call
 except ImportError:
-    # Fallback decorators if monitoring not available
     def monitor_api_calls(service_name):
         def decorator(func):
             return func
@@ -107,7 +106,7 @@ def get_user_premium_status(access_token):
             return None
     except Exception as e:
         print(f"❌ Error getting user premium status: {e}")
-        return None
+    return None
 
 @monitor_api_calls("spotify")
 @fault_tolerant_api_call("spotify")

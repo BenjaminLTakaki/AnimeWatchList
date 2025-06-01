@@ -18,15 +18,14 @@ from config import GEMINI_API_KEY, GEMINI_API_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CL
 
 # Monitoring imports with fallback
 try:
-    from monitoring_system import monitor_api_calls, fault_tolerant_api_call
+    from monitoring_system import monitor_api_calls
+    from fault_handling import fault_tolerant_api_call
 except ImportError:
-    # Fallback decorators if monitoring not available
-    def monitor_api_calls(service):
+    def monitor_api_calls(service_name):
         def decorator(func):
             return func
         return decorator
-    
-    def fault_tolerant_api_call(service):
+    def fault_tolerant_api_call(service_name, fallback_func=None):
         def decorator(func):
             return func
         return decorator
@@ -349,8 +348,7 @@ Respond with ONLY the title, no quotes or explanation:"""
         
         title = raw_title.strip().replace('"', '').replace("'", "")
         title = ' '.join(word.capitalize() for word in title.split())
-        
-        # Validate length and word count
+          # Validate length and word count
         if len(title) > 50 or len(title) < 3:
             return ""
             
@@ -360,6 +358,8 @@ Respond with ONLY the title, no quotes or explanation:"""
         
         return title
 
+    @monitor_api_calls("gemini")
+    @fault_tolerant_api_call("gemini")
     def generate_title(self, playlist_data: Dict, mood: str = "") -> str:
         """Main title generation using live Spotify data"""
         try:

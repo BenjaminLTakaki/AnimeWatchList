@@ -11,15 +11,14 @@ from config import STABILITY_API_KEY, DEFAULT_NEGATIVE_PROMPT, COVERS_DIR
 
 # Monitoring imports with fallback
 try:
-    from monitoring_system import monitor_api_calls, fault_tolerant_api_call
+    from monitoring_system import monitor_api_calls
+    from fault_handling import fault_tolerant_api_call
 except ImportError:
-    # Fallback decorators if monitoring not available
-    def monitor_api_calls(service):
+    def monitor_api_calls(service_name):
         def decorator(func):
             return func
         return decorator
-    
-    def fault_tolerant_api_call(service):
+    def fault_tolerant_api_call(service_name, fallback_func=None):
         def decorator(func):
             return func
         return decorator
@@ -99,7 +98,7 @@ def send_generation_request(url, params):
     
     except Exception as e:
         print(f"Error sending request: {e}")
-        return None
+    return None
 
 @monitor_api_calls("stability")
 @fault_tolerant_api_call("stability")

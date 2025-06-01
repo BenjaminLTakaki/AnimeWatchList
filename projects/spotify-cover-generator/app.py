@@ -5,6 +5,7 @@ import json
 import datetime
 import traceback
 import uuid 
+import time
 from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
@@ -247,7 +248,7 @@ class SpotifyState(db.Model):
         return False
 
 class LoraModelDB(db.Model):
-    __tablename__ = 'spotify_lora_models'
+    __
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     source_type = db.Column(db.String(20), default='local')  # Only 'local' now
@@ -888,6 +889,7 @@ def root():
 
 @app.route("/generate", methods=["GET", "POST"])
 @limiter.limit("10 per hour", methods=["POST"])
+@monitor_performance
 def generate():
     """Main generation route"""
     global initialized
@@ -1523,6 +1525,167 @@ def profile():
 def serve_image(filename):
     return send_from_directory(COVERS_DIR, filename)
 
+# Monitoring endpoints
+@app.route("/health")
+def health_check():
+    """Health check endpoint for monitoring"""
+    try:
+        from monitoring_system import system_monitor
+        health_status = system_monitor.get_health_status()
+        return jsonify(health_status), 200 if health_status["status"] == "healthy" else 503
+    except ImportError:
+        # Fallback health check
+        return jsonify({
+            "status": "healthy",
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "message": "Basic health check - monitoring system not available"
+        }), 200
+
+@app.route("/metrics")
+def metrics_endpoint():
+    """Metrics endpoint for performance monitoring"""
+    try:
+        from monitoring_system import system_monitor
+        metrics = system_monitor.get_performance_metrics()
+        return jsonify(metrics), 200
+    except ImportError:
+        # Fallback metrics
+        return jsonify({
+            "status": "monitoring_unavailable",
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "message": "Monitoring system not available"
+        }), 200
+
+# Monitoring and health check routes
+@app.route('/health')
+def health_check():
+    """Comprehensive health check endpoint"""
+    try:
+        from monitoring_system import system_monitor
+        
+        # Perform health checks
+        health_status = {
+            "status": "healthy",
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+            "checks": {}
+        }
+        
+        # Database check
+        try:
+            with db.engine.connect() as connection:
+                start_time = time.time()
+                connection.execute(text("SELECT 1"))
+                response_time = (time.time() - start_time) * 1000
+                health_status["checks"]["database"] = {
+                    "status": "healthy",
+                    "response_time_ms": round(response_time, 2)
+                }
+        except Exception as e:
+            health_status["checks"]["database"] = {
+                "status": "unhealthy",
+                "error": str(e)
+            }
+            health_status["status"] = "unhealthy"
+        
+        # Spotify API check
+        try:
+            start_time = time.time()
+            response = requests.get("https://api.spotify.com/v1/browse/categories", timeout=5)
+            response_time = (time.time() - start_time) * 1000
+            if response.status_code in [200, 401]:  # 401 is fine, means API is responding
+                health_status["checks"]["spotify_api"] = {
+                    "status": "healthy",
+                    "response_time_ms": round(response_time, 2)
+                }
+            else:
+                health_status["checks"]["spotify_api"] = {
+                    "status": "degraded",
+                    "response_time_ms": round(response_time, 2)
+                }
+        except Exception as e:
+            health_status["checks"]["spotify_api"] = {
+                "status": "unhealthy",
+                "error": str(e)
+            }
+        
+        # Gemini API check (if key is available)
+        if os.environ.get('GEMINI_API_KEY'):
+            try:
+                start_time = time.time()
+                # Light ping to Gemini API
+                response = requests.get("https://generativelanguage.googleapis.com/v1beta/models", timeout=5)
+                response_time = (time.time() - start_time) * 1000
+                if response.status_code in [200, 401, 403]:
+                    health_status["checks"]["gemini_api"] = {
+                        "status": "healthy",
+                        "response_time_ms": round(response_time, 2)
+                    }
+                else:
+                    health_status["checks"]["gemini_api"] = {
+                        "status": "degraded",
+                        "response_time_ms": round(response_time, 2)
+                    }
+            except Exception as e:
+                health_status["checks"]["gemini_api"] = {
+                    "status": "unhealthy",
+                    "error": str(e)
+                }
+        
+        # Stability AI check (if key is available)
+        if os.environ.get('STABILITY_API_KEY'):
+            try:
+                start_time = time.time()
+                # Light ping to Stability AI
+                response = requests.get("https://api.stability.ai/v1/engines/list", 
+                                      headers={"Authorization": f"Bearer {os.environ.get('STABILITY_API_KEY')}"}, 
+                                      timeout=5)
+                response_time = (time.time() - start_time) * 1000
+                if response.status_code in [200, 401, 403]:
+                    health_status["checks"]["stability_api"] = {
+                        "status": "healthy",
+                        "response_time_ms": round(response_time, 2)
+                    }
+                else:
+                    health_status["checks"]["stability_api"] = {
+                        "status": "degraded",
+                        "response_time_ms": round(response_time, 2)
+                    }
+            except Exception as e:
+                health_status["checks"]["stability_api"] = {
+                    "status": "unhealthy",
+                    "error": str(e)
+                }
+        
+        return jsonify(health_status), 200 if health_status["status"] == "healthy" else 503
+        
+    except Exception as e:
+        return jsonify({
+            "status": "unhealthy",
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+            "error": str(e)
+        }), 500
+
+@app.route('/metrics')
+def metrics():
+    """Application metrics endpoint"""
+    try:
+        from monitoring_system import system_monitor
+        
+        metrics_data = {
+            "performance": system_monitor.get_performance_metrics(),
+            "system": system_monitor.get_system_metrics(),
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+        }
+        
+        return jsonify(metrics_data), 200
+        
+    except Exception as e:
+        return jsonify({
+            "error": "Metrics not available",
+            "message": str(e),
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+        }), 500
+
 # Enhanced error handlers with monitoring
 @app.errorhandler(404)
 def handle_404_error(e):
@@ -1577,21 +1740,27 @@ def handle_generic_error(e):
         
         # Create user-friendly error message
         user_info = get_current_user_or_guest()
-        context = FaultContext(
-            function_name="web_request",
-            attempt_number=1,
-            error=e,
-            user_id=str(user_info.get('user', {}).get('id', '')),
-            is_guest=user_info.get('type') == 'guest'
-        )
         
-        user_message = create_user_friendly_error_messages(e, context)
+        # Import FaultContext here to avoid import issues
+        try:
+            from fault_handling import FaultContext, create_user_friendly_error_messages
+            context = FaultContext(
+                function_name="web_request",
+                attempt_number=1,
+                error=e,
+                user_id=str(user_info.get('user', {}).get('id', '')),
+                is_guest=user_info.get('type') == 'guest'
+            )
+            user_message = create_user_friendly_error_messages(e, context)
+        except (ImportError, Exception):
+            user_message = "An unexpected error occurred. Please try again or contact support if the problem persists."
         
         return render_template('error.html', 
                              error_message=user_message,
                              show_retry=True), 500
-    except:
-        # Ultimate fallback if monitoring system fails
+    except Exception as fallback_error:
+        # Ultimate fallback if everything fails
+        print(f"Error in error handler: {fallback_error}")
         return "An error occurred. Please try again.", 500
 
 # Set up monitoring when app starts

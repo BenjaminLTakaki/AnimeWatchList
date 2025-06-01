@@ -7,14 +7,6 @@ import io
 from pathlib import Path
 from PIL import Image
 
-# Monitoring imports with fallback
-try:
-    from monitoring_system import monitor_performance
-except ImportError:
-    # Fallback decorator if monitoring not available
-    def monitor_performance(func):
-        return func
-
 from spotify_client import extract_playlist_data
 from image_generator import create_prompt_from_data, generate_cover_image
 from title_generator import generate_title
@@ -75,6 +67,13 @@ def save_generation_data_with_user(data, user_id=None):
         except Exception as file_error:
             print(f"Error saving data to file: {file_error}")
             return None
+
+# Monitoring imports with fallback
+try:
+    from monitoring_system import monitor_performance
+except ImportError:
+    def monitor_performance(func):
+        return func
 
 @monitor_performance
 def generate_cover(url, user_mood=None, lora_input=None, output_path=None, negative_prompt=None, user_id=None):
