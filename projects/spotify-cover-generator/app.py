@@ -248,7 +248,7 @@ class SpotifyState(db.Model):
         return False
 
 class LoraModelDB(db.Model):
-    __
+    __tablename__ = 'spotify_lora_models'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     source_type = db.Column(db.String(20), default='local')  # Only 'local' now
@@ -1553,117 +1553,7 @@ def metrics_endpoint():
         return jsonify({
             "status": "monitoring_unavailable",
             "timestamp": datetime.datetime.utcnow().isoformat(),
-            "message": "Monitoring system not available"
-        }), 200
-
-# Monitoring and health check routes
-@app.route('/health')
-def health_check():
-    """Comprehensive health check endpoint"""
-    try:
-        from monitoring_system import system_monitor
-        
-        # Perform health checks
-        health_status = {
-            "status": "healthy",
-            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-            "checks": {}
-        }
-        
-        # Database check
-        try:
-            with db.engine.connect() as connection:
-                start_time = time.time()
-                connection.execute(text("SELECT 1"))
-                response_time = (time.time() - start_time) * 1000
-                health_status["checks"]["database"] = {
-                    "status": "healthy",
-                    "response_time_ms": round(response_time, 2)
-                }
-        except Exception as e:
-            health_status["checks"]["database"] = {
-                "status": "unhealthy",
-                "error": str(e)
-            }
-            health_status["status"] = "unhealthy"
-        
-        # Spotify API check
-        try:
-            start_time = time.time()
-            response = requests.get("https://api.spotify.com/v1/browse/categories", timeout=5)
-            response_time = (time.time() - start_time) * 1000
-            if response.status_code in [200, 401]:  # 401 is fine, means API is responding
-                health_status["checks"]["spotify_api"] = {
-                    "status": "healthy",
-                    "response_time_ms": round(response_time, 2)
-                }
-            else:
-                health_status["checks"]["spotify_api"] = {
-                    "status": "degraded",
-                    "response_time_ms": round(response_time, 2)
-                }
-        except Exception as e:
-            health_status["checks"]["spotify_api"] = {
-                "status": "unhealthy",
-                "error": str(e)
-            }
-        
-        # Gemini API check (if key is available)
-        if os.environ.get('GEMINI_API_KEY'):
-            try:
-                start_time = time.time()
-                # Light ping to Gemini API
-                response = requests.get("https://generativelanguage.googleapis.com/v1beta/models", timeout=5)
-                response_time = (time.time() - start_time) * 1000
-                if response.status_code in [200, 401, 403]:
-                    health_status["checks"]["gemini_api"] = {
-                        "status": "healthy",
-                        "response_time_ms": round(response_time, 2)
-                    }
-                else:
-                    health_status["checks"]["gemini_api"] = {
-                        "status": "degraded",
-                        "response_time_ms": round(response_time, 2)
-                    }
-            except Exception as e:
-                health_status["checks"]["gemini_api"] = {
-                    "status": "unhealthy",
-                    "error": str(e)
-                }
-        
-        # Stability AI check (if key is available)
-        if os.environ.get('STABILITY_API_KEY'):
-            try:
-                start_time = time.time()
-                # Light ping to Stability AI
-                response = requests.get("https://api.stability.ai/v1/engines/list", 
-                                      headers={"Authorization": f"Bearer {os.environ.get('STABILITY_API_KEY')}"}, 
-                                      timeout=5)
-                response_time = (time.time() - start_time) * 1000
-                if response.status_code in [200, 401, 403]:
-                    health_status["checks"]["stability_api"] = {
-                        "status": "healthy",
-                        "response_time_ms": round(response_time, 2)
-                    }
-                else:
-                    health_status["checks"]["stability_api"] = {
-                        "status": "degraded",
-                        "response_time_ms": round(response_time, 2)
-                    }
-            except Exception as e:
-                health_status["checks"]["stability_api"] = {
-                    "status": "unhealthy",
-                    "error": str(e)
-                }
-        
-        return jsonify(health_status), 200 if health_status["status"] == "healthy" else 503
-        
-    except Exception as e:
-        return jsonify({
-            "status": "unhealthy",
-            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-            "error": str(e)
-        }), 500
+            "message": "Monitoring system not available"        }), 200
 
 @app.route('/metrics')
 def metrics():
