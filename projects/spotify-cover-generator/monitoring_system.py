@@ -13,8 +13,8 @@ from dataclasses import dataclass, asdict
 import threading
 from collections import deque, defaultdict
 import smtplib
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Configure structured logging for Render
 class RenderCloudLogger:
