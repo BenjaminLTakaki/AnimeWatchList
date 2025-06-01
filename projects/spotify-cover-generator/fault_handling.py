@@ -9,6 +9,8 @@ from enum import Enum
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import urllib3
+from packaging import version
 
 class FaultSeverity(Enum):
     """Fault severity levels for appropriate response"""
@@ -320,22 +322,26 @@ class RobustHTTPClient:
     def __init__(self):
         self.session = requests.Session()
         
-        # Configure retry strategy
-        retry_strategy = Retry(
-            total=3,
-            status_forcelist=[429, 500, 502, 503, 504],
-            method_whitelist=["HEAD", "GET", "POST"],
-            backoff_factor=1,
-            raise_on_status=False
-        )
+        retry_kwargs = {
+            'total': 3,
+            'status_forcelist': [429, 500, 502, 503, 504],
+            'backoff_factor': 1,
+            'raise_on_status': False
+        }
+        
+        # Check urllib3 version to use correct parameter name
+        if version.parse(urllib3.__version__) >= version.parse("1.26.0"):
+            retry_kwargs['allowed_methods'] = ["HEAD", "GET", "POST"]
+        else:
+            retry_kwargs['method_whitelist'] = ["HEAD", "GET", "POST"]
+        
+        retry_strategy = Retry(**retry_kwargs)
         
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
         
-        # Default timeouts (connect, read)
         self.default_timeout = (10, 30)
-        
     def request(self, method: str, url: str, service_name: str = "unknown", 
                 timeout: Optional[tuple] = None, **kwargs) -> requests.Response:
         """Make HTTP request with fault tolerance"""
