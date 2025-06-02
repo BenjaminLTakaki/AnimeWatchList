@@ -71,7 +71,6 @@ def get_analysis_prompt(cv_text, job_description=None):
         job_description_section=job_description_section,
         job_specific_fields=job_specific_fields
     )
-    
 DEBUG = True
 
 UPLOAD_FOLDER = 'uploads'

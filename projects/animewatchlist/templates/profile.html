@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - Anime Tracker{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-card">
+        <div class="profile-header">
+            <h3>Welcome, {{ current_user.username }}!</h3>
+            <p class="profile-email">{{ current_user.email }}</p>
+            {% if current_user.date_joined %}
+            <p class="profile-date">Member since {{ current_user.date_joined.strftime('%B %Y') }}</p>
+            {% endif %}
+        </div>
+
+        <div class="profile-stats">
+            <div class="stat-card">
+                <div class="stat-number">{{ stats[0] if stats and stats|length >= 2 else 0 }}</div>
+                <div class="stat-label">Watched</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ stats[1] if stats and stats|length >= 2 else 0 }}</div>
+                <div class="stat-label">Not Watched</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ (stats[0] + stats[1]) if stats and stats|length >= 2 else 0 }}</div>
+                <div class="stat-label">Total</div>
+            </div>
+        </div>
+
+        <div class="profile-actions">
+            <a href="{{ get_url_for('watched') }}" class="btn btn-primary">View Watched</a>
+            <a href="{{ get_url_for('not_watched') }}" class="btn btn-secondary">View Not Watched</a>
+            <a href="{{ get_url_for('search') }}" class="btn btn-secondary">Search Anime</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

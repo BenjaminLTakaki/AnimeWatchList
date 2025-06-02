@@ -9,6 +9,20 @@ import random
 import ssl
 from config import STABILITY_API_KEY, DEFAULT_NEGATIVE_PROMPT, COVERS_DIR
 
+# Monitoring imports with fallback
+try:
+    from monitoring_system import monitor_api_calls
+    from fault_handling import fault_tolerant_api_call
+except ImportError:
+    def monitor_api_calls(service_name):
+        def decorator(func):
+            return func
+        return decorator
+    def fault_tolerant_api_call(service_name, fallback_func=None):
+        def decorator(func):
+            return func
+        return decorator
+
 def create_prompt_from_data(playlist_data, user_mood=None):
     """Create optimized prompt for stable diffusion"""
     genres_str = ", ".join(playlist_data.get("genres", ["various"]))
@@ -84,8 +98,10 @@ def send_generation_request(url, params):
     
     except Exception as e:
         print(f"Error sending request: {e}")
-        return None
+    return None
 
+@monitor_api_calls("stability")
+@fault_tolerant_api_call("stability")
 def generate_cover_image(prompt, lora=None, output_path=None, negative_prompt=None):
     """Generate album cover image using Stability AI SD 3.5 Large API"""
     # Check if we have API key
@@ -177,7 +193,7 @@ def generate_cover_image(prompt, lora=None, output_path=None, negative_prompt=No
                 # Extract image from backup API response
                 if "artifacts" in response_data and len(response_data["artifacts"]) > 0:
                     image_base64 = response_data["artifacts"][0]["base64"]
-                    image_bytes = base64.b64decode(image_base64)
+                    image_bytes = response_data["artifacts"][0]["base64"]
                     
                     # Create image from bytes
                     image = Image.open(io.BytesIO(image_bytes))

@@ -4,6 +4,20 @@ from collections import Counter
 from models import PlaylistData, GenreAnalysis
 from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
 
+# Monitoring imports with fallback
+try:
+    from monitoring_system import monitor_api_calls
+    from fault_handling import fault_tolerant_api_call
+except ImportError:
+    def monitor_api_calls(service_name):
+        def decorator(func):
+            return func
+        return decorator
+    def fault_tolerant_api_call(service_name, fallback_func=None):
+        def decorator(func):
+            return func
+        return decorator
+
 # Global Spotify client
 sp = None
 
@@ -92,8 +106,10 @@ def get_user_premium_status(access_token):
             return None
     except Exception as e:
         print(f"❌ Error getting user premium status: {e}")
-        return None
+    return None
 
+@monitor_api_calls("spotify")
+@fault_tolerant_api_call("spotify")
 def extract_playlist_data(playlist_url):
     """Extract data from playlist with enhanced error handling"""
     global sp

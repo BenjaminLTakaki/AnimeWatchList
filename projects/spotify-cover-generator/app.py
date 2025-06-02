@@ -4,6 +4,8 @@ import random
 import json
 import datetime
 import traceback
+import uuid 
+import time
 from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
@@ -24,6 +26,31 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 from sqlalchemy import text
+
+# Monitoring and fault handling imports
+try:
+    from monitoring_system import (
+        setup_monitoring, monitor_performance, monitor_api_calls,
+        app_logger, alert_manager, system_monitor
+    )
+    from fault_handling import (
+        fault_tolerant_api_call, GracefulDegradation, db_failover,
+        create_user_friendly_error_messages, FaultContext, http_client
+    )
+    print("✅ Monitoring system imported successfully")
+except ImportError as e:
+    print(f"⚠️ Monitoring system import failed: {e}")
+    # Define dummy decorators as fallback
+    def monitor_performance(func):
+        return func
+    def monitor_api_calls(service_name):
+        def decorator(func):
+            return func
+        return decorator
+    def fault_tolerant_api_call(service_name, fallback_func):
+        def decorator(func):
+            return func
+        return decorator
 
 # Configuration imports or fallbacks
 try:
@@ -862,6 +889,7 @@ def root():
 
 @app.route("/generate", methods=["GET", "POST"])
 @limiter.limit("10 per hour", methods=["POST"])
+@monitor_performance
 def generate():
     """Main generation route"""
     global initialized
@@ -1496,6 +1524,192 @@ def profile():
 @app.route("/generated_covers/<path:filename>")
 def serve_image(filename):
     return send_from_directory(COVERS_DIR, filename)
+
+if not any(rule.endpoint == 'health_check' for rule in app.url_map.iter_rules()):
+    @app.route('/health')
+    def health_check():
+        """Health check endpoint for monitoring"""
+        try:
+            from monitoring_system import health_checker
+            health_results = health_checker.run_all_checks()
+            all_healthy = all(result.healthy for result in health_results.values())
+            
+            response_data = {
+                "status": "healthy" if all_healthy else "degraded",
+                "timestamp": datetime.datetime.utcnow().isoformat(),
+                "services": {name: {
+                    "healthy": result.healthy,
+                    "response_time_ms": result.response_time_ms,
+                    "error": result.error
+                } for name, result in health_results.items()}
+            }
+            
+            return jsonify(response_data), 200 if all_healthy else 503
+            
+        except ImportError:
+            # Fallback health check if monitoring system not available
+            return jsonify({
+                "status": "healthy",
+                "timestamp": datetime.datetime.utcnow().isoformat(),
+                "message": "Basic health check - monitoring system not available"
+            }), 200
+        except Exception as e:
+            return jsonify({
+                "status": "error", 
+                "error": str(e),
+                "timestamp": datetime.datetime.utcnow().isoformat()
+            }), 500
+
+@app.route('/metrics')
+def metrics_endpoint():
+    """Metrics endpoint for performance monitoring"""
+    try:
+        from monitoring_system import app_logger
+        
+        metrics_data = {
+            "performance": app_logger.get_performance_summary(),
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }
+        
+        return jsonify(metrics_data), 200
+        
+    except ImportError:
+        # Fallback metrics
+        return jsonify({
+            "status": "monitoring_unavailable",
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "message": "Monitoring system not available"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "error": "Metrics not available",
+            "message": str(e),
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }), 500
+
+# 5. FIX monitoring_system.py initialization
+"""
+In your app.py, around the end of the file, UPDATE this section:
+
+FIND:
+try:
+    setup_monitoring(app)
+    print("✅ Monitoring system setup complete")
+except Exception as e:
+    print(f"⚠️ Monitoring setup failed: {e}")
+
+REPLACE with:
+"""
+
+def setup_basic_monitoring(app):
+    """Setup basic monitoring if full system unavailable"""
+    @app.before_request
+    def log_request():
+        request.start_time = time.time()
+    
+    @app.after_request  
+    def log_response(response):
+        if hasattr(request, 'start_time'):
+            duration = time.time() - request.start_time
+            print(f"REQUEST: {request.method} {request.path} - {response.status_code} ({duration:.3f}s)")
+        return response
+
+try:
+    from monitoring_system import setup_monitoring
+    setup_monitoring(app)
+    print("✅ Full monitoring system setup complete")
+except ImportError as e:
+    print(f"⚠️ Full monitoring not available: {e}")
+    setup_basic_monitoring(app)
+    print("✅ Basic monitoring setup complete")
+except Exception as e:
+    print(f"⚠️ Monitoring setup failed: {e}")
+    setup_basic_monitoring(app)
+    print("✅ Fallback monitoring setup complete")
+
+# Enhanced error handlers with monitoring
+@app.errorhandler(404)
+def handle_404_error(e):
+    try:
+        app_logger.log_structured(
+            "info",
+            "page_not_found",
+            path=request.path,
+            method=request.method,
+            user_agent=request.headers.get('User-Agent', '')
+        )
+    except:
+        pass  # Fallback if monitoring not available
+    return "Page not found", 404
+
+@app.errorhandler(403)
+def handle_403_error(e):
+    try:
+        app_logger.log_structured(
+            "warning",
+            "access_forbidden", 
+            path=request.path,
+            method=request.method,
+            user_id=session.get('user_id')
+        )
+    except:
+        pass  # Fallback if monitoring not available
+    return "Access forbidden", 403
+
+@app.errorhandler(Exception)
+def handle_generic_error(e):
+    """Enhanced error handler with user-friendly messages"""
+    try:
+        # Log the error
+        app_logger.log_structured(
+            "error",
+            "unhandled_exception",
+            error=str(e),
+            error_type=type(e).__name__,
+            path=request.path,
+            method=request.method,
+            user_id=session.get('user_id'),
+            traceback=traceback.format_exc()
+        )
+        
+        # Alert on critical errors
+        alert_manager.alert(
+            "unhandled_exception",
+            f"Unhandled exception on {request.method} {request.path}: {str(e)}",
+            severity="critical"
+        )
+        
+        # Create user-friendly error message
+        user_info = get_current_user_or_guest()
+        
+        # Import FaultContext here to avoid import issues
+        try:
+            from fault_handling import FaultContext, create_user_friendly_error_messages
+            context = FaultContext(
+                function_name="web_request",
+                attempt_number=1,
+                error=e,
+                user_id=str(user_info.get('user', {}).get('id', '')),
+                is_guest=user_info.get('type') == 'guest'
+            )
+            user_message = create_user_friendly_error_messages(e, context)
+        except (ImportError, Exception):
+            user_message = "An unexpected error occurred. Please try again or contact support if the problem persists."
+        
+        return render_template('error.html', 
+                             error_message=user_message,
+                             show_retry=True), 500
+    except Exception as fallback_error:
+        # Ultimate fallback if everything fails
+        print(f"Error in error handler: {fallback_error}")
+        return "An error occurred. Please try again.", 500
+
+# Set up monitoring when app starts
+try:
+    setup_monitoring(app)
+    print("✅ Monitoring system setup complete")
+except Exception as e:
+    print(f"⚠️ Monitoring setup failed: {e}")
 
 if __name__ == '__main__':
     print("Initializing application...")

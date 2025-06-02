@@ -68,6 +68,14 @@ def save_generation_data_with_user(data, user_id=None):
             print(f"Error saving data to file: {file_error}")
             return None
 
+# Monitoring imports with fallback
+try:
+    from monitoring_system import monitor_performance
+except ImportError:
+    def monitor_performance(func):
+        return func
+
+@monitor_performance
 def generate_cover(url, user_mood=None, lora_input=None, output_path=None, negative_prompt=None, user_id=None):
     """Generate album cover and title from Spotify URL with user tracking"""
     print(f"Processing Spotify URL: {url}")

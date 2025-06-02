@@ -9,7 +9,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎵 Your Profile</h1>
+            <h1>Your Profile</h1>
             <div class="nav-links">
                 <a href="{{ url_for('generate') }}" class="button secondary">← Back to Generator</a>
                 <a href="{{ url_for('logout') }}" class="button secondary">Logout</a>
@@ -137,13 +137,12 @@
                 <h2>🎨 Recent Generations</h2>
                 <div class="recent-generations">
                     {% for generation in recent_generations %}
-                    <div class="generation-item">
-                        <div class="generation-info">
+                    <div class="generation-item">                        <div class="generation-info">
                             <strong>{{ generation.playlist_name or 'Untitled Playlist' }}</strong>
                             {% if generation.mood %}
                                 <span class="mood-tag">{{ generation.mood }}</span>
                             {% endif %}
-                            <div class="generation-date">{{ generation.created_at.strftime('%m/%d/%Y %I:%M %p') }}</div>
+                            <div class="generation-date">{{ generation.timestamp.strftime('%m/%d/%Y %I:%M %p') }}</div>
                         </div>
                         {% if generation.genres %}
                         <div class="generation-genres">

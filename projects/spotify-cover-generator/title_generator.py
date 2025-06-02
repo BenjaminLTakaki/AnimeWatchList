@@ -16,6 +16,20 @@ except ImportError:
 
 from config import GEMINI_API_KEY, GEMINI_API_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
 
+# Monitoring imports with fallback
+try:
+    from monitoring_system import monitor_api_calls
+    from fault_handling import fault_tolerant_api_call
+except ImportError:
+    def monitor_api_calls(service_name):
+        def decorator(func):
+            return func
+        return decorator
+    def fault_tolerant_api_call(service_name, fallback_func=None):
+        def decorator(func):
+            return func
+        return decorator
+
 class LiveSpotifyTitleGenerator:
     def __init__(self):
         """Initialize with Spotify client and caching"""
@@ -25,19 +39,18 @@ class LiveSpotifyTitleGenerator:
         self._initialize_spotify()
         
     def _initialize_spotify(self):
-        """Initialize Spotify client"""
+        """Use the global Spotify client instead of creating a new one"""
         try:
-            if SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET:
-                auth_manager = SpotifyClientCredentials(
-                    client_id=SPOTIFY_CLIENT_ID,
-                    client_secret=SPOTIFY_CLIENT_SECRET
-                )
-                self.sp = spotipy.Spotify(auth_manager=auth_manager)
-                print("✓ Spotify client initialized for live album titles")
+            from spotify_client import sp
+            if sp:
+                self.sp = sp
+                print("✓ Using global Spotify client for title generation")
             else:
-                print("⚠️ Spotify credentials missing - AI generation only")
+                print("⚠️ Global Spotify client not available")
+                self.sp = None
         except Exception as e:
-            print(f"⚠️ Spotify initialization failed: {e}")
+            print(f"⚠️ Could not access global Spotify client: {e}")
+            self.sp = None
 
     def extract_artist_ids_from_playlist_data(self, playlist_data: Dict) -> List[str]:
         """Extract artist IDs from playlist data"""
@@ -77,8 +90,7 @@ class LiveSpotifyTitleGenerator:
                 results = self.sp.artist_albums(
                     artist_id, 
                     album_type='album,single', 
-                    limit=limit_per_artist,
-                    market='US'
+                    limit=limit_per_artist
                 )
                 
                 artist_albums = []
@@ -105,18 +117,27 @@ class LiveSpotifyTitleGenerator:
         
         for artist_id in artist_ids[:5]:  # Limit to avoid quota issues
             try:
-                # Get related artists
+                # Get related artists with better error handling
                 related = self.sp.artist_related_artists(artist_id)
                 related_artist_ids = [artist['id'] for artist in related.get('artists', [])[:5]]
                 
                 # Fetch albums from related artists
-                related_albums = self.fetch_albums_for_artists(related_artist_ids, limit_per_artist=8)
-                similar_albums.extend(related_albums)
-                
+                if related_artist_ids:  # Only if we found related artists
+                    related_albums = self.fetch_albums_for_artists(related_artist_ids, limit_per_artist=8)
+                    similar_albums.extend(related_albums)
+                    
+            except spotipy.exceptions.SpotifyException as e:
+                if e.http_status == 404:
+                    print(f"⚠️ Artist {artist_id} not found or no related artists available - skipping")
+                elif e.http_status == 403:
+                    print(f"⚠️ Access forbidden for artist {artist_id} - may be region restricted")
+                else:
+                    print(f"⚠️ Spotify API error for artist {artist_id}: {e}")
+                continue  # Skip this artist and continue with others
             except Exception as e:
-                print(f"Error fetching related artists for {artist_id}: {e}")
+                print(f"⚠️ Unexpected error fetching related artists for {artist_id}: {e}")
                 continue
-                
+                    
         return list(set(similar_albums))
 
     def fetch_genre_albums(self, genres: List[str], limit: int = 30) -> List[str]:
@@ -146,8 +167,7 @@ class LiveSpotifyTitleGenerator:
                         results = self.sp.search(
                             q=search_term, 
                             type='album', 
-                            limit=10,
-                            market='US'
+                            limit=10
                         )
                         
                         for album in results.get('albums', {}).get('items', []):
@@ -334,8 +354,7 @@ Respond with ONLY the title, no quotes or explanation:"""
         
         title = raw_title.strip().replace('"', '').replace("'", "")
         title = ' '.join(word.capitalize() for word in title.split())
-        
-        # Validate length and word count
+          # Validate length and word count
         if len(title) > 50 or len(title) < 3:
             return ""
             
@@ -345,6 +364,8 @@ Respond with ONLY the title, no quotes or explanation:"""
         
         return title
 
+    @monitor_api_calls("gemini")
+    @fault_tolerant_api_call("gemini")
     def generate_title(self, playlist_data: Dict, mood: str = "") -> str:
         """Main title generation using live Spotify data"""
         try:
@@ -436,6 +457,8 @@ Respond with ONLY the title, no quotes or explanation:"""
             ])
 
 # Updated main function
+@monitor_api_calls("gemini")
+@fault_tolerant_api_call("gemini")
 def generate_title(playlist_data, mood=""):
     """Generate title using live Spotify album data"""
     generator = LiveSpotifyTitleGenerator()
