@@ -198,22 +198,12 @@ def create_app(config_name=None):
     class UserCourse(db.Model):
         __tablename__ = 'skillstown_user_courses'
         id = db.Column(db.Integer, primary_key=True)
-        user_id = db.Column(db.Integer, nullable=False)
+        user_id = db.Column(db.String(36), db.ForeignKey('students.id'), nullable=False)
         category = db.Column(db.String(100), nullable=False)
         course_name = db.Column(db.String(255), nullable=False)
         status = db.Column(db.String(50), default='enrolled')
         created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
         __table_args__ = (db.UniqueConstraint('user_id', 'course_name', name='skillstown_user_course_unique'),)
-
-    class UserProfile(db.Model):
-        __tablename__ = 'skillstown_user_profiles'
-        id = db.Column(db.Integer, primary_key=True)
-        user_id = db.Column(db.Integer, nullable=False)
-        cv_text = db.Column(db.Text)
-        job_description = db.Column(db.Text)
-        skills = db.Column(db.Text)
-        skill_analysis = db.Column(db.Text)
-        uploaded_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 
     with app.app_context(): 
         db.create_all()
