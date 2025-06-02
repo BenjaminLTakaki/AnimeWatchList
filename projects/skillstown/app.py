@@ -14,9 +14,6 @@ from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 
-# Initialize SQLAlchemy
-db = SQLAlchemy()
-
 # Production detection
 is_production = os.environ.get('RENDER', False) or os.environ.get('FLASK_ENV') == 'production'
 
@@ -31,7 +28,7 @@ def get_url_for(*args, **kwargs):
     return url
 
 # Import models after db is defined
-from .models import Company, Student, Category, ContentPage, Course, CourseContentPage, UserProfile, SkillsTownCourse, CourseDetail
+from models import Company, Student, Category, ContentPage, Course, CourseContentPage, UserProfile, SkillsTownCourse, CourseDetail, db
 
 # Auth setup
 def init_auth(app, get_url_for_func, get_stats_func):
