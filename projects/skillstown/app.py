@@ -5,7 +5,7 @@ import re
 import sys
 import PyPDF2
 import requests
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, current_app
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, current_app, Response
 from flask_login import login_required, current_user, LoginManager, login_user, logout_user, UserMixin
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
@@ -28,7 +28,7 @@ def get_url_for(*args, **kwargs):
     return url
 
 # Import models after db is defined
-from .models import Company, Student, Category, ContentPage, Course, CourseContentPage, UserProfile, SkillsTownCourse, CourseDetail, db
+from models import Company, Student, Category, ContentPage, Course, CourseContentPage, UserProfile, SkillsTownCourse, CourseDetail, db
 
 # Auth setup
 def init_auth(app, get_url_for_func, get_stats_func):
@@ -397,7 +397,7 @@ def create_app(config_name=None):
         results = []
         if query:
             results = search_courses(query)
-        return render_template('courses/search.html', query=query, results=results)
+        return render_template('courses/search.html', query)
 
     @app.route('/enroll', methods=['POST'])
     @login_required
@@ -504,18 +504,102 @@ def create_app(config_name=None):
             db.session.commit()
             flash(f'Course status updated to {new_status}!', 'success')
         
-        return redirect(get_url_for('course_detail', course_id=course_id))
-
-    @app.route('/profile')
+        return redirect(get_url_for('course_detail', course_id=course_id))    @app.route('/profile')
     @login_required
     def skillstown_user_profile():
         stats = get_skillstown_stats(current_user.id)
         recent_courses = UserCourse.query.filter_by(user_id=current_user.id).order_by(UserCourse.created_at.desc()).limit(5).all()
         return render_template('profile.html', stats=stats, recent_courses=recent_courses)
-
+    
     @app.route('/about')
     def about():
         return render_template('about.html')
+
+    @app.route('/generate-podcast', methods=['POST'])
+    @login_required
+    def generate_podcast():
+        try:
+            data = request.get_json()
+            course_id = data.get('course_id')
+            course_name = data.get('course_name')
+            
+            if not course_id or not course_name:
+                return jsonify({'error': 'Missing course_id or course_name'}), 400
+            
+            # Get course details and materials
+            course = UserCourse.query.filter_by(id=course_id, user_id=current_user.id).first_or_404()
+            course_details = CourseDetail.query.filter_by(user_course_id=course_id).first()
+            
+            # Prepare course content for the podcast
+            course_content = f"""
+Course: {course.course_name}
+Category: {course.category}
+            """
+            
+            if course_details:
+                if course_details.description:
+                    course_content += f"\nDescription: {course_details.description}"
+                
+                # Add materials content
+                if course_details.materials:
+                    try:
+                        materials = json.loads(course_details.materials)
+                        course_content += "\n\nCourse Materials:\n"
+                        for material in materials.get('materials', []):
+                            course_content += f"- {material.get('title', '')}: {material.get('description', '')}\n"
+                            if material.get('topics'):
+                                course_content += f"  Topics: {', '.join(material.get('topics', []))}\n"
+                    except:
+                        pass
+            
+            # Load course catalog for additional context
+            try:
+                catalog = load_course_catalog()
+                for category in catalog.get('categories', []):
+                    if category['name'] == course.category:
+                        for cat_course in category.get('courses', []):
+                            if cat_course['name'] == course.course_name:
+                                course_content += f"\n\nDetailed Description: {cat_course.get('description', '')}"
+                                break
+            except:
+                pass
+            
+            # Use local NarreteX API
+            narretex_url = "http://localhost:8100/instant-podcast"
+            payload = {
+                "topic": course_name,
+                "document": course_content
+            }
+            
+            print(f"Generating podcast for: {course_name}")
+            print(f"Content length: {len(course_content)} characters")
+            
+            response = requests.post(
+                narretex_url,
+                json=payload,
+                timeout=120  # 2 minutes timeout for podcast generation
+            )
+            
+            if response.status_code == 200:
+                # Return the audio directly
+                return Response(
+                    response.content,
+                    mimetype='audio/wav',
+                    headers={
+                        'Content-Disposition': f'attachment; filename="{course_name}_podcast.wav"'
+                    }
+                )
+            else:
+                print(f"NarreteX API error: {response.status_code} - {response.text}")
+                return jsonify({'error': 'Failed to generate podcast'}), 500
+                
+        except requests.exceptions.Timeout:
+            return jsonify({'error': 'Podcast generation timed out. Please try again.'}), 408
+        except requests.exceptions.ConnectionError:
+            return jsonify({'error': 'Could not connect to podcast service. Please ensure services are running.'}), 503
+        except Exception as e:
+            print(f"Podcast generation error: {e}")
+            return jsonify({'error': 'Internal server error'}), 500
 
     # Admin routes
     @app.route('/admin/reset-skillstown-tables', methods=['POST'])

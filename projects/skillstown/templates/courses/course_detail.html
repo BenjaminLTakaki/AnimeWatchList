@@ -77,8 +77,7 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
+                    <div class="row">                        <div class="col-md-6 mb-3">
                             <div class="action-card podcast-card">
                                 <div class="action-icon mb-3">
                                     <i class="fas fa-podcast fa-3x text-primary"></i>
@@ -90,11 +89,14 @@
                                     <li>Real-world examples and applications</li>
                                     <li>Easy to understand explanations</li>
                                 </ul>
-                                <a href="https://skillstown.com/?course_id={{ course.id }}&course_name={{ course.course_name|urlencode }}&action=podcast" 
-                                   target="_blank" 
-                                   class="btn btn-primary w-100">
-                                    <i class="fas fa-external-link-alt me-2"></i>Create Podcast
-                                </a>
+                                <button id="generate-podcast-btn" 
+                                        data-course-id="{{ course.id }}" 
+                                        data-course-name="{{ course.course_name }}"
+                                        class="btn btn-primary w-100">
+                                    <i class="fas fa-spinner fa-spin me-2" id="podcast-spinner" style="display: none;"></i>
+                                    <i class="fas fa-podcast me-2" id="podcast-icon"></i>
+                                    <span id="podcast-text">Create Podcast</span>
+                                </button>
                             </div>
                         </div>
                         
@@ -314,6 +316,82 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log(`User clicked ${action} for course: {{ course.course_name }}`);
         });
     });
+    
+    // Add podcast generation functionality
+    const podcastBtn = document.getElementById('generate-podcast-btn');
+    
+    if (podcastBtn) {
+        const podcastSpinner = document.getElementById('podcast-spinner');
+        const podcastIcon = document.getElementById('podcast-icon');
+        const podcastText = document.getElementById('podcast-text');
+        
+        podcastBtn.addEventListener('click', async function() {
+            const courseId = this.dataset.courseId;
+            const courseName = this.dataset.courseName;
+            
+            // Show loading state
+            podcastSpinner.style.display = 'inline-block';
+            podcastIcon.style.display = 'none';
+            podcastText.textContent = 'Generating Podcast...';
+            podcastBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/generate-podcast', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        course_id: courseId,
+                        course_name: courseName
+                    })
+                });
+                
+                if (response.ok) {
+                    const audioBlob = await response.blob();
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    // Create audio player
+                    const audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.style.width = '100%';
+                    audio.style.marginTop = '10px';
+                    audio.src = audioUrl;
+                    
+                    // Replace button with audio player
+                    const container = podcastBtn.parentNode;
+                    container.replaceChild(audio, podcastBtn);
+                    
+                    // Add download link
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = audioUrl;
+                    downloadLink.download = `${courseName}_podcast.wav`;
+                    downloadLink.className = 'btn btn-outline-primary btn-sm mt-2 w-100';
+                    downloadLink.innerHTML = '<i class="fas fa-download me-1"></i>Download Podcast';
+                    container.appendChild(downloadLink);
+                    
+                    // Add success message
+                    const successMsg = document.createElement('div');
+                    successMsg.className = 'alert alert-success mt-2';
+                    successMsg.innerHTML = '<i class="fas fa-check-circle me-2"></i>Podcast generated successfully!';
+                    container.appendChild(successMsg);
+                    
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to generate podcast');
+                }
+            } catch (error) {
+                console.error('Podcast generation error:', error);
+                alert(`Failed to generate podcast: ${error.message}`);
+                
+                // Reset button state
+                podcastSpinner.style.display = 'none';
+                podcastIcon.style.display = 'inline-block';
+                podcastText.textContent = 'Create Podcast';
+                podcastBtn.disabled = false;
+            }
+        });
+    }
 });
 </script>
 {% endblock %}
