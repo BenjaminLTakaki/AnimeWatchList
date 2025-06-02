@@ -60,11 +60,7 @@ def aggressive_fix():
 
 if __name__ == '__main__':
     print("⚠️  WARNING: This will drop ALL your SkillsTown data!")
-    confirm = input("Type 'yes' to continue: ")
-    if confirm.lower() == 'yes':
-        if aggressive_fix():
-            print("\n🎉 Aggressive fix complete! Now run: python manage.py db upgrade && gunicorn wsgi:application")
-        else:
-            print("\n❌ Fix failed.")
+    if aggressive_fix():
+        print("\n🎉 Aggressive fix complete! Now run: python manage.py db upgrade && gunicorn wsgi:application")
     else:
-        print("Cancelled.")
+        print("\n❌ Fix failed.")
