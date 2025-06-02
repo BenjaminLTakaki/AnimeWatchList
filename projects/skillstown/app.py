@@ -31,7 +31,7 @@ def get_url_for(*args, **kwargs):
     return url
 
 # Import models after db is defined
-from models import Company, Student, Category, ContentPage, Course, CourseContentPage, UserProfile, SkillsTownCourse, CourseDetail
+from .models import Company, Student, Category, ContentPage, Course, CourseContentPage, UserProfile, SkillsTownCourse, CourseDetail
 
 # Auth setup
 def init_auth(app, get_url_for_func, get_stats_func):
