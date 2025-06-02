@@ -132,15 +132,15 @@ class CourseDetail(db.Model):
     __tablename__ = 'skillstown_course_details'
     
     id = db.Column(db.Integer, primary_key=True)
-    user_course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+    user_course_id = db.Column(db.Integer, nullable=False)  # References UserCourse.id
     description = db.Column(db.Text)
     progress_percentage = db.Column(db.Integer, default=0)
     completed_at = db.Column(db.DateTime)
     materials = db.Column(db.Text)  # JSON format for course materials
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     
-    # Relationship to Course model
-    course = db.relationship('Course', backref='details')
+    def __repr__(self):
+        return f'<CourseDetail {self.user_course_id}>'
 
 class SkillsTownCourse(db.Model):
     __tablename__ = 'skillstown_courses'
