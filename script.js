@@ -14,14 +14,40 @@ document.addEventListener('DOMContentLoaded', function () {
             navMenu.classList.toggle('active');
             navToggle.classList.toggle('active');
         });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!navToggle.contains(e.target) && !navMenu.contains(e.target)) {
+                navMenu.classList.remove('active');
+                navToggle.classList.remove('active');
+            }
+        });
     }
+
+    // Header scroll effect
+    const header = document.querySelector('.header');
+    let lastScrollTop = 0;
+
+    window.addEventListener('scroll', () => {
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        
+        if (scrollTop > 100) {
+            header.style.background = 'rgba(10, 10, 10, 0.95)';
+            header.style.boxShadow = '0 2px 20px rgba(0, 0, 0, 0.3)';
+        } else {
+            header.style.background = 'rgba(10, 10, 10, 0.9)';
+            header.style.boxShadow = 'none';
+        }
+
+        lastScrollTop = scrollTop;
+    });
 
     // Back to Top Button Functionality
     const backToTopBtn = document.querySelector('.back-to-top');
 
     if (backToTopBtn) {
         window.addEventListener('scroll', () => {
-            if (window.scrollY > 300) {
+            if (window.scrollY > 500) {
                 backToTopBtn.classList.add('show');
             } else {
                 backToTopBtn.classList.remove('show');
@@ -29,7 +55,10 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         backToTopBtn.addEventListener('click', () => {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            window.scrollTo({ 
+                top: 0, 
+                behavior: 'smooth' 
+            });
         });
     }
 
@@ -47,9 +76,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Disable submit button to prevent multiple submissions
             const submitButton = contactForm.querySelector('button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            
             if (submitButton) {
                 submitButton.disabled = true;
-                submitButton.innerText = 'Sending...';
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
             }
 
             emailjs.sendForm('service_0uetwny', 'template_r6nz0s3', this)
@@ -63,7 +94,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     // Re-enable button
                     if (submitButton) {
                         submitButton.disabled = false;
-                        submitButton.innerText = 'Send Message';
+                        submitButton.innerHTML = originalText;
                     }
                 }, (error) => {
                     console.error('Error sending message:', error);
@@ -72,13 +103,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     // Re-enable button
                     if (submitButton) {
                         submitButton.disabled = false;
-                        submitButton.innerText = 'Send Message';
+                        submitButton.innerHTML = originalText;
                     }
                 });
         });
     }
 
-    // Helper function to show messages
+    // Helper function to show messages with better styling
     function showMessage(form, text, type) {
         // Remove any existing message
         const existingMessage = form.querySelector('.success-message, .error-message');
@@ -89,12 +120,21 @@ document.addEventListener('DOMContentLoaded', function () {
         // Create message element
         const messageElement = document.createElement('div');
         messageElement.className = type === 'success' ? 'success-message' : 'error-message';
-        messageElement.innerText = text;
+        messageElement.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+            ${text}
+        `;
         form.appendChild(messageElement);
 
         // Remove message after 5 seconds
         setTimeout(() => {
-            messageElement.remove();
+            messageElement.style.opacity = '0';
+            messageElement.style.transform = 'translateY(-20px)';
+            setTimeout(() => {
+                if (messageElement.parentNode) {
+                    messageElement.remove();
+                }
+            }, 300);
         }, 5000);
     }
 
@@ -108,11 +148,45 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const target = document.querySelector(this.getAttribute('href'));
             if (target) {
-                target.scrollIntoView({
+                const headerOffset = 100;
+                const elementPosition = target.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+                window.scrollTo({
+                    top: offsetPosition,
                     behavior: 'smooth'
                 });
+
+                // Close mobile menu if open
+                if (navMenu && navMenu.classList.contains('active')) {
+                    navMenu.classList.remove('active');
+                    navToggle.classList.remove('active');
+                }
             }
         });
+    });
+
+    // Intersection Observer for animations
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, observerOptions);
+
+    // Observe sections for animations
+    document.querySelectorAll('section, .project-card, .repo-card').forEach(el => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(30px)';
+        el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(el);
     });
 });
 
@@ -122,10 +196,10 @@ async function fetchGitHubRepos() {
     if (!reposContainer) return;
 
     try {
-        const response = await fetch('https://api.github.com/users/BenjaminLTakaki/repos?sort=updated');
+        const response = await fetch('https://api.github.com/users/BenjaminLTakaki/repos?sort=updated&per_page=50');
 
         if (!response.ok) {
-            throw new Error('GitHub API request failed');
+            throw new Error(`GitHub API request failed: ${response.status}`);
         }
 
         const repos = await response.json();
@@ -135,32 +209,41 @@ async function fetchGitHubRepos() {
 
         // Filter out certain repos and get top 3
         const filteredRepos = repos
-            .filter(repo =>
+            .filter(repo => 
                 !repo.fork &&
                 repo.name.toLowerCase() !== 'animewatchlist' &&
-                repo.name.toLowerCase() !== 'portfoliowebsite')
+                repo.name.toLowerCase() !== 'portfoliowebsite' &&
+                repo.name.toLowerCase() !== 'skillstownrecommender' &&
+                repo.name.toLowerCase() !== 'spotify-cover-generator' &&
+                repo.description // Only show repos with descriptions
+            )
             .slice(0, 3);
 
         if (filteredRepos.length === 0) {
-            reposContainer.innerHTML = '<p>No GitHub projects to display.</p>';
+            reposContainer.innerHTML = '<p class="no-repos">No additional GitHub projects to display.</p>';
             return;
         }
 
         // Display each repo
-        filteredRepos.forEach(repo => {
+        filteredRepos.forEach((repo, index) => {
             const card = document.createElement('div');
             card.className = 'repo-card';
+            card.style.animationDelay = `${index * 0.1}s`;
 
             // Get language color
             const langColor = getLanguageColor(repo.language);
 
             card.innerHTML = `
-                <h4>${repo.name}</h4>
+                <h4>${formatRepoName(repo.name)}</h4>
                 <p>${repo.description || 'No description available'}</p>
                 <div class="repo-meta">
-                    ${repo.language ?
-                    `<span class="language"><span class="lang-color" style="background-color: ${langColor}"></span>${repo.language}</span>` :
-                    ''}
+                    ${repo.language ? 
+                        `<span class="language">
+                            <span class="lang-color" style="background-color: ${langColor}"></span>
+                            ${repo.language}
+                        </span>` : 
+                        ''
+                    }
                 </div>
                 <div class="repo-links">
                     <a href="${repo.html_url}" target="_blank" class="btn btn-secondary">
@@ -174,8 +257,21 @@ async function fetchGitHubRepos() {
 
     } catch (error) {
         console.error('Error fetching GitHub repos:', error);
-        reposContainer.innerHTML = '<p>Could not load GitHub projects.</p>';
+        reposContainer.innerHTML = `
+            <div class="error-message">
+                <i class="fas fa-exclamation-triangle"></i>
+                Could not load GitHub projects at this time.
+            </div>
+        `;
     }
+}
+
+// Function to format repository names
+function formatRepoName(name) {
+    return name
+        .split(/[-_]/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
 }
 
 // Function to get language color
@@ -191,8 +287,42 @@ function getLanguageColor(language) {
         'PHP': '#4F5D95',
         'C++': '#f34b7d',
         'Ruby': '#701516',
-        'Go': '#00ADD8'
+        'Go': '#00ADD8',
+        'Rust': '#dea584',
+        'Swift': '#fa7343',
+        'Kotlin': '#F18E33',
+        'Vue': '#4FC08D',
+        'React': '#61DAFB'
     };
 
     return colors[language] || '#8e8e8e';
+}
+
+// Enhanced loading function for project links
+function showLoading(event) {
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.className = 'loading-overlay';
+    loadingOverlay.innerHTML = `
+        <div class="loading-spinner"></div>
+        <p>Loading project...</p>
+        <small>This may take a moment</small>
+    `;
+    document.body.appendChild(loadingOverlay);
+    
+    // Add fade in animation
+    setTimeout(() => {
+        loadingOverlay.style.opacity = '1';
+    }, 10);
+    
+    // Remove loading overlay after 5 seconds if still present
+    setTimeout(() => {
+        if (loadingOverlay.parentNode) {
+            loadingOverlay.style.opacity = '0';
+            setTimeout(() => {
+                if (loadingOverlay.parentNode) {
+                    loadingOverlay.remove();
+                }
+            }, 300);
+        }
+    }, 5000);
 }

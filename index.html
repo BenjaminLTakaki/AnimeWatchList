@@ -5,8 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Benjamin Takaki - Portfolio</title>
     <link rel="stylesheet" href="styles/styles.css" />
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Font Awesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" integrity="sha512-iBBXm8fW90+nuLcSKVB1DVXQ3R/4IWp/jBsjmLbzRv7ZvUc4VjZdE6Vmvv4v1T5GkZMc5Ny9GD0RrR1r99C1sw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 </head>
 <body>
     <!-- Sidebar with Social Links -->
@@ -50,16 +54,24 @@
 
     <!-- Hero Section -->
     <section class="hero" id="home">
-        <div class="container hero-content">
-            <h1>Hello! I'm <span class="highlight">Benjamin Takaki</span></h1>
-            <p>I am an ICT student passionate about programming and leveraging technology to solve real-world challenges.</p>
-            <div class="cta-buttons">
-                <a href="resume.pdf" target="_blank" class="btn btn-primary">Get Resume</a>
-                <a href="#about" class="btn btn-secondary">Learn More</a>
+        <div class="container">
+            <div class="hero-content">
+                <h1>Hello! I'm <span class="highlight">Benjamin Takaki</span></h1>
+                <p>I am an ICT student passionate about programming and leveraging technology to solve real-world challenges.</p>
+                <div class="cta-buttons">
+                    <a href="resume.pdf" target="_blank" class="btn btn-primary">
+                        <i class="fas fa-download"></i>
+                        Get Resume
+                    </a>
+                    <a href="#about" class="btn btn-secondary">
+                        <i class="fas fa-arrow-down"></i>
+                        Learn More
+                    </a>
+                </div>
             </div>
-        </div>
-        <div class="hero-image">
-            <img src="your-photo.jpg" alt="Portrait of Benjamin Takaki" />
+            <div class="hero-image">
+                <img src="your-photo.jpg" alt="Portrait of Benjamin Takaki" />
+            </div>
         </div>
     </section>
 
@@ -89,7 +101,7 @@
                 <!-- Course Recommendation Project -->
                 <div class="project-card">
                     <div class="project-image">
-                        <img src="projects/skillstown/static/images/preview.jpg" alt="SkillsTown Course Recommender Preview" onerror="this.src='https://via.placeholder.com/300x200?text=SkillsTownRecommender'">
+                        <img src="projects/skillstown/static/images/preview.jpg" alt="SkillsTown Course Recommender Preview" onerror="this.src='https://via.placeholder.com/600x400/1a1a1a/3b82f6?text=SkillsTown+Course+Recommender'">
                     </div>
                     <div class="project-details">
                         <h3>SkillsTown Course Recommender</h3>
@@ -104,9 +116,6 @@
                             <a href="/skillstown" class="btn btn-primary" onclick="showLoading(event)">
                                 <i class="fas fa-external-link-alt"></i> View Project
                             </a>
-                            <a href="https://github.com/BenjaminLTakaki/SkillsTownRecommender" target="_blank" class="btn btn-secondary">
-                                <i class="fab fa-github"></i> View on GitHub
-                            </a>
                         </div>
                     </div>
                 </div>
@@ -114,7 +123,7 @@
                 <!-- AnimeWatchList Project -->
                 <div class="project-card">
                     <div class="project-image">
-                        <img src="projects/animewatchlist/static/images/preview.jpg" alt="AnimeWatchList Preview" onerror="this.src='https://via.placeholder.com/300x200?text=AnimeWatchList'">
+                        <img src="projects/animewatchlist/static/images/preview.jpg" alt="AnimeWatchList Preview" onerror="this.src='https://via.placeholder.com/600x400/1a1a1a/06b6d4?text=AnimeWatchList'">
                     </div>
                     <div class="project-details">
                         <h3>AnimeWatchList</h3>
@@ -129,53 +138,38 @@
                             <a href="/animewatchlist" class="btn btn-primary" onclick="showLoading(event)">
                                 <i class="fas fa-external-link-alt"></i> View Project
                             </a>
-                            <a href="https://github.com/BenjaminLTakaki/AnimeWatchList" target="_blank" class="btn btn-secondary">
-                                <i class="fab fa-github"></i> View on GitHub
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Spotify Cover Generator Project -->
+                <div class="project-card">
+                    <div class="project-image">
+                        <img src="projects/spotify-cover-generator/static/images/preview.jpg" alt="Spotify Cover Generator Preview" onerror="this.src='https://via.placeholder.com/600x400/1a1a1a/3b82f6?text=Spotify+Cover+Generator'">
+                    </div>
+                    <div class="project-details">
+                        <h3>Spotify Cover Generator</h3>
+                        <p>Generate custom album artwork and titles based on your Spotify playlists using AI. Analyze genres and create cover art that matches your music's style.</p>
+                        <div class="project-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">Flask</span>
+                            <span class="tag">Spotify API</span>
+                            <span class="tag">AI</span>
+                        </div>
+                        <div class="project-links">
+                            <a href="/spotify" class="btn btn-primary" onclick="showLoading(event)">
+                                <i class="fas fa-external-link-alt"></i> View Project
                             </a>
                         </div>
                     </div>
                 </div>
-                    <div class="project-card">
-                        <div class="project-image">
-                            <img src="projects/spotify-cover-generator/static/images/preview.jpg" alt="Spotify Cover Generator Preview" onerror="this.src='https://via.placeholder.com/300x200?text=SpotifyCoverGenerator'">
-                        </div>
-                        <div class="project-details">
-                            <h3>Spotify Cover Generator</h3>
-                            <p>Generate custom album artwork and titles based on your Spotify playlists using AI. Analyze genres and create cover art that matches your music's style.</p>
-                            <div class="project-tags">
-                                <span class="tag">Python</span>
-                                <span class="tag">Flask</span>
-                                <span class="tag">Spotify API</span>
-                                <span class="tag">AI</span>
-                            </div>
-                            <div class="project-links">
-                                <a href="/spotify" class="btn btn-primary" onclick="showLoading(event)">
-                                    <i class="fas fa-external-link-alt"></i> View Project
-                                </a>
-                                <a href="https://github.com/BenjaminLTakaki/spotify-cover-generator" target="_blank" class="btn btn-secondary">
-                                    <i class="fab fa-github"></i> View on GitHub
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                <script>
-                    // Add this function to your existing JavaScript
-                    function showLoading(event) {
-                        // Create a loading overlay
-                        const loadingOverlay = document.createElement('div');
-                        loadingOverlay.className = 'loading-overlay';
-                        loadingOverlay.innerHTML = `
-                                                        <div class="loading-spinner"></div>
-                                                        <p>Loading project...</p>
-                                                    `;
-                        document.body.appendChild(loadingOverlay);
-                    }
-                </script>
 
                 <!-- GitHub Repositories Section - Displaying top 3 repos -->
                 <div id="github-projects" class="github-section">
                     <h3 class="github-heading">From My GitHub</h3>
-                    <div id="github-repos" class="repo-grid"></div>
+                    <div id="github-repos" class="repo-grid">
+                        <div class="loading">Loading GitHub repositories...</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -190,7 +184,10 @@
                 <input type="text" name="name" placeholder="Your Name" required aria-label="Your Name" />
                 <input type="email" name="email" placeholder="Your Email" required aria-label="Your Email" />
                 <textarea name="message" placeholder="Your Message" required aria-label="Your Message"></textarea>
-                <button type="submit" class="btn btn-primary">Send Message</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i>
+                    Send Message
+                </button>
             </form>
         </div>
     </section>
@@ -202,12 +199,34 @@
 
     <!-- Footer -->
     <footer class="footer">
-        <p>&copy; 2024 Benjamin Takaki. All rights reserved.</p>
+        <div class="container">
+            <p>&copy; 2024 Benjamin Takaki. All rights reserved.</p>
+        </div>
     </footer>
 
     <!-- Scripts -->
     <!-- EmailJS SDK -->
     <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
     <script src="script.js"></script>
+
+    <script>
+        // Enhanced loading function
+        function showLoading(event) {
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.className = 'loading-overlay';
+            loadingOverlay.innerHTML = `
+                <div class="loading-spinner"></div>
+                <p>Loading project...</p>
+            `;
+            document.body.appendChild(loadingOverlay);
+            
+            // Remove loading overlay after 3 seconds if still present
+            setTimeout(() => {
+                if (loadingOverlay.parentNode) {
+                    loadingOverlay.remove();
+                }
+            }, 3000);
+        }
+    </script>
 </body>
 </html>
