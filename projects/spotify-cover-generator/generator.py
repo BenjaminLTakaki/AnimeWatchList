@@ -15,14 +15,19 @@ from utils import create_image_filename, get_available_loras
 from models import GenerationResult
 from config import COVERS_DIR
 
+# Monitoring and Fault Handling Imports
+from .monitoring_system import app_logger, monitor_performance
+# from .fault_handling import fault_tolerant_api_call, GracefulDegradation # If needed later
+
+@monitor_performance
 def save_generation_data_with_user(data, user_id=None):
     """Save generation data to database with user tracking"""
     try:
-        # Import here to avoid circular imports
+        # Import here to avoid circular imports if app calls this,
+        # though ideally db operations are further abstracted or use current_app.
         from app import GenerationResultDB, db, app
         
-        with app.app_context():
-            # Create a new generation result record
+        with app.app_context(): # Ensure app context for db operations
             new_result = GenerationResultDB(
                 title=data.get("title", "New Album"),
                 output_path=data.get("output_path", ""),
@@ -36,58 +41,49 @@ def save_generation_data_with_user(data, user_id=None):
                 lora_name=data.get("lora_name", ""),
                 lora_type=data.get("lora_type", ""),
                 lora_url=data.get("lora_url", ""),
-                user_id=user_id  # Add user tracking
+                user_id=user_id
             )
-            
             db.session.add(new_result)
             db.session.commit()
-            
-            # Return the ID as a string
+            app_logger.info("generation_data_saved_db", result_id=new_result.id, user_id=user_id)
             return str(new_result.id)
     except Exception as e:
-        print(f"Error saving data to database: {e}")
-        
-        # Fall back to saving to a JSON file if database fails
+        app_logger.error("save_generation_to_db_failed", error=str(e), user_id=user_id, exc_info=True)
         try:
-            from config import DATA_DIR
-            import json
+            from config import DATA_DIR # Keep import local if only used here
+            import json # Keep import local
             
-            # Create a unique filename based on timestamp
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            safe_name = "".join(c for c in data.get("item_name", "") if c.isalnum() or c in [' ', '-', '_']).strip()
+            safe_name = "".join(c for c in data.get("item_name", "unknown_item") if c.isalnum() or c in [' ', '-', '_']).strip()
             safe_name = safe_name.replace(' ', '_')
             json_filename = f"{timestamp}_{safe_name}.json"
             
-            with open(DATA_DIR / json_filename, 'w', encoding='utf-8') as f:
+            data_file_path = Path(DATA_DIR) / json_filename
+            with open(data_file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             
-            print(f"Data saved to file {DATA_DIR / json_filename} (database failed)")
-            
-            return str(DATA_DIR / json_filename)
+            app_logger.info("generation_data_saved_file_fallback", path=str(data_file_path), user_id=user_id)
+            return str(data_file_path)
         except Exception as file_error:
-            print(f"Error saving data to file: {file_error}")
+            app_logger.error("save_generation_to_file_fallback_failed", error=str(file_error), user_id=user_id, exc_info=True)
             return None
 
-# Monitoring imports with fallback
-try:
-    from monitoring_system import monitor_performance
-except ImportError:
-    def monitor_performance(func):
-        return func
+# Removed old monitoring import fallback
 
 @monitor_performance
 def generate_cover(url, user_mood=None, lora_input=None, output_path=None, negative_prompt=None, user_id=None):
     """Generate album cover and title from Spotify URL with user tracking"""
-    print(f"Processing Spotify URL: {url}")
+    app_logger.info("generate_cover_start", spotify_url=url, user_id=user_id, user_mood=user_mood)
     
     # Extract playlist/album data
-    playlist_data = extract_playlist_data(url)
+    playlist_data = extract_playlist_data(url) # This function should have its own logging/monitoring
     if isinstance(playlist_data, dict) and "error" in playlist_data:
+        app_logger.error("playlist_data_extraction_failed", url=url, error=playlist_data["error"])
         return {"error": playlist_data["error"]}
     
-    print(f"\nSuccessfully extracted data for: {playlist_data.item_name}")
-    print(f"Top genres identified: {', '.join(playlist_data.genre_analysis.top_genres)}")
-    
+    app_logger.info("playlist_data_extracted", item_name=playlist_data.item_name, user_id=user_id)
+    app_logger.debug("playlist_genres", genres=playlist_data.genre_analysis.top_genres, user_id=user_id)
+
     # Convert playlist data to dictionary
     data = playlist_data.to_dict()
     
@@ -95,15 +91,15 @@ def generate_cover(url, user_mood=None, lora_input=None, output_path=None, negat
     base_image_prompt = create_prompt_from_data(data, user_mood)
     
     # Generate title
-    title = generate_title(data, user_mood)
-    print(f"Generated title: {title}")
+    title = generate_title(data, user_mood) # This function should have its own logging/monitoring
+    app_logger.info("title_generated", title=title, user_id=user_id)
     
     # Add title to data
     data["title"] = title
     
     # Create final image prompt with title
     image_prompt = f"{base_image_prompt}, representing the album '{title}'"
-    print(f"Final image prompt with title: {image_prompt}")
+    app_logger.debug("final_image_prompt", prompt=image_prompt, user_id=user_id)
     
     # Determine output path
     if not output_path:
@@ -164,7 +160,7 @@ def generate_cover(url, user_mood=None, lora_input=None, output_path=None, negat
         try:
             image = Image.open(output_path)
         except Exception as e:
-            print(f"Error opening generated image: {e}")
+            app_logger.error("open_generated_image_failed", path=str(output_path), error=str(e), exc_info=True)
             return {"error": f"Failed to process generated image: {str(e)}"}
     
     # Convert image to base64 for embedding in HTML

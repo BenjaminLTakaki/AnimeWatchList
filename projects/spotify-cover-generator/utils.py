@@ -4,11 +4,21 @@ import json
 import datetime
 import re
 import urllib.parse
+from urllib.parse import urlparse
 from pathlib import Path
 import os
 import requests
 from collections import Counter
+import uuid # For guest session functions
+from flask import current_app, session # Added session for guest functions
+from sqlalchemy import text # For db utils
+
+# Local project imports
 from config import DATA_DIR, LORA_DIR, COVERS_DIR
+from .extensions import db
+from .database_models import SpotifyState # For ensure_tables_exist
+# This assumes 'models.py' (not database_models.py) contains GenreAnalysis for calculate_genre_percentages
+from models import GenreAnalysis
 
 def generate_random_string(size=10):
     """Generate a random string of letters and digits."""
@@ -64,19 +74,20 @@ def save_generation_data(data, output_path=None):
             return None
 
 def calculate_genre_percentages(genres_list):
-    """Calculate percentage distribution of genres"""
+    """Calculate percentage distribution of genres. Version from app.py."""
     if not genres_list:
         return []
     
     try:
         # Attempt to use the more structured GenreAnalysis if available
-        from models import GenreAnalysis 
+        # from models import GenreAnalysis # This import is now at the top of the file
         genre_analysis = GenreAnalysis.from_genre_list(genres_list)
         return genre_analysis.get_percentages(max_genres=5)
     except ImportError:
         # Fallback if models.py or GenreAnalysis is not available
-        print("⚠️ models.GenreAnalysis not found, using fallback for calculate_genre_percentages.")
-        if not isinstance(genres_list, list): # Ensure it's a list
+        logger = current_app.logger if current_app else print
+        logger("⚠️ models.GenreAnalysis not found, using fallback for calculate_genre_percentages.")
+        if not isinstance(genres_list, list):
             return []
             
         genre_counter = Counter(genres_list)
@@ -92,22 +103,21 @@ def calculate_genre_percentages(genres_list):
             percentages.append({
                 "name": genre,
                 "percentage": percentage,
-                "count": count  # Keep the count for potential display
+                "count": count
             })
         return percentages
 
 def extract_playlist_id(playlist_url):
-    """Extract playlist ID from Spotify URL"""
+    """Extract playlist ID from Spotify URL. Version from app.py."""
     if not playlist_url or "playlist/" not in playlist_url:
         return None
     try:
-        # Example: https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=...
-        #          -> 37i9dQZF1DXcBWIGoYBM5M
-        path_part = urllib.parse.urlparse(playlist_url).path
+        path_part = urlparse(playlist_url).path # urlparse imported at the top
         if "/playlist/" in path_part:
             return path_part.split("/playlist/")[-1].split("/")[0]
     except Exception as e:
-        print(f"Error parsing playlist URL '{playlist_url}': {e}")
+        logger = current_app.logger if current_app else print
+        logger(f"Error parsing playlist URL '{playlist_url}': {e}")
     return None
 
 def get_available_loras():
@@ -347,5 +357,110 @@ def list_recent_generations(limit=10):
                 "image_url": f"/spotifycovergenerator/generated_covers/{os.path.basename(result.output_path)}"
             } for result in results]
     except Exception as e:
-        print(f"Error listing recent generations: {e}")
+            logger = current_app.logger if current_app else print
+            logger(f"Error listing recent generations: {e}")
         return []
+
+# --- Functions moved from app.py ---
+
+def create_tables_manually():
+    """
+    Manually create tables using SQLAlchemy 2.0+ compatible syntax.
+    Moved from app.py. Depends on db from extensions.
+    """
+    logger = current_app.logger if current_app else print
+    logger("Attempting manual table creation...")
+    # Simplified SQL commands for brevity, ensure these match the actual table structures needed
+    sql_commands = [
+        "CREATE TABLE IF NOT EXISTS spotify_users (id SERIAL PRIMARY KEY, email VARCHAR(120) UNIQUE, username VARCHAR(80) UNIQUE, password_hash VARCHAR(200), spotify_id VARCHAR(100) UNIQUE, spotify_username VARCHAR(100), spotify_access_token VARCHAR(500), spotify_refresh_token VARCHAR(500), spotify_token_expires TIMESTAMP, display_name VARCHAR(100), is_premium BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, last_login TIMESTAMP, is_active BOOLEAN DEFAULT TRUE);",
+        "CREATE TABLE IF NOT EXISTS spotify_login_sessions (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES spotify_users(id) ON DELETE CASCADE, session_token VARCHAR(100) UNIQUE NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, expires_at TIMESTAMP NOT NULL, is_active BOOLEAN DEFAULT TRUE, ip_address VARCHAR(45), user_agent VARCHAR(500));",
+        "CREATE TABLE IF NOT EXISTS spotify_oauth_states (id SERIAL PRIMARY KEY, state VARCHAR(100) UNIQUE NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, used BOOLEAN DEFAULT FALSE);",
+        "CREATE TABLE IF NOT EXISTS spotify_lora_models (id SERIAL PRIMARY KEY, name VARCHAR(100) UNIQUE NOT NULL, source_type VARCHAR(20) DEFAULT 'local', path VARCHAR(500) DEFAULT '', file_size INTEGER DEFAULT 0, uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, uploaded_by INTEGER REFERENCES spotify_users(id) ON DELETE SET NULL);",
+        "CREATE TABLE IF NOT EXISTS spotify_generation_results (id SERIAL PRIMARY KEY, title VARCHAR(500) NOT NULL, output_path VARCHAR(1000) NOT NULL, item_name VARCHAR(500), genres JSON, all_genres JSON, style_elements JSON, mood VARCHAR(1000), energy_level VARCHAR(50), timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, spotify_url VARCHAR(1000), lora_name VARCHAR(200), lora_type VARCHAR(20), lora_url VARCHAR(1000), user_id INTEGER REFERENCES spotify_users(id) ON DELETE SET NULL);",
+        "CREATE INDEX IF NOT EXISTS idx_users_email ON spotify_users(email);",
+        "CREATE INDEX IF NOT EXISTS idx_users_spotify_id ON spotify_users(spotify_id);",
+        "CREATE INDEX IF NOT EXISTS idx_sessions_token ON spotify_login_sessions(session_token);"
+    ]
+    with current_app.app_context():
+        with db.engine.connect() as connection:
+            for i, sql in enumerate(sql_commands):
+                try:
+                    connection.execute(text(sql))
+                    connection.commit()
+                    logger(f"SQL command {i+1} executed successfully.")
+                except Exception as e:
+                    logger(f"SQL command {i+1} failed: {e}")
+                    pass # Continue attempting other commands
+
+def ensure_tables_exist():
+    """Ensure tables exist before any database operation. Moved from app.py."""
+    logger = current_app.logger if current_app else print
+    with current_app.app_context():
+        try:
+            # Check for a specific table (e.g., spotify_oauth_states which maps to SpotifyState model)
+            with db.engine.connect() as connection: # Use db.engine for basic check
+                connection.execute(text(f"SELECT 1 FROM {SpotifyState.__tablename__} LIMIT 1"))
+            logger("Database tables seem to exist.")
+        except Exception:
+            logger("Tables missing or DB connection issue, attempting to create...")
+            try:
+                db.create_all()
+                logger("db.create_all() executed.")
+                # Verify again or run manual creation if needed
+                with db.engine.connect() as connection:
+                    connection.execute(text(f"SELECT 1 FROM {SpotifyState.__tablename__} LIMIT 1"))
+                logger("Tables confirmed after db.create_all().")
+            except Exception as e_create:
+                logger(f"db.create_all() failed: {e_create}. Attempting manual table creation...")
+                try:
+                    create_tables_manually() # Fallback to manual creation
+                except Exception as e_manual:
+                    logger(f"Manual table creation also failed: {e_manual}")
+
+# --- Guest Session Functions (Moved from app.py) ---
+def get_or_create_guest_session():
+    """Get or create a guest session for anonymous users."""
+    if 'guest_session_id' not in session:
+        session['guest_session_id'] = str(uuid.uuid4())
+        session['guest_created'] = datetime.datetime.utcnow().isoformat()
+        session['guest_generations_today'] = 0
+        session['guest_last_generation'] = None
+    return session['guest_session_id']
+
+def get_guest_generations_today():
+    """Get number of generations for guest today."""
+    logger = current_app.logger if current_app else print
+    if 'guest_session_id' not in session:
+        get_or_create_guest_session()
+
+    if 'guest_last_generation' in session and session['guest_last_generation']:
+        try:
+            last_gen_iso = session['guest_last_generation']
+            if last_gen_iso:
+                last_gen = datetime.datetime.fromisoformat(last_gen_iso)
+                if last_gen.date() != datetime.datetime.utcnow().date():
+                    session['guest_generations_today'] = 0
+        except (TypeError, ValueError) as e:
+            logger(f"Could not parse guest_last_generation: {session.get('guest_last_generation')}. Resetting count. Error: {e}")
+            session['guest_last_generation'] = None
+            session['guest_generations_today'] = 0
+    return session.get('guest_generations_today', 0)
+
+def increment_guest_generations():
+    """Increment guest generation count."""
+    session['guest_generations_today'] = get_guest_generations_today() + 1
+    session['guest_last_generation'] = datetime.datetime.utcnow().isoformat()
+
+def can_guest_generate():
+    """Check if guest can generate."""
+    # Guest limit can be configured in current_app.config if needed
+    guest_limit = current_app.config.get('GUEST_DAILY_GENERATION_LIMIT', 1) if current_app else 1
+    return get_guest_generations_today() < guest_limit
+
+def track_guest_generation():
+    """Track generation for guest."""
+    logger = current_app.logger if current_app else print
+    try:
+        increment_guest_generations()
+    except Exception as e:
+        logger(f"Error tracking guest generation: {e}")

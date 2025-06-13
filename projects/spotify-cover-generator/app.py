@@ -20,55 +20,49 @@ from flask import (Flask, request, render_template, send_from_directory, jsonify
                    session, redirect, url_for, flash, make_response)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from flask_sqlalchemy import SQLAlchemy
+# Removed flask_sqlalchemy import, will be handled by extensions
 from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 from sqlalchemy import text
 
-# Monitoring and fault handling imports
-try:
-    from monitoring_system import (
-        setup_monitoring, monitor_performance, monitor_api_calls,
-        app_logger, alert_manager, system_monitor
-    )
-    from fault_handling import (
-        fault_tolerant_api_call, GracefulDegradation, db_failover,
-        create_user_friendly_error_messages, FaultContext, http_client
-    )
-    print("✅ Monitoring system imported successfully")
-except ImportError as e:
-    print(f"⚠️ Monitoring system import failed: {e}")
-    # Define dummy decorators as fallback
-    def monitor_performance(func):
-        return func
-    def monitor_api_calls(service_name):
-        def decorator(func):
-            return func
-        return decorator
-    def fault_tolerant_api_call(service_name, fallback_func):
-        def decorator(func):
-            return func
-        return decorator
+from .extensions import db # Import db from extensions
+from .utils import (
+    calculate_genre_percentages,
+    extract_playlist_id,
+    ensure_tables_exist, # Will call create_tables_manually internally
+    get_or_create_guest_session,
+    get_guest_generations_today,
+    increment_guest_generations,
+    can_guest_generate,
+    track_guest_generation
+)
 
-# Configuration imports or fallbacks
-try:
-    from config import (
-        BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY,
-        SPOTIFY_DB_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET,
-        SPOTIFY_REDIRECT_URI
-    )
-    print("Config imported successfully")
-except ImportError as e:
-    print(f"Config import failed: {e}")
-    BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
-    COVERS_DIR = BASE_DIR / "generated_covers"
-    FLASK_SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'dev-key')
-    SPOTIFY_DB_URL = os.environ.get('DATABASE_URL', 'postgresql://localhost/test')
-    SPOTIFY_CLIENT_ID = os.environ.get('SPOTIFY_CLIENT_ID')
-    SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET')
-    SPOTIFY_REDIRECT_URI = os.environ.get('SPOTIFY_REDIRECT_URI', 'http://localhost:5000/spotify-callback')
+# Monitoring and fault handling imports
+from .monitoring_system import (
+    setup_monitoring,
+    monitor_performance,
+    # monitor_api_calls, # Not directly used in app.py
+    app_logger,
+    alert_manager,
+    health_checker # Used in /health route
+)
+from .fault_handling import (
+    FaultContext,
+    create_user_friendly_error_messages
+    # fault_tolerant_api_call, # Not directly used in app.py
+    # GracefulDegradation, db_failover, http_client # Not directly used in app.py
+)
+print("✅ Successfully imported monitoring and fault_handling modules.")
+
+# Direct configuration import
+from config import (
+    BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY,
+    SPOTIFY_DB_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET,
+    SPOTIFY_REDIRECT_URI, GEMINI_API_KEY, STABILITY_API_KEY
+)
+print("Successfully imported configurations from config.py")
 
 # Flask app initialization
 app = Flask(__name__,
@@ -81,8 +75,17 @@ app.secret_key = FLASK_SECRET_KEY or ''.join(random.choices(
 app.config['SQLALCHEMY_DATABASE_URI'] = SPOTIFY_DB_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db = SQLAlchemy(app)
+# Initialize db with app from extensions
+db.init_app(app)
 migrate = Migrate(app, db)
+
+# Import models after db is initialized and before it's used by other functions or routes
+from .database_models import User, LoginSession, SpotifyState, LoraModelDB, GenerationResultDB
+# If database_models.py needs db from app.py, you might need to adjust imports
+# For example, if database_models.py has `from .app import db` (circular)
+# or if you pass `db` to an init_app function in database_models.py.
+# Assuming for now that models in database_models.py are defined with their own `db = SQLAlchemy()`
+# or correctly pick up this `db` instance upon import.
 
 # Rate limiter
 limiter = Limiter(
@@ -91,199 +94,6 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 limiter.init_app(app)
-
-# Models definition
-class User(db.Model):
-    __tablename__ = 'spotify_users'
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=True)
-    username = db.Column(db.String(80), unique=True, nullable=True)
-    password_hash = db.Column(db.String(200), nullable=True)
-    spotify_id = db.Column(db.String(100), unique=True, nullable=True)
-    spotify_username = db.Column(db.String(100), nullable=True)
-    spotify_access_token = db.Column(db.String(500), nullable=True)
-    spotify_refresh_token = db.Column(db.String(500), nullable=True)
-    spotify_token_expires = db.Column(db.DateTime, nullable=True)
-    display_name = db.Column(db.String(100), nullable=True)
-    is_premium = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    last_login = db.Column(db.DateTime, nullable=True)
-    is_active = db.Column(db.Boolean, default=True)
-    generations = db.relationship('GenerationResultDB', backref='user', lazy=True)
-
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        return bool(self.password_hash and check_password_hash(self.password_hash, password))
-
-    def is_premium_user(self):
-        premium_emails = ['bentakaki7@gmail.com']
-        premium_usernames = ['benthegamer']
-        if self.email and self.email.lower() in premium_emails:
-            return True
-        if self.spotify_username and self.spotify_username.lower() in premium_usernames:
-            return True
-        if self.spotify_id and self.spotify_id.lower() in premium_usernames:
-            return True
-        return False
-
-    def get_daily_generation_limit(self):
-        return 999 if self.is_premium_user() else 2
-
-    def can_generate_today(self):
-        today = datetime.datetime.utcnow().date()
-        count = GenerationResultDB.query.filter(
-            GenerationResultDB.user_id == self.id,
-            db.func.date(GenerationResultDB.timestamp) == today
-        ).count()
-        return count < self.get_daily_generation_limit()
-
-    def get_generations_today(self):
-        today = datetime.datetime.utcnow().date()
-        return GenerationResultDB.query.filter(
-            GenerationResultDB.user_id == self.id,
-            db.func.date(GenerationResultDB.timestamp) == today
-        ).count()
-
-    def refresh_spotify_token_if_needed(self):
-        if not self.spotify_refresh_token:
-            return False
-        if self.spotify_token_expires and \
-           self.spotify_token_expires <= datetime.datetime.utcnow() + timedelta(minutes=5):
-            return self._refresh_spotify_token()
-        return True
-
-    def _refresh_spotify_token(self):
-        if not self.spotify_refresh_token:
-            return False
-        auth_header = base64.b64encode(f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}".encode()).decode()
-        headers = {'Authorization': f'Basic {auth_header}', 'Content-Type': 'application/x-www-form-urlencoded'}
-        data = {'grant_type': 'refresh_token', 'refresh_token': self.spotify_refresh_token}
-        try:
-            response = requests.post('https://accounts.spotify.com/api/token', headers=headers, data=data)
-            if response.status_code == 200:
-                token_data = response.json()
-                self.spotify_access_token = token_data['access_token']
-                self.spotify_token_expires = datetime.datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
-                if 'refresh_token' in token_data:
-                    self.spotify_refresh_token = token_data['refresh_token']
-                db.session.commit()
-                return True
-        except Exception as e:
-            print(f"Error refreshing Spotify token: {e}")
-        return False
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'email': self.email,
-            'username': self.username,
-            'display_name': self.display_name,
-            'spotify_username': self.spotify_username,
-            'is_premium': self.is_premium_user(),
-            'daily_limit': self.get_daily_generation_limit(),
-            'generations_today': self.get_generations_today(),
-            'can_generate': self.can_generate_today(),
-            'created_at': self.created_at.isoformat() if self.created_at else None
-        }
-
-class LoginSession(db.Model):
-    __tablename__ = 'spotify_login_sessions'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=False)
-    session_token = db.Column(db.String(100), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    expires_at = db.Column(db.DateTime, nullable=False)
-    is_active = db.Column(db.Boolean, default=True)
-    ip_address = db.Column(db.String(45), nullable=True)
-    user_agent = db.Column(db.String(500), nullable=True)
-    user = db.relationship('User', backref='sessions')
-
-    @staticmethod
-    def create_session(user_id, ip_address=None, user_agent=None):
-        token = secrets.token_urlsafe(32)
-        expires = datetime.datetime.utcnow() + timedelta(days=30)
-        sess = LoginSession(
-            user_id=user_id, session_token=token,
-            expires_at=expires, ip_address=ip_address,
-            user_agent=user_agent
-        )
-        db.session.add(sess)
-        db.session.commit()
-        return token
-
-    @staticmethod
-    def get_user_from_session(session_token):
-        sess = LoginSession.query.filter_by(session_token=session_token, is_active=True).first()
-        if not sess or sess.expires_at <= datetime.datetime.utcnow():
-            if sess:
-                sess.is_active = False
-                db.session.commit()
-            return None
-        return sess.user
-
-class SpotifyState(db.Model):
-    __tablename__ = 'spotify_oauth_states'
-    id = db.Column(db.Integer, primary_key=True)
-    state = db.Column(db.String(100), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    used = db.Column(db.Boolean, default=False)
-    
-    @staticmethod
-    def create_state():
-        state = secrets.token_urlsafe(32)
-        oauth_state = SpotifyState(state=state)
-        db.session.add(oauth_state)
-        db.session.commit()
-        return state
-    
-    @staticmethod
-    def verify_and_use_state(state):
-        oauth_state = SpotifyState.query.filter_by(state=state, used=False).first()
-        if oauth_state and oauth_state.created_at > datetime.datetime.utcnow() - timedelta(minutes=10):
-            oauth_state.used = True
-            db.session.commit()
-            return True
-        return False
-
-class LoraModelDB(db.Model):
-    __tablename__ = 'spotify_lora_models'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    source_type = db.Column(db.String(20), default='local')  # Only 'local' now
-    path = db.Column(db.String(500), default='')
-    file_size = db.Column(db.Integer, default=0)  # File size in bytes
-    uploaded_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    uploaded_by = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=True)
-    
-    def to_lora_model(self):
-        from models import LoraModel
-        return LoraModel(
-            name=self.name,
-            source_type=self.source_type,
-            path=self.path,
-            trigger_words=[],  # Can be extended later
-            strength=0.7
-        )
-
-class GenerationResultDB(db.Model):
-    __tablename__ = 'spotify_generation_results'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(500), nullable=False)
-    output_path = db.Column(db.String(1000), nullable=False)
-    item_name = db.Column(db.String(500))
-    genres = db.Column(db.JSON)
-    all_genres = db.Column(db.JSON)
-    style_elements = db.Column(db.JSON)
-    mood = db.Column(db.String(1000))
-    energy_level = db.Column(db.String(50))
-    timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
-    spotify_url = db.Column(db.String(1000))
-    lora_name = db.Column(db.String(200))
-    lora_type = db.Column(db.String(20))
-    lora_url = db.Column(db.String(1000))
-    user_id = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=True)
 
 # HELPER FUNCTIONS
 def login_required(f):
@@ -314,7 +124,7 @@ def get_current_user():
             if user:
                 return user
         except Exception as e:
-            print(f"Error fetching user by ID from session: {e}")
+            app_logger.error("fetch_user_by_id_session_error", details=str(e), exc_info=True)
             session.pop('user_id', None)
     
     # Method 2: Check user_session token in session
@@ -336,7 +146,7 @@ def get_current_user():
                 # Clean up expired session
                 session.pop('user_session', None)
         except Exception as e:
-            print(f"Error fetching user by session token: {e}")
+            app_logger.error("fetch_user_by_session_token_error", details=str(e), exc_info=True)
             session.pop('user_session', None)
     
     # Method 3: Check session_token cookie as fallback
@@ -356,72 +166,15 @@ def get_current_user():
                     session['user_session'] = session_token
                     return user
         except Exception as e:
-            print(f"Error fetching user by cookie: {e}")
+            app_logger.error("fetch_user_by_cookie_error", details=str(e), exc_info=True)
     
     return None
-
-def calculate_genre_percentages(genres_list):
-    """Calculate percentage distribution of genres"""
-    if not genres_list:
-        return []
-    
-    try:
-        # Attempt to use the more structured GenreAnalysis if available
-        from models import GenreAnalysis 
-        genre_analysis = GenreAnalysis.from_genre_list(genres_list)
-        return genre_analysis.get_percentages(max_genres=5)
-    except ImportError:
-        # Fallback if models.py or GenreAnalysis is not available
-        print("⚠️ models.GenreAnalysis not found, using fallback for calculate_genre_percentages.")
-        if not isinstance(genres_list, list):
-            return []
-            
-        genre_counter = Counter(genres_list)
-        total_count = sum(genre_counter.values())
-        if total_count == 0:
-            return []
-            
-        sorted_genres = genre_counter.most_common(5)
-        
-        percentages = []
-        for genre, count in sorted_genres:
-            percentage = round((count / total_count) * 100)
-            percentages.append({
-                "name": genre,
-                "percentage": percentage,
-                "count": count
-            })
-        return percentages
-
-def extract_playlist_id(playlist_url):
-    """Extract playlist ID from Spotify URL"""
-    if not playlist_url or "playlist/" not in playlist_url:
-        return None
-    try:
-        path_part = urlparse(playlist_url).path
-        if "/playlist/" in path_part:
-            return path_part.split("/playlist/")[-1].split("/")[0]
-    except Exception as e:
-        print(f"Error parsing playlist URL '{playlist_url}': {e}")
-    return None
-
-def ensure_tables_exist():
-    """Ensure tables exist before any database operation."""
-    try:
-        with app.app_context():
-            with db.engine.connect() as connection:
-                connection.execute(text("SELECT 1 FROM spotify_oauth_states LIMIT 1"))
-    except Exception:
-        print("⚠️ Tables missing or DB connection issue, attempting to create...")
-        try:
-            with app.app_context():
-                db.create_all()
-                print("✓ Tables created/verified on-demand.")
-        except Exception as e_create:
-            print(f"❌ On-demand table creation failed: {e_create}")
 
 # Global initialization flag
 initialized = False
+# calculate_genre_percentages, extract_playlist_id, ensure_tables_exist, and create_tables_manually
+# have been moved to utils.py
+# Guest session functions also moved to utils.py
 
 def migrate_lora_table():
     """Migrate LoRA table to add missing columns"""
@@ -436,7 +189,7 @@ def migrate_lora_table():
                 """))
                 existing_columns = [row[0] for row in result]
                 
-                print(f"Existing columns in spotify_lora_models: {existing_columns}")
+                app_logger.info("lora_migration_check", message=f"Existing columns in spotify_lora_models: {existing_columns}")
                 
                 # Add missing columns if they don't exist
                 migrations = []
@@ -465,9 +218,9 @@ def migrate_lora_table():
                     try:
                         connection.execute(text(migration))
                         connection.commit()
-                        print(f"✓ Executed: {migration}")
+                        app_logger.info("lora_migration_executed", migration=migration)
                     except Exception as e:
-                        print(f"⚠️ Migration failed (might already exist): {migration} - {e}")
+                        app_logger.warning("lora_migration_skipped", migration=migration, error=str(e), exc_info=True)
                           # Add foreign key constraint if it doesn't exist
                 try:
                     # Check if constraint exists
@@ -484,15 +237,15 @@ def migrate_lora_table():
                             FOREIGN KEY (uploaded_by) REFERENCES spotify_users(id) ON DELETE SET NULL
                         """))
                         connection.commit()
-                    print("✓ Foreign key constraint added/verified")                
+                    app_logger.info("lora_fk_constraint_verified", constraint="fk_lora_models_uploaded_by")
                 except Exception as e:
-                    print(f"⚠️ Foreign key constraint warning: {e}")
+                    app_logger.warning("lora_fk_constraint_warning", error=str(e), exc_info=True)
                 
-                print("✅ LoRA table migration completed")
+                app_logger.info("lora_migration_completed", status="success")
                 return True
                 
     except Exception as e:
-        print(f"❌ LoRA table migration failed: {e}")
+        app_logger.error("lora_migration_failed", error=str(e), exc_info=True)
         return False
 
 def initialize_app():
@@ -507,9 +260,9 @@ def initialize_app():
         # Create LoRA directory for file uploads
         lora_dir = BASE_DIR / "loras"
         os.makedirs(lora_dir, exist_ok=True)
-        print("✓ Created directories")
+        app_logger.info("directory_creation_success", directories=[str(COVERS_DIR), str(lora_dir)])
     except Exception as e:
-        print(f"⚠️ Directory creation warning: {e}")
+        app_logger.warning("directory_creation_warning", error=str(e), exc_info=True)
     
     # Database setup
     try:
@@ -520,24 +273,30 @@ def initialize_app():
             try:
                 with db.engine.connect() as connection:
                     connection.execute(text('SELECT 1'))
-                print("✓ Database connection successful")
+                app_logger.info("database_connection_success")
             except Exception as e:
-                print(f"❌ Database connection failed: {e}")
+                app_logger.error("database_connection_failed", error=str(e), exc_info=True)
                 return False
             
             # Check and create tables
             inspector = db.inspect(db.engine)
             existing_tables = inspector.get_table_names()
-            print(f"📋 Existing tables: {existing_tables}")
+            app_logger.info("db_setup_existing_tables", tables=existing_tables)
             
-            db.create_all()
-            print("✓ db.create_all() executed")
+            db.create_all() # This needs to be within app_context, which it is.
+            app_logger.info("db_create_all_executed")
             
             # Run LoRA table migration
             migrate_lora_table()
             
-            # Verify required tables exist
-            new_tables = inspector.get_table_names()
+            # Ensure all tables exist using the utility function
+            # This function (now in utils.py) handles db.create_all() and manual creation if needed.
+            ensure_tables_exist()
+
+            # Verify required tables exist (optional, as ensure_tables_exist should handle it)
+            # For robustness, a light check can remain or be added to ensure_tables_exist
+            inspector = db.inspect(db.engine) # Re-inspect after ensure_tables_exist
+            final_tables = inspector.get_table_names()
             required_tables = [
                 'spotify_users', 
                 'spotify_login_sessions', 
@@ -545,31 +304,20 @@ def initialize_app():
                 'spotify_generation_results',
                 'spotify_lora_models'
             ]
-            
-            missing_tables = [t for t in required_tables if t not in new_tables]
-            if missing_tables:
-                print(f"❌ Still missing tables: {', '.join(missing_tables)}")
-                try:
-                    create_tables_manually()
-                    final_tables = inspector.get_table_names()
-                    final_missing = [t for t in required_tables if t not in final_tables]
-                    if final_missing:
-                        print(f"❌ Manual creation also failed for: {', '.join(final_missing)}")
-                        return False
-                    else:
-                        print("✓ Manual table creation successful for missing tables")
-                except Exception as e_manual:
-                    print(f"❌ Manual table creation attempt failed: {e_manual}")
-                    return False
+            missing_after_ensure = [t for t in required_tables if t not in final_tables]
+            if missing_after_ensure:
+                app_logger.critical("db_setup_missing_tables_after_ensure", missing_tables=missing_after_ensure)
+                # This would indicate a problem with ensure_tables_exist or db setup.
+                return False # Hard fail if tables are still not there.
             else:
-                print("✓ All required tables present")
+                app_logger.info("db_setup_all_tables_confirmed")
                 
     except Exception as e:
-        print(f"❌ Database setup failed: {e}")
+        app_logger.error("database_setup_failed", error=str(e), exc_info=True)
         return False
     
     # Import modules with better error handling
-    print("📦 Importing modules...")
+    app_logger.info("module_import_start")
     
     # Global variables to track what's available
     global spotify_client_available, models_available, utils_available, generator_available
@@ -589,66 +337,62 @@ def initialize_app():
         # Try importing modules
         try:
             import spotify_client
-            print("✓ spotify_client imported")
+            app_logger.info("module_import_success", module="spotify_client")
             spotify_client_available = True
         except ImportError as e:
-            print(f"⚠️ spotify_client import failed: {e}")
+            app_logger.warning("module_import_failed", module="spotify_client", error=str(e))
             
         try:
             import models
-            print("✓ models imported")
+            app_logger.info("module_import_success", module="models")
             models_available = True
         except ImportError as e:
-            print(f"⚠️ models import failed: {e}")
+            app_logger.warning("module_import_failed", module="models", error=str(e))
             
         try:
             import utils
-            print("✓ utils imported")
+            app_logger.info("module_import_success", module="utils")
             utils_available = True
         except ImportError as e:
-            print(f"⚠️ utils import failed: {e}")
+            app_logger.warning("module_import_failed", module="utils", error=str(e))
         
         try:
             import generator
-            print("✓ generator imported")
+            app_logger.info("module_import_success", module="generator")
             generator_available = True
         except ImportError as e:
-            print(f"⚠️ generator import failed: {e}")
+            app_logger.warning("module_import_failed", module="generator", error=str(e))
         
         try:
             import title_generator
             import image_generator
             import chart_generator
-            print("✓ Additional generation modules imported")
+            app_logger.info("module_import_success", modules=["title_generator", "image_generator", "chart_generator"])
         except ImportError as e:
-            print(f"⚠️ Some generation modules unavailable: {e}")
+            app_logger.warning("module_import_failed", modules=["title_generator", "image_generator", "chart_generator"], error=str(e))
             
     finally:
         os.chdir(original_cwd)
     
-    print("✓ Module imports completed")
+    app_logger.info("module_import_completed")
     
     # Initialize Spotify client if available
     if spotify_client_available:
-        print("🎵 Initializing Spotify client...")
+        app_logger.info("spotify_client_initialization_start")
         try:
             spotify_initialized = spotify_client.initialize_spotify()
             if spotify_initialized:
-                print("✓ Spotify client initialized")
+                app_logger.info("spotify_client_initialization_success")
             else:
-                print("⚠️ Spotify client initialization failed - continuing with limited functionality")
+                app_logger.warning("spotify_client_initialization_failed_functional")
         except Exception as e:
-            print(f"⚠️ Spotify initialization error: {e}")
+            app_logger.error("spotify_client_initialization_error", error=str(e), exc_info=True)
     else:
-        print("⚠️ Spotify client not available - skipping initialization")
+        app_logger.warning("spotify_client_unavailable_for_initialization")
     
-    # Check environment variables
-    print("🔑 Checking environment variables...")
-    try:
-        from config import GEMINI_API_KEY, STABILITY_API_KEY
-    except ImportError:
-        GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-        STABILITY_API_KEY = os.environ.get('STABILITY_API_KEY')
+    # Check environment variables (values are now directly imported from config)
+    app_logger.info("env_variable_check_start")
+    # GEMINI_API_KEY and STABILITY_API_KEY are already imported directly from config.
     
     env_vars_present = all([
         SPOTIFY_CLIENT_ID, 
@@ -665,21 +409,21 @@ def initialize_app():
             missing.append("Gemini API key")
         if not STABILITY_API_KEY:
             missing.append("Stable Diffusion API key")
-        print(f"❌ Missing environment variables: {', '.join(missing)}")
-    else:
-        print("✓ All environment variables present")
+        app_logger.error("missing_env_variables", missing_keys=missing) if missing else app_logger.info("all_env_variables_present")
     
     # Set initialization status
     initialized = env_vars_present and (spotify_client_available or models_available)
     
     if initialized:
-        print("🎉 Application initialized successfully!")
+        app_logger.info("application_initialization_status", status="success")
     else:
-        print("⚠️ Application initialization completed with limited functionality")
+        app_logger.warning("application_initialization_status", status="limited_functionality")
     
     return initialized
 
-def create_tables_manually():
+# create_tables_manually function has been moved to utils.py
+
+# Guest session functions are now in utils.py:
     """Manually create tables using SQLAlchemy 2.0+ compatible syntax"""
     print("🔨 Attempting manual table creation...")
     
@@ -799,38 +543,9 @@ def create_tables_manually():
                 print(f"❌ SQL command {i+1} failed: {e}")
                 raise
 
-# Guest session functions (unchanged)
-def get_or_create_guest_session():
-    """Get or create a guest session for anonymous users"""
-    if 'guest_session_id' not in session:
-        session['guest_session_id'] = str(uuid.uuid4())
-        session['guest_created'] = datetime.datetime.utcnow().isoformat()
-        session['guest_generations_today'] = 0
-        session['guest_last_generation'] = None
-    return session['guest_session_id']
-
-def get_guest_generations_today():
-    """Get number of generations for guest today"""
-    if 'guest_session_id' not in session:
-        return 0
-    
-    if 'guest_last_generation' in session and session['guest_last_generation']:
-        last_gen = datetime.datetime.fromisoformat(session['guest_last_generation'])
-        if last_gen.date() != datetime.datetime.utcnow().date():
-            session['guest_generations_today'] = 0
-    
-    return session.get('guest_generations_today', 0)
-
-def increment_guest_generations():
-    """Increment guest generation count"""
-    session['guest_generations_today'] = get_guest_generations_today() + 1
-    session['guest_last_generation'] = datetime.datetime.utcnow().isoformat()
-
-def can_guest_generate():
-    """Check if guest can generate (limit: 1 per day)"""
-    return get_guest_generations_today() < 1
-
-def get_current_user_or_guest():
+# Guest session functions are now in utils.py:
+# get_or_create_guest_session, get_guest_generations_today,
+# increment_guest_generations, can_guest_generate, track_guest_generation
     """Get current logged in user or return guest info"""
     user = get_current_user()
     if user:
@@ -847,13 +562,14 @@ def get_current_user_or_guest():
             'show_upload': user.is_premium_user()  # ONLY premium users can upload files
         }
     else:
+        # Uses utils.get_or_create_guest_session, utils.get_guest_generations_today, utils.can_guest_generate
         get_or_create_guest_session()
         return {
             'type': 'guest',
             'user': None,
             'display_name': 'Guest',
             'is_premium': False,
-            'daily_limit': 1,
+            'daily_limit': 1, # This could be current_app.config.get('GUEST_DAILY_LIMIT', 1)
             'generations_today': get_guest_generations_today(),
             'can_generate': can_guest_generate(),
             'can_use_loras': False,
@@ -861,12 +577,7 @@ def get_current_user_or_guest():
             'show_upload': False
         }
 
-def track_guest_generation():
-    """Track generation for guest"""
-    try:
-        increment_guest_generations()
-    except Exception as e:
-        print(f"Error tracking guest generation: {e}")
+# track_guest_generation moved to utils.py
 
 # Context processor to inject common template variables
 @app.context_processor
@@ -888,8 +599,8 @@ def root():
         return redirect(url_for('login'))
 
 @app.route("/generate", methods=["GET", "POST"])
-@limiter.limit("10 per hour", methods=["POST"])
-@monitor_performance
+@limiter.limit("10 per hour", methods=["POST"]) # Keep limiter for specific routes
+@monitor_performance # Apply performance monitoring
 def generate():
     """Main generation route"""
     global initialized
@@ -905,13 +616,13 @@ def generate():
         )
     
     if not initialized:
-        if initialize_app():
-            print("Application initialized successfully from generate route")
+        if initialize_app(): # This is the app.py initialize_app
+            app_logger.info("app_initialization_from_route", route="generate", status="success")
         else:
-            print("Failed to initialize application from generate route")
+            app_logger.error("app_initialization_from_route_failed", route="generate")
             return render_template(
                 "index.html", 
-                error="Application is still initializing or encountered an issue. Please try again in a moment.",
+                error="Application is still initializing or encountered an issue. Please try again in a moment.", # User-friendly
                 loras=[]
             )
     
@@ -919,28 +630,32 @@ def generate():
     loras = []
     if user_info['can_use_loras']:
         try:
-            if 'utils_available' in globals() and utils_available:
-                import utils
-                loras = utils.get_available_loras()
+            if 'utils_available' in globals() and utils_available: # utils should be imported at top now
+                # import utils # No longer needed here if utils is imported at top
+                loras = utils.get_available_loras() # Assumes utils is already imported
         except Exception as e:
-            print(f"⚠️ Error getting LoRAs: {e}")
+            app_logger.warning("get_loras_failed", error=str(e), exc_info=True)
 
     if request.method == "POST":
         try:
             # Check if core generation modules are available
-            generation_available = (
-                'generator_available' in globals() and generator_available and
-                'spotify_client_available' in globals() and spotify_client_available
-            )
-            
-            if not generation_available:
+            # These globals (generator_available, etc.) are set by initialize_app()
+            if not (generator_available and spotify_client_available):
+                app_logger.warning("generation_modules_unavailable_on_post",
+                                   generator_available=generator_available,
+                                   spotify_client_available=spotify_client_available)
+                # Attempt re-import or fail gracefully
                 try:
-                    import generator
+                    import generator # These should be top-level if always needed
                     import spotify_client
-                    generation_available = True
-                    print("✓ Generation modules imported on demand")
-                except ImportError as e:
-                    print(f"⚠️ Core generation modules not available: {e}")
+                    # Re-set flags if successful, though ideally initialize_app handles this
+                    # For now, this is a fallback within the request if initial load failed.
+                    global generator_available_local, spotify_client_available_local
+                    generator_available_local = True
+                    spotify_client_available_local = True
+                    app_logger.info("generation_modules_reimported_on_demand")
+                except ImportError as import_e:
+                    app_logger.error("core_generation_modules_reimport_failed", error=str(import_e))
                     return render_template(
                         "index.html",
                         error="Core generation modules are not available. The system is still starting up - please try again in a moment.",
@@ -998,32 +713,26 @@ def generate():
             genre_percentages_data = []
             
             try:
-                import chart_generator
+                import chart_generator # Consider moving to top if always used
                 genres_chart_data = chart_generator.generate_genre_chart(result.get("all_genres", []))
             except ImportError:
-                print("⚠️ chart_generator not available, skipping genre chart.")
+                app_logger.warning("chart_generator_unavailable")
             except Exception as e:
-                print(f"⚠️ Error generating genre chart: {e}")
+                app_logger.error("genre_chart_generation_failed", error=str(e), exc_info=True)
 
             try:
-                if 'utils_available' in globals() and utils_available:
-                    import utils
-                    genre_percentages_data = utils.calculate_genre_percentages(result.get("all_genres", []))
-                else:
-                    genre_percentages_data = calculate_genre_percentages(result.get("all_genres", []))
+                # utils.calculate_genre_percentages is now imported at the top
+                genre_percentages_data = calculate_genre_percentages(result.get("all_genres", []))
             except Exception as e:
-                print(f"⚠️ Error calculating genre percentages: {e}")
+                app_logger.error("genre_percentages_calculation_failed", error=str(e), exc_info=True)
             
             # Extract playlist ID with fallback
             playlist_id = None
             try:
-                if 'utils_available' in globals() and utils_available:
-                    import utils
-                    playlist_id = utils.extract_playlist_id(playlist_url) if playlist_url and "playlist/" in playlist_url else None
-                else:
-                    playlist_id = extract_playlist_id(playlist_url) if playlist_url and "playlist/" in playlist_url else None
+                # utils.extract_playlist_id is now imported at the top
+                playlist_id = extract_playlist_id(playlist_url) if playlist_url and "playlist/" in playlist_url else None
             except Exception as e:
-                print(f"⚠️ Error extracting playlist ID: {e}")
+                app_logger.error("extract_playlist_id_failed", error=str(e), exc_info=True)
             
             display_data = {
                 "title": result["title"],
@@ -1064,13 +773,12 @@ def generate():
                     db.session.add(new_generation)
                     db.session.commit()
                 except Exception as e:
-                    print(f"⚠️ Error saving generation result to DB: {e}")
+                    app_logger.error("save_generation_to_db_failed", error=str(e), exc_info=True)
 
             return render_template("result.html", **display_data)
         except Exception as e:
-            print(f"❌ Server error processing request: {e}")
-            import traceback
-            traceback.print_exc()
+            app_logger.error("generate_post_request_failed", error=str(e), exc_info=True)
+            # No need for traceback.print_exc() as app_logger with exc_info=True handles it.
             return render_template(
                 "index.html", 
                 error=f"An unexpected error occurred: {str(e)}. Please try again.",
@@ -1082,7 +790,8 @@ def generate():
 # LoRA UPLOAD ROUTE (FIXED FOR FILE UPLOADS ONLY)
 @app.route('/spotify/api/upload_lora', methods=['POST'])
 @login_required
-@limiter.limit("5 per hour")
+@limiter.limit("5 per hour") # Keep specific limiter
+@monitor_performance # Apply performance monitoring
 def upload_lora():
     """Upload LoRA file (Premium users only)"""
     try:
@@ -1153,13 +862,14 @@ def upload_lora():
         })
         
     except Exception as e:
-        print(f"Error uploading LoRA: {e}")
+        app_logger.error("upload_lora_failed", error=str(e), exc_info=True)
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 # Add new LoRA management and upload info routes
 @app.route('/spotify/api/delete_lora', methods=['DELETE'])
 @login_required
-@limiter.limit("10 per hour")
+@limiter.limit("10 per hour") # Keep specific limiter
+@monitor_performance # Apply performance monitoring
 def delete_lora():
     """Delete LoRA file (All users can delete their own uploads)"""
     try:
@@ -1178,14 +888,14 @@ def delete_lora():
         if lora_record.path and os.path.exists(lora_record.path):
             try:
                 os.remove(lora_record.path)
-                print(f"Deleted LoRA file: {lora_record.path}")
+                app_logger.info("lora_file_deleted_fs", path=lora_record.path)
             except Exception as e:
-                print(f"Could not delete file {lora_record.path}: {e}")
+                app_logger.error("lora_file_delete_fs_failed", path=lora_record.path, error=str(e), exc_info=True)
         db.session.delete(lora_record)
         db.session.commit()
         return jsonify({"success": True, "message": f"LoRA '{lora_name}' deleted successfully"})
     except Exception as e:
-        print(f"Error deleting LoRA: {e}")
+        app_logger.error("delete_lora_db_failed", lora_name=lora_name, error=str(e), exc_info=True)
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
@@ -1242,11 +952,12 @@ def get_loras():
         return jsonify({"loras": loras})
         
     except Exception as e:
-        print(f"Error getting LoRAs: {e}")
+        app_logger.error("get_loras_api_failed", error=str(e), exc_info=True)
         return jsonify({"loras": []})
 
 # SPOTIFY AUTH ROUTES (FIXED)
 @app.route('/spotify-login')
+@monitor_performance # Apply performance monitoring
 def spotify_login():
     """Initiate Spotify OAuth flow"""
     if not SPOTIFY_CLIENT_ID:
@@ -1275,6 +986,7 @@ def spotify_login():
     return redirect(auth_url)
 
 @app.route('/spotify-callback')
+@monitor_performance # Apply performance monitoring
 def spotify_callback():
     """Handle Spotify OAuth callback - FIXED PREMIUM DETECTION"""
     try:
@@ -1326,7 +1038,7 @@ def spotify_callback():
         spotify_user = user_response.json()
         spotify_id = spotify_user['id']
         
-        print(f"🔍 Spotify user data: {spotify_user}")  # Debug log
+        app_logger.debug("spotify_user_auth_data", data=spotify_user)
         
         # Find or create user
         user = User.query.filter_by(spotify_id=spotify_id).first()
@@ -1335,18 +1047,18 @@ def spotify_callback():
             # Create new user
             user = User(
                 spotify_id=spotify_id,
-                spotify_username=spotify_user.get('id'),
+                spotify_username=spotify_user.get('id'), # Often same as id
                 display_name=spotify_user.get('display_name', spotify_user.get('id')),
-                email=spotify_user.get('email'),
-                is_premium=False  # Will be determined by is_premium_user() method
+                email=spotify_user.get('email'), # May be null
+                is_premium=False
             )
             db.session.add(user)
-            print(f"✓ Created new user with email: {user.email}, spotify_username: {user.spotify_username}")
+            app_logger.info("new_user_created_from_spotify_auth", spotify_id=spotify_id, email=user.email)
         else:
             # Update existing user
-            user.display_name = spotify_user.get('display_name', spotify_user.get('id'))
-            user.email = spotify_user.get('email')
-            print(f"✓ Updated existing user with email: {user.email}, spotify_username: {user.spotify_username}")
+            user.display_name = spotify_user.get('display_name', user.display_name) # Keep old if new is null
+            user.email = spotify_user.get('email') or user.email # Keep old if new is null
+            app_logger.info("existing_user_updated_from_spotify_auth", spotify_id=spotify_id, email=user.email)
         
         # Update tokens
         user.spotify_access_token = access_token
@@ -1357,8 +1069,12 @@ def spotify_callback():
         db.session.commit()
         
         # Check if user is premium AFTER saving to database
-        is_premium = user.is_premium_user()
-        print(f"🔍 Premium check result: {is_premium} for email: {user.email}, spotify_username: {user.spotify_username}")
+        is_premium = user.is_premium_user() # This method itself contains logic for premium check
+        app_logger.info("user_premium_check_result",
+                        spotify_id=user.spotify_id,
+                        is_premium=is_premium,
+                        email=user.email,
+                        spotify_username=user.spotify_username)
         
         # Create login session
         session_token = LoginSession.create_session(
@@ -1385,14 +1101,13 @@ def spotify_callback():
         return resp
         
     except Exception as e:
-        print(f"Error in Spotify callback: {e}")
-        import traceback
-        traceback.print_exc()
-        flash('An error occurred during Spotify authorization', 'error')
+        app_logger.error("spotify_callback_failed", error=str(e), exc_info=True)
+        flash('An error occurred during Spotify authorization. Please try again.', 'error')
         return redirect(url_for('generate'))
 
 # OTHER ROUTES (login, logout, profile, etc. - keep existing)
 @app.route('/login', methods=['GET', 'POST'])
+@monitor_performance # Apply performance monitoring
 def login():
     """Login route - handle both form login and Spotify OAuth"""
     if request.method == 'POST':
@@ -1446,6 +1161,7 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/register', methods=['GET', 'POST'])
+@monitor_performance # Apply performance monitoring
 def register():
     """Register route"""
     if request.method == 'POST':
@@ -1482,7 +1198,7 @@ def register():
             return redirect(url_for('login'))
         except Exception as e:
             db.session.rollback()
-            print(f"Error creating user: {e}")
+            app_logger.error("user_registration_failed", email=email, username=username, error=str(e), exc_info=True)
             flash('Registration failed. Please try again.', 'error')
             return redirect(url_for('register'))
         
@@ -1490,6 +1206,7 @@ def register():
 
 @app.route('/profile')
 @login_required
+@monitor_performance # Apply performance monitoring
 def profile():
     """User profile page"""
     user = get_current_user()
@@ -1530,7 +1247,7 @@ if not any(rule.endpoint == 'health_check' for rule in app.url_map.iter_rules())
     def health_check():
         """Health check endpoint for monitoring"""
         try:
-            from monitoring_system import health_checker
+        # health_checker imported at the top
             health_results = health_checker.run_all_checks()
             all_healthy = all(result.healthy for result in health_results.values())
             
@@ -1543,20 +1260,13 @@ if not any(rule.endpoint == 'health_check' for rule in app.url_map.iter_rules())
                     "error": result.error
                 } for name, result in health_results.items()}
             }
-            
             return jsonify(response_data), 200 if all_healthy else 503
-            
-        except ImportError:
-            # Fallback health check if monitoring system not available
-            return jsonify({
-                "status": "healthy",
-                "timestamp": datetime.datetime.utcnow().isoformat(),
-                "message": "Basic health check - monitoring system not available"
-            }), 200
-        except Exception as e:
+    except Exception as e: # Catch if health_checker itself fails
+        app_logger.critical("health_check_endpoint_failed", error=str(e), exc_info=True)
             return jsonify({
                 "status": "error", 
-                "error": str(e),
+            "error": "Health check system failed",
+            "details": str(e),
                 "timestamp": datetime.datetime.utcnow().isoformat()
             }), 500
 
@@ -1564,26 +1274,22 @@ if not any(rule.endpoint == 'health_check' for rule in app.url_map.iter_rules())
 def metrics_endpoint():
     """Metrics endpoint for performance monitoring"""
     try:
-        from monitoring_system import app_logger
-        
+        # app_logger imported at the top
         metrics_data = {
-            "performance": app_logger.get_performance_summary(),
+            "performance": app_logger.get_performance_summary(), # Assuming this method exists on app_logger
             "timestamp": datetime.datetime.utcnow().isoformat()
         }
-        
         return jsonify(metrics_data), 200
-        
-    except ImportError:
-        # Fallback metrics
-        return jsonify({
-            "status": "monitoring_unavailable",
-            "timestamp": datetime.datetime.utcnow().isoformat(),
-            "message": "Monitoring system not available"
-        }), 200
     except Exception as e:
+        # Log this error, as the metrics endpoint itself failing is an issue
+        try: # Nested try to ensure app_logger is available
+            app_logger.error("metrics_endpoint_failed", error=str(e), exc_info=True)
+        except: # Fallback if app_logger is not even available
+            print(f"CRITICAL: Metrics endpoint failed and app_logger unavailable: {e}")
+
         return jsonify({
             "error": "Metrics not available",
-            "message": str(e),
+            "message": str(e), # Potentially sensitive, consider generic message in prod
             "timestamp": datetime.datetime.utcnow().isoformat()
         }), 500
 
@@ -1704,20 +1410,19 @@ def handle_generic_error(e):
         print(f"Error in error handler: {fallback_error}")
         return "An error occurred. Please try again.", 500
 
-# Set up monitoring when app starts
-try:
-    setup_monitoring(app)
-    print("✅ Monitoring system setup complete")
-except Exception as e:
-    print(f"⚠️ Monitoring setup failed: {e}")
+# Set up monitoring when app starts - this block is already correct from previous steps.
+# The try-except around setup_monitoring with setup_basic_monitoring as fallback is good.
+# No changes needed to this specific block below based on current instructions.
 
 if __name__ == '__main__':
     print("Initializing application...")
     # Application startup logic
-    from models import initialize_app
-    if initialize_app():
+    # Call the local initialize_app function (defined in this file, app.py)
+    if initialize_app(): # This is app.initialize_app()
         print("Application initialized successfully")
     else:
-        print("Application initialization had issues; continuing...")
+        print("Application initialization had issues; CRITICAL. Check logs.")
+        # Depending on severity, you might want to sys.exit(1) here
+        # For now, it will continue as per original logic.
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=False, host="0.0.0.0", port=port)

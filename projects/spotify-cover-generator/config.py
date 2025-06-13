@@ -51,7 +51,7 @@ STABILITY_API_KEY = os.getenv("STABILITY_API_KEY")
 SD_3_5_LARGE_ENGINE = "sd3.5-large"
 
 # Flask configuration
-FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY")
+FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "a-very-strong-dev-secret-key-for-spotify-app!") # Added default for dev
 
 # Database configuration - Render provides this automatically
 SPOTIFY_DB_URL = os.getenv('DATABASE_URL') or os.getenv('SPOTIFY_DB_URL', 'postgresql://postgres:password@localhost/portfoliodb')

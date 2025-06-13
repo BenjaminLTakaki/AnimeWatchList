@@ -499,28 +499,6 @@ class GenreAnalysis:
             return max(mood_scores.items(), key=lambda x: x[1])[0]
         
         return "balanced"
-
-    @classmethod
-    def from_genre_list(cls, genres: List[str]):
-        """Create a GenreAnalysis object from a list of genres."""
-        if not genres:
-            return cls()
-        
-        # Count and sort genres by frequency
-        genre_counter = Counter(genres)
-        top_genres = [genre for genre, _ in genre_counter.most_common(10)]
-        genres_with_counts = genre_counter.most_common(20)
-        
-        # Optimized mood calculation with caching
-        genres_tuple = tuple(sorted(genres))  # Sort for consistent caching
-        mood = cls._calculate_mood(genres_tuple)
-        
-        return cls(
-            top_genres=top_genres,
-            all_genres=genres,
-            genres_with_counts=genres_with_counts,
-            mood=mood
-        )
     
     def get_style_elements(self):
         """Get style elements based on genres."""
@@ -632,24 +610,6 @@ class PlaylistData:
             spotify_url=data.get("spotify_url", ""),
             found_genres=data.get("found_genres", False),
             artist_ids=data.get("artist_ids", [])  # NEW: Include artist IDs
-        )
-    
-    @classmethod
-    def from_dict(cls, data):
-        """Create PlaylistData from dictionary."""
-        genre_analysis = GenreAnalysis(
-            top_genres=data.get("genres", []),
-            all_genres=data.get("all_genres", []),
-            genres_with_counts=data.get("genres_with_counts", []),
-            mood=data.get("mood_descriptor", "balanced")
-        )
-        
-        return cls(
-            item_name=data.get("item_name", "Unknown Playlist"),
-            track_names=data.get("track_names", []),
-            genre_analysis=genre_analysis,
-            spotify_url=data.get("spotify_url", ""),
-            found_genres=data.get("found_genres", False)
         )
 
 @dataclass

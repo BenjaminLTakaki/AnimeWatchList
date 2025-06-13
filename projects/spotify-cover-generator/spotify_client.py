@@ -4,29 +4,23 @@ from collections import Counter
 from models import PlaylistData, GenreAnalysis
 from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
 
-# Monitoring imports with fallback
-try:
-    from monitoring_system import monitor_api_calls
-    from fault_handling import fault_tolerant_api_call
-except ImportError:
-    def monitor_api_calls(service_name):
-        def decorator(func):
-            return func
-        return decorator
-    def fault_tolerant_api_call(service_name, fallback_func=None):
-        def decorator(func):
-            return func
-        return decorator
+# Monitoring and Fault Handling Imports
+from .monitoring_system import app_logger, monitor_api_calls
+from .fault_handling import fault_tolerant_api_call, GracefulDegradation, circuit_breakers, retry_with_exponential_backoff
+
+app_logger.info("Successfully imported monitoring and fault_handling modules in spotify_client.")
 
 # Global Spotify client
 sp = None
 
+@monitor_api_calls("spotify_init") # More specific service name
+@retry_with_exponential_backoff(max_retries=3)
 def initialize_spotify(use_oauth=False):
     """Initialize Spotify API client"""
     global sp
     try:
         if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
-            print("ERROR: Missing Spotify API credentials. Please set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in your .env file.")
+            app_logger.error("spotify_credentials_missing", message="Missing Spotify API credentials.")
             return False
             
         if use_oauth:
@@ -48,27 +42,30 @@ def initialize_spotify(use_oauth=False):
         # Test the connection
         try:
             if use_oauth:
-                user_info = sp.current_user()
-                print(f"✓ Spotify OAuth connection successful for user: {user_info.get('id', 'unknown')}")
+                user_info = sp.current_user() # Network call
+                app_logger.info("spotify_oauth_connection_success", user_id=user_info.get('id', 'unknown'))
                 # Debug premium status detection
-                print(f"🔍 User email: {user_info.get('email')}")
-                print(f"🔍 User ID: {user_info.get('id')}")
-                print(f"🔍 User product: {user_info.get('product')}")
+                app_logger.debug("spotify_user_details_oauth",
+                                 email=user_info.get('email'),
+                                 user_id=user_info.get('id'),
+                                 product=user_info.get('product'))
             else:
-                sp.search(q='test', limit=1)
-                print("✓ Spotify API connection successful")
+                sp.search(q='test', limit=1) # Network call
+                app_logger.info("spotify_client_credentials_connection_success")
             return True
         except spotipy.exceptions.SpotifyException as e:
-            print(f"✗ Spotify API authentication failed: {e}")
+            app_logger.error("spotify_api_authentication_failed", error=str(e), exc_info=True, use_oauth=use_oauth)
             # If client credentials failed, try OAuth as fallback
             if not use_oauth:
-                print("Trying OAuth authentication instead...")
-                return initialize_spotify(use_oauth=True)
+                app_logger.info("spotify_auth_fallback_attempt_oauth")
+                return initialize_spotify(use_oauth=True) # Recursive call, retry logic will apply
             return False
     except Exception as e:
-        print(f"✗ Spotify API initialization failed: {e}")
+        app_logger.error("spotify_api_initialization_failed", error=str(e), exc_info=True)
         return False
 
+@monitor_api_calls("spotify_user_premium_status")
+@retry_with_exponential_backoff()
 def get_user_premium_status(access_token):
     """Get user's premium status from Spotify API"""
     try:
@@ -78,11 +75,11 @@ def get_user_premium_status(access_token):
         
         if response.status_code == 200:
             user_data = response.json()
-            print(f"🔍 Spotify user data for premium check:")
-            print(f"  - ID: {user_data.get('id')}")
-            print(f"  - Email: {user_data.get('email')}")
-            print(f"  - Product: {user_data.get('product')}")
-            print(f"  - Display Name: {user_data.get('display_name')}")
+            app_logger.debug("spotify_user_data_for_premium_check",
+                             user_id=user_data.get('id'),
+                             email=user_data.get('email'),
+                             product=user_data.get('product'),
+                             display_name=user_data.get('display_name'))
             
             # Check our premium criteria
             email = user_data.get('email', '').lower()
@@ -91,9 +88,9 @@ def get_user_premium_status(access_token):
             is_premium_email = email == 'bentakaki7@gmail.com'
             is_premium_spotify = spotify_id == 'benthegamer'
             
-            print(f"🔍 Premium check results:")
-            print(f"  - Email match: {is_premium_email} (checking: {email})")
-            print(f"  - Spotify ID match: {is_premium_spotify} (checking: {spotify_id})")
+            app_logger.debug("spotify_premium_check_details",
+                             email_match=is_premium_email, current_email=email,
+                             spotify_id_match=is_premium_spotify, current_spotify_id=spotify_id)
             
             return {
                 'user_data': user_data,
@@ -102,22 +99,25 @@ def get_user_premium_status(access_token):
                 'is_premium': is_premium_email or is_premium_spotify
             }
         else:
-            print(f"❌ Failed to get user data: {response.status_code} - {response.text}")
+            app_logger.error("fetch_spotify_user_data_failed", status_code=response.status_code, response_text=response.text)
             return None
     except Exception as e:
-        print(f"❌ Error getting user premium status: {e}")
+        app_logger.error("get_user_premium_status_exception", error=str(e), exc_info=True)
     return None
 
-@monitor_api_calls("spotify")
-@fault_tolerant_api_call("spotify")
+@fault_tolerant_api_call("spotify_api", fallback_func=GracefulDegradation.handle_spotify_failure)
+# @monitor_api_calls is implicitly handled by @fault_tolerant_api_call if it wraps it,
+# or can be added explicitly if fault_tolerant_api_call doesn't already include performance monitoring.
+# Assuming fault_tolerant_api_call includes or replaces monitor_api_calls for this function.
 def extract_playlist_data(playlist_url):
     """Extract data from playlist with enhanced error handling"""
     global sp
     
     # Check Spotify client
     if not sp:
-        print("Attempting to create new Spotify client...")
-        if not initialize_spotify():
+        app_logger.info("spotify_client_not_initialized_in_extract_data")
+        if not initialize_spotify(): # initialize_spotify is now decorated
+            app_logger.error("spotify_client_reinitialization_failed_in_extract_data")
             return {"error": "Failed to initialize Spotify client. Please check your API credentials."}
     
     # Parse URL and check validity
@@ -133,18 +133,19 @@ def extract_playlist_data(playlist_url):
                 if "playlist/" in playlist_url:
                     item_id = playlist_url.split("playlist/")[-1].split("?")[0].split("/")[0]
                 else:
+                    app_logger.warning("invalid_playlist_url_format_extract", url=playlist_url)
                     return {"error": "Invalid playlist URL format"}
                 
-                print(f"🎵 Processing playlist ID: {item_id}")
+                app_logger.info("processing_playlist_id", item_id=item_id)
                 
                 # Get playlist info
-                playlist_info = sp.playlist(item_id, fields="name,description,owner")
+                playlist_info = sp.playlist(item_id, fields="name,description,owner") # Network call
                 item_name = playlist_info.get("name", "Unknown Playlist")
                 
-                print(f"✓ Found playlist: {item_name}")
+                app_logger.info("found_playlist_name", name=item_name)
                 
                 # Get tracks to analyze genres
-                results = sp.playlist_tracks(
+                results = sp.playlist_tracks( # Network call
                     item_id,
                     fields="items(track(id,name,artists(id,name)))",
                     market="US",
@@ -170,17 +171,18 @@ def extract_playlist_data(playlist_url):
                 else:
                     return {"error": "Invalid album URL format"}
                 
-                print(f"💿 Processing album ID: {item_id}")
+                app_logger.info("processing_album_id", item_id=item_id)
                 
-                album_info = sp.album(item_id)
+                album_info = sp.album(item_id) # Network call
                 item_name = album_info.get("name", "Unknown Album")
                 
-                print(f"✓ Found album: {item_name}")
+                app_logger.info("found_album_name", name=item_name)
                 
                 album_tracks = album_info.get("tracks", {}).get("items", [])[:50]
                 tracks = [{"track": track} for track in album_tracks]
                 
             except spotipy.exceptions.SpotifyException as e:
+                app_logger.error("spotify_api_exception_album", item_id=item_id, error=str(e), status_code=e.http_status, exc_info=True)
                 if e.http_status == 404:
                     return {"error": "Album not found. Please check if the album exists."}
                 elif e.http_status == 403:
@@ -188,11 +190,13 @@ def extract_playlist_data(playlist_url):
                 else:
                     return {"error": f"Spotify API error: {str(e)}"}
             except Exception as e:
+                app_logger.error("processing_album_url_failed", item_id=item_id, error=str(e), exc_info=True)
                 return {"error": f"Error processing album URL: {str(e)}"}
             
-        print(f"Found {'playlist' if is_playlist else 'album'}: {item_name}")
+        app_logger.info("item_type_processed", item_type='playlist' if is_playlist else 'album', item_name=item_name)
         
         if not tracks:
+            app_logger.warning("no_tracks_found", item_name=item_name, item_type='playlist' if is_playlist else 'album')
             return {"error": f"No tracks found in the {'playlist' if is_playlist else 'album'}. The {'playlist' if is_playlist else 'album'} may be empty."}
         
         # Extract all artist IDs and info from tracks
@@ -212,9 +216,10 @@ def extract_playlist_data(playlist_url):
                         artist_ids.append(artist.get("id"))
         
         if not artists:
+            app_logger.warning("no_artists_found_in_tracks", item_name=item_name)
             return {"error": "No artists found in tracks. Unable to analyze genres."}
             
-        print(f"Found {len(set(artists))} unique artists in {len(tracks)} tracks")
+        app_logger.info("artists_found_for_genre_analysis", unique_artist_count=len(set(artists)), track_count=len(tracks))
         
         # Get genres from artists with enhanced error handling
         genres = []
@@ -225,28 +230,28 @@ def extract_playlist_data(playlist_url):
             batch = unique_artist_ids[i:min(i+50, len(unique_artist_ids))]
             
             try:
-                artist_info_batch = sp.artists(batch)
+                artist_info_batch = sp.artists(batch) # Network call
                 if artist_info_batch and 'artists' in artist_info_batch:
-                    for artist in artist_info_batch['artists']:
-                        if artist:  # Check if artist data is not None
-                            artist_genres = artist.get('genres', [])
+                    for artist_data in artist_info_batch['artists']:
+                        if artist_data:  # Check if artist data is not None
+                            artist_genres = artist_data.get('genres', [])
                             genres.extend(artist_genres)
                             if artist_genres:
-                                print(f"  - {artist.get('name', 'Unknown')}: {', '.join(artist_genres[:3])}")
+                                app_logger.debug("artist_genres_fetched", artist_name=artist_data.get('name', 'Unknown'), genres=artist_genres[:3])
             except spotipy.exceptions.SpotifyException as e:
-                print(f"⚠️ Error getting artist info for batch {i//50 + 1}: {e}")
+                app_logger.warning("fetch_artist_info_batch_failed_spotify_exception", batch_num=(i//50 + 1), error=str(e), exc_info=True)
                 continue
             except Exception as e:
-                print(f"⚠️ Unexpected error processing artist batch: {e}")
+                app_logger.warning("fetch_artist_info_batch_failed_unexpected", batch_num=(i//50 + 1), error=str(e), exc_info=True)
                 continue
         
-        print(f"Total genres collected: {len(genres)}")
+        app_logger.info("total_genres_collected", count=len(genres))
         if genres:
             genre_counts = Counter(genres)
-            print(f"Top genres: {dict(genre_counts.most_common(5))}")
+            app_logger.debug("top_genres_collected", top_genres=dict(genre_counts.most_common(5)))
         
         # Create genre analysis
-        genre_analysis = GenreAnalysis.from_genre_list(genres)
+        genre_analysis = GenreAnalysis.from_genre_list(genres) # Local computation
         
         # Create playlist data
         playlist_data = PlaylistData(
@@ -258,14 +263,14 @@ def extract_playlist_data(playlist_url):
             artist_ids=list(set(artist_ids))  # Store unique artist IDs
         )
         
-        return playlist_data  
+        return playlist_data
         
     except spotipy.exceptions.SpotifyException as e:
-        print(f"Spotify API error: {e}")
+        app_logger.error("extract_playlist_data_spotify_exception", url=playlist_url, error=str(e), status_code=e.http_status, exc_info=True)
         if e.http_status == 429:
             return {"error": "Rate limit exceeded. Please try again in a few minutes."}
-        elif e.http_status == 401:
-            return {"error": "Authentication error. Please check your Spotify API credentials."}
+        elif e.http_status == 401: # This might indicate token expiry if not using auto-refresh via auth_manager
+            return {"error": "Authentication error. Please check your Spotify API credentials or try re-authenticating."}
         elif e.http_status == 403:
             return {"error": "Access forbidden. You may not have permission to access this content."}
         elif e.http_status == 404:
@@ -273,9 +278,7 @@ def extract_playlist_data(playlist_url):
         else:
             return {"error": f"Spotify API error ({e.http_status}): {str(e)}"}
     except Exception as e:
-        print(f"Unexpected error extracting data: {e}")
-        import traceback
-        traceback.print_exc()
+        app_logger.error("extract_playlist_data_unexpected_error", url=playlist_url, error=str(e), exc_info=True)
         return {"error": f"An unexpected error occurred while processing your request: {str(e)}"}
 
 def validate_spotify_url(url):
@@ -306,39 +309,45 @@ def validate_spotify_url(url):
     
     return True, "Valid Spotify URL"
 
+@monitor_api_calls("spotify_playlist_track_count")
+@retry_with_exponential_backoff()
 def get_playlist_tracks_count(playlist_url):
     """Get the number of tracks in a playlist (for validation)"""
     global sp
     
     if not sp:
-        if not initialize_spotify():
+        if not initialize_spotify(): # initialize_spotify is decorated
+            app_logger.warning("spotify_client_not_initialized_for_track_count")
             return 0
     
     try:
         if "playlist/" in playlist_url:
             playlist_id = playlist_url.split("playlist/")[-1].split("?")[0].split("/")[0]
-            playlist_info = sp.playlist(playlist_id, fields="tracks.total")
+            playlist_info = sp.playlist(playlist_id, fields="tracks.total") # Network call
             return playlist_info.get("tracks", {}).get("total", 0)
         elif "album/" in playlist_url:
             album_id = playlist_url.split("album/")[-1].split("?")[0].split("/")[0]
-            album_info = sp.album(album_id, market="US")
+            album_info = sp.album(album_id, market="US") # Network call
             return len(album_info.get("tracks", {}).get("items", []))
     except Exception as e:
-        print(f"Error getting track count: {e}")
+        app_logger.error("get_playlist_tracks_count_failed", url=playlist_url, error=str(e), exc_info=True)
         return 0
     
-    return 0
+    return 0 # Should not be reached if logic is correct
 
+@monitor_api_calls("spotify_search")
+@retry_with_exponential_backoff()
 def search_spotify_content(query, content_type="playlist", limit=10):
     """Search for Spotify content (for potential future features)"""
     global sp
     
     if not sp:
-        if not initialize_spotify():
+        if not initialize_spotify(): # initialize_spotify is decorated
+            app_logger.warning("spotify_client_not_initialized_for_search")
             return []
     
     try:
-        results = sp.search(q=query, type=content_type, limit=limit, market="US")
+        results = sp.search(q=query, type=content_type, limit=limit, market="US") # Network call
         
         if content_type == "playlist":
             items = results.get("playlists", {}).get("items", [])
@@ -361,10 +370,11 @@ def search_spotify_content(query, content_type="playlist", limit=10):
                 "tracks_total": item.get("total_tracks", 0)
             } for item in items]
     except Exception as e:
-        print(f"Error searching Spotify content: {e}")
+        app_logger.error("search_spotify_content_failed", query=query, content_type=content_type, error=str(e), exc_info=True)
         return []
     
-    return []
+    # This line was outside the try block, seems like a typo.
+    # return [] # If try block completes without returning, it implies empty results for other types.
 
 # Helper function for debugging
 def debug_spotify_connection():

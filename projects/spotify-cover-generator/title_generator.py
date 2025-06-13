@@ -16,19 +16,17 @@ except ImportError:
 
 from config import GEMINI_API_KEY, GEMINI_API_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
 
-# Monitoring imports with fallback
-try:
-    from monitoring_system import monitor_api_calls
-    from fault_handling import fault_tolerant_api_call
-except ImportError:
-    def monitor_api_calls(service_name):
-        def decorator(func):
-            return func
-        return decorator
-    def fault_tolerant_api_call(service_name, fallback_func=None):
-        def decorator(func):
-            return func
-        return decorator
+# Monitoring and Fault Handling Imports
+from .monitoring_system import app_logger, monitor_performance, monitor_api_calls
+from .fault_handling import (
+    fault_tolerant_api_call,
+    GracefulDegradation,
+    http_client,
+    circuit_breakers, # Potentially for http_client if it uses them
+    retry_with_exponential_backoff
+)
+
+app_logger.info("Successfully imported monitoring, fault_handling, and config modules in title_generator.")
 
 class LiveSpotifyTitleGenerator:
     def __init__(self):
@@ -41,15 +39,15 @@ class LiveSpotifyTitleGenerator:
     def _initialize_spotify(self):
         """Use the global Spotify client instead of creating a new one"""
         try:
-            from spotify_client import sp
+            from spotify_client import sp # Assuming sp is the initialized spotipy client from spotify_client.py
             if sp:
                 self.sp = sp
-                print("✓ Using global Spotify client for title generation")
+                app_logger.info("title_generator_using_global_spotify_client")
             else:
-                print("⚠️ Global Spotify client not available")
+                app_logger.warning("title_generator_global_spotify_client_not_available")
                 self.sp = None
         except Exception as e:
-            print(f"⚠️ Could not access global Spotify client: {e}")
+            app_logger.error("title_generator_failed_to_access_global_spotify_client", error=str(e), exc_info=True)
             self.sp = None
 
     def extract_artist_ids_from_playlist_data(self, playlist_data: Dict) -> List[str]:
@@ -103,7 +101,7 @@ class LiveSpotifyTitleGenerator:
                 album_titles.extend(artist_albums)
                 
             except Exception as e:
-                print(f"Error fetching albums for artist {artist_id}: {e}")
+                app_logger.warning("fetch_albums_for_artist_failed", artist_id=artist_id, error=str(e), exc_info=True)
                 continue
         
         return list(set(album_titles))  # Remove duplicates
@@ -128,14 +126,14 @@ class LiveSpotifyTitleGenerator:
                     
             except spotipy.exceptions.SpotifyException as e:
                 if e.http_status == 404:
-                    print(f"⚠️ Artist {artist_id} not found or no related artists available - skipping")
+                    app_logger.info("fetch_related_artists_not_found", artist_id=artist_id)
                 elif e.http_status == 403:
-                    print(f"⚠️ Access forbidden for artist {artist_id} - may be region restricted")
+                    app_logger.warning("fetch_related_artists_forbidden", artist_id=artist_id)
                 else:
-                    print(f"⚠️ Spotify API error for artist {artist_id}: {e}")
-                continue  # Skip this artist and continue with others
+                    app_logger.error("fetch_related_artists_spotify_exception", artist_id=artist_id, error=str(e), exc_info=True)
+                continue
             except Exception as e:
-                print(f"⚠️ Unexpected error fetching related artists for {artist_id}: {e}")
+                app_logger.error("fetch_related_artists_unexpected_error", artist_id=artist_id, error=str(e), exc_info=True)
                 continue
                     
         return list(set(similar_albums))
@@ -182,7 +180,7 @@ class LiveSpotifyTitleGenerator:
                 genre_albums.extend(found_albums)
                 
             except Exception as e:
-                print(f"Error searching albums for genre {genre}: {e}")
+                app_logger.warning("search_albums_for_genre_failed", genre=genre, error=str(e), exc_info=True)
                 continue
         
         return list(set(genre_albums))
@@ -295,11 +293,13 @@ class LiveSpotifyTitleGenerator:
         
         return selected
 
+    @fault_tolerant_api_call("gemini_api", fallback_func=GracefulDegradation.handle_gemini_failure)
     def generate_ai_title_with_context(self, genres: List[str], mood: str, 
                                      sample_titles: List[str]) -> str:
         """Generate AI title using real album titles as context"""
-        if not GEMINI_API_KEY:
-            return ""
+        if not GEMINI_API_KEY: # Checked also in _call_gemini_api but good for early exit
+            app_logger.error("gemini_api_key_missing_for_ai_title_generation")
+            return "" # Fallback will be handled by decorator if this raises or returns specific value
             
         # Use sample titles as inspiration for the AI
         context_titles = sample_titles[:10] if sample_titles else []
@@ -320,31 +320,59 @@ Respond with ONLY the title, no quotes or explanation:"""
 
         return self._call_gemini_api(prompt)
 
+    @monitor_api_calls("gemini_api")
+    @retry_with_exponential_backoff()
     def _call_gemini_api(self, prompt: str) -> str:
-        """Call Gemini API for title generation"""
-        try:
-            headers = {"Content-Type": "application/json"}
-            data = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": 0.7,
-                    "maxOutputTokens": 15,
-                    "topP": 0.8
-                }
-            }
-            
-            url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
-            response = requests.post(url, headers=headers, json=data, timeout=30)
-            
-            if response.status_code == 200:
-                response_json = response.json()
-                if 'candidates' in response_json and len(response_json['candidates']) > 0:
-                    text = response_json['candidates'][0]['content']['parts'][0]['text']
-                    return self._clean_title(text)
-            
+        """Call Gemini API for title generation using http_client."""
+        if not GEMINI_API_KEY:
+            app_logger.error("gemini_api_key_missing")
             return ""
+            
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.7,
+                "maxOutputTokens": 15, # Adjusted for typical title length
+                "topP": 0.8
+            }
+        }
+
+        url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
+
+        try:
+            # Using http_client from fault_handling module
+            response = http_client.request(
+                method='POST',
+                url=url,
+                headers=headers,
+                json=data,
+                timeout=30 # http_client should also respect this
+            )
+            
+            # http_client.request should raise an exception for HTTP errors by default.
+            # If not, or if specific non-200s are not exceptions:
+            if response.status_code != 200:
+                app_logger.error("gemini_api_error_status",
+                                 status_code=response.status_code,
+                                 response_text=response.text,
+                                 url=url)
+                return ""
+
+            response_json = response.json()
+            if 'candidates' in response_json and len(response_json['candidates']) > 0:
+                part = response_json['candidates'][0].get('content', {}).get('parts', [{}])[0]
+                if 'text' in part:
+                    text = part['text']
+                    return self._clean_title(text)
+                else:
+                    app_logger.warning("gemini_api_no_text_in_part", response_part=part)
+                    return ""
+            else:
+                app_logger.warning("gemini_api_no_candidates", response_json=response_json)
+                return ""
         except Exception as e:
-            print(f"Error calling Gemini API: {e}")
+            app_logger.error("gemini_api_call_exception", error=str(e), url=url, exc_info=True)
             return ""
 
     def _clean_title(self, raw_title: str) -> str:
@@ -364,83 +392,71 @@ Respond with ONLY the title, no quotes or explanation:"""
         
         return title
 
-    @monitor_api_calls("gemini")
-    @fault_tolerant_api_call("gemini")
+    @monitor_performance # Added monitor_performance, removed gemini specific decorators
     def generate_title(self, playlist_data: Dict, mood: str = "") -> str:
         """Main title generation using live Spotify data"""
         try:
-            print("🎵 Generating title using live Spotify data...")
+            app_logger.info("live_spotify_title_generation_start", mood=mood)
             
             genres = playlist_data.get("genres", [])
             all_titles = []
             
-            # Extract artist IDs from your playlist data structure
             artist_ids = self.extract_artist_ids_from_playlist_data(playlist_data)
             
             if not artist_ids:
-                print("⚠️ No artist IDs found in playlist data")
-                # Try to get them from track names or other data if needed
-                # This depends on your playlist_data structure
+                app_logger.warning("no_artist_ids_found_for_title_generation", playlist_data_keys=list(playlist_data.keys()))
             
-            # Method 1: Get albums from the playlist's artists
             if artist_ids and self.sp:
                 artist_albums = self.fetch_albums_for_artists(artist_ids)
                 if artist_albums:
                     all_titles.extend(artist_albums)
-                    print(f"✓ Found {len(artist_albums)} albums from playlist artists")
+                    app_logger.info("fetched_artist_albums_for_titles", count=len(artist_albums))
                 
-                # Method 2: Get albums from similar artists
                 similar_albums = self.fetch_similar_artists_albums(artist_ids)
                 if similar_albums:
                     all_titles.extend(similar_albums)
-                    print(f"✓ Found {len(similar_albums)} albums from similar artists")
+                    app_logger.info("fetched_similar_artist_albums_for_titles", count=len(similar_albums))
             
-            # Method 3: Get albums by genre
             if genres and self.sp:
                 genre_albums = self.fetch_genre_albums(genres)
                 if genre_albums:
                     all_titles.extend(genre_albums)
-                    print(f"✓ Found {len(genre_albums)} albums from genre search")
+                    app_logger.info("fetched_genre_albums_for_titles", count=len(genre_albums))
             
-            # Remove duplicates
             all_titles = list(set(all_titles))
             
             if all_titles:
-                print(f"🎵 Total pool: {len(all_titles)} unique album titles")
-                
-                # Select best candidates
+                app_logger.info("total_album_title_pool_size", count=len(all_titles))
                 candidates = self.select_best_titles(all_titles, genres, mood, count=10)
                 
                 if candidates:
-                    # Method A: Use a real title directly (70% chance)
-                    if random.random() < 0.7:
-                        chosen_title = random.choice(candidates[:5])  # Pick from top 5
-                        print(f"✓ Selected real album title: '{chosen_title}'")
+                    if random.random() < 0.7: # 70% chance for real title
+                        chosen_title = random.choice(candidates[:5])
+                        app_logger.info("selected_real_album_title", title=chosen_title)
                         return chosen_title
-                    
-                    # Method B: Generate AI title inspired by real titles (30% chance)
-                    else:
+                    else: # 30% chance for AI title
+                        # generate_ai_title_with_context is now decorated with fault tolerance for Gemini
                         ai_title = self.generate_ai_title_with_context(genres, mood, candidates)
                         if ai_title and self._is_good_title(ai_title):
-                            print(f"✓ Generated AI-inspired title: '{ai_title}'")
+                            app_logger.info("generated_ai_inspired_title", title=ai_title)
                             return ai_title
                         else:
-                            # Fallback to real title
-                            chosen_title = random.choice(candidates[:3])
-                            print(f"✓ AI failed, using real title: '{chosen_title}'")
+                            app_logger.warning("ai_title_generation_failed_or_bad_fallback_to_real", generated_title=ai_title)
+                            chosen_title = random.choice(candidates[:3]) if len(candidates) >=3 else random.choice(candidates) if candidates else self._ultimate_fallback(genres, mood)
+                            app_logger.info("fallback_to_real_album_title_after_ai_fail", title=chosen_title)
                             return chosen_title
             
-            # Ultimate fallback: Generate with AI only
-            print("⚠️ No Spotify titles found, using AI generation only")
-            ai_title = self.generate_ai_title_with_context(genres, mood, [])
-            if ai_title:
+            app_logger.warning("no_spotify_titles_found_using_ai_only_for_title")
+            ai_title = self.generate_ai_title_with_context(genres, mood, []) # Decorated
+            if ai_title and self._is_good_title(ai_title):
+                app_logger.info("generated_ai_title_no_spotify_context", title=ai_title)
                 return ai_title
             
-            # Last resort
+            app_logger.warning("ai_only_title_generation_failed_using_ultimate_fallback")
             return self._ultimate_fallback(genres, mood)
             
         except Exception as e:
-            print(f"❌ Error in title generation: {e}")
+            app_logger.error("title_generation_pipeline_error", error=str(e), exc_info=True)
             return self._ultimate_fallback(playlist_data.get("genres", []), mood)
 
     def _ultimate_fallback(self, genres: List[str], mood: str) -> str:
@@ -457,8 +473,7 @@ Respond with ONLY the title, no quotes or explanation:"""
             ])
 
 # Updated main function
-@monitor_api_calls("gemini")
-@fault_tolerant_api_call("gemini")
+@monitor_performance # Added monitor_performance, removed gemini specific decorators
 def generate_title(playlist_data, mood=""):
     """Generate title using live Spotify album data"""
     generator = LiveSpotifyTitleGenerator()
