@@ -1,8 +1,17 @@
 // Run when DOM is loaded
 document.addEventListener('DOMContentLoaded', function () {
+    // Initialize theme
+    initializeTheme();
+    
     // Initialize EmailJS
     if (typeof emailjs !== 'undefined') {
         emailjs.init("5XhzQ2uxmMYO1HHL_");
+    }
+
+    // Theme Toggle
+    const themeToggle = document.getElementById('theme-toggle');
+    if (themeToggle) {
+        themeToggle.addEventListener('click', toggleTheme);
     }
 
     // Navigation Toggle
@@ -188,6 +197,63 @@ document.addEventListener('DOMContentLoaded', function () {
         el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
         observer.observe(el);
     });
+});
+
+// Theme Management Functions
+function initializeTheme() {
+    // Check for saved theme preference or default to 'dark'
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = savedTheme === 'system' ? (systemPrefersDark ? 'dark' : 'light') : savedTheme;
+    
+    setTheme(theme);
+    updateThemeToggle(theme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    setTheme(newTheme);
+    updateThemeToggle(newTheme);
+    localStorage.setItem('theme', newTheme);
+}
+
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    
+    // Update meta theme-color for mobile browsers
+    const metaThemeColor = document.querySelector('meta[name=theme-color]');
+    if (metaThemeColor) {
+        metaThemeColor.setAttribute('content', theme === 'dark' ? '#0a0a0a' : '#ffffff');
+    } else {
+        // Create meta theme-color if it doesn't exist
+        const meta = document.createElement('meta');
+        meta.name = 'theme-color';
+        meta.content = theme === 'dark' ? '#0a0a0a' : '#ffffff';
+        document.head.appendChild(meta);
+    }
+}
+
+function updateThemeToggle(theme) {
+    const themeToggle = document.getElementById('theme-toggle');
+    if (themeToggle) {
+        if (theme === 'light') {
+            themeToggle.classList.add('light');
+        } else {
+            themeToggle.classList.remove('light');
+        }
+    }
+}
+
+// Listen for system theme changes
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'system') {
+        const theme = e.matches ? 'dark' : 'light';
+        setTheme(theme);
+        updateThemeToggle(theme);
+    }
 });
 
 // Function to fetch and display GitHub repositories
