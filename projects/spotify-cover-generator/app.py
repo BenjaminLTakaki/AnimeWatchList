@@ -1043,7 +1043,7 @@ def generate():
                 "lora_url": result.get("lora_url", ""),
                 "user_info": user_info,
                 "user": user_info.get('user'),
-                "can_edit_playlist": user_info['can_edit_playlists'],
+                "can_edit_playlist": user_info['can_edit_playlists'] and playlist_id is not None, # Can only edit if it's a playlist
                 "playlist_id": playlist_id
             }
             
@@ -1390,6 +1390,113 @@ def spotify_callback():
         traceback.print_exc()
         flash('An error occurred during Spotify authorization', 'error')
         return redirect(url_for('generate'))
+
+# SPOTIFY PLAYLIST UPDATE ROUTES
+@app.route('/spotify/api/update_playlist_title', methods=['POST'])
+@login_required
+def update_playlist_title_route():
+    user = get_current_user()
+    if not user or not user.spotify_access_token:
+        return jsonify({"success": False, "error": "User not authenticated or Spotify not connected"}), 401
+
+    data = request.get_json()
+    playlist_id = data.get('playlist_id')
+    new_title = data.get('new_title')
+
+    if not playlist_id or not new_title:
+        return jsonify({"success": False, "error": "Missing playlist_id or new_title"}), 400
+
+    # Ensure spotify_client is available
+    global spotify_client_available
+    if not spotify_client_available: # This global flag might not be strictly necessary anymore if we always import
+        import spotify_client # ensure it's imported
+        if not hasattr(spotify_client, 'get_user_specific_client'): # Basic check
+             return jsonify({"success": False, "error": "Spotify client functionality unavailable."}), 500
+    else:
+        import spotify_client
+
+    user.refresh_spotify_token_if_needed()
+    db.session.commit() # Commit any changes from token refresh
+
+    user_specific_sp = spotify_client.get_user_specific_client(user.spotify_access_token)
+    if not user_specific_sp:
+        return jsonify({"success": False, "error": "Failed to initialize Spotify client for user"}), 500
+
+    try:
+        current_spotify_user_id = user_specific_sp.me()['id']
+    except Exception as e:
+        print(f"Error fetching user's Spotify ID: {e}")
+        return jsonify({"success": False, "error": "Failed to verify Spotify user identity"}), 500
+
+    playlist_owner_id = spotify_client.get_playlist_owner_id(user_specific_sp, playlist_id)
+
+    if not playlist_owner_id:
+        return jsonify({"success": False, "error": "Could not verify playlist ownership"}), 500 # Or 404/403
+
+    if current_spotify_user_id != playlist_owner_id:
+        return jsonify({"success": False, "error": "You do not own this playlist"}), 403
+
+    if spotify_client.update_playlist_details(user_specific_sp, playlist_id, name=new_title):
+        return jsonify({"success": True, "message": "Playlist title updated successfully"})
+    else:
+        return jsonify({"success": False, "error": "Failed to update playlist title"}), 500
+
+@app.route('/spotify/api/update_playlist_cover', methods=['POST'])
+@login_required
+def update_playlist_cover_route():
+    user = get_current_user()
+    if not user or not user.spotify_access_token:
+        return jsonify({"success": False, "error": "User not authenticated or Spotify not connected"}), 401
+
+    data = request.get_json()
+    playlist_id = data.get('playlist_id')
+    image_path = data.get('image_path') # This should be a server-side path
+
+    if not playlist_id or not image_path:
+        return jsonify({"success": False, "error": "Missing playlist_id or image_path"}), 400
+
+    # Ensure image_path is within the allowed directory (e.g., COVERS_DIR)
+    # COVERS_DIR should be imported from config
+    from config import COVERS_DIR
+    if not os.path.abspath(image_path).startswith(os.path.abspath(str(COVERS_DIR))):
+        return jsonify({"success": False, "error": "Invalid image path"}), 400
+
+    if not os.path.exists(image_path):
+        return jsonify({"success": False, "error": "Image file not found on server"}), 404
+
+    global spotify_client_available
+    if not spotify_client_available: # Similar to above, ensure client code is available
+        import spotify_client
+        if not hasattr(spotify_client, 'get_user_specific_client'):
+             return jsonify({"success": False, "error": "Spotify client functionality unavailable."}), 500
+    else:
+        import spotify_client
+
+    user.refresh_spotify_token_if_needed()
+    db.session.commit()
+
+    user_specific_sp = spotify_client.get_user_specific_client(user.spotify_access_token)
+    if not user_specific_sp:
+        return jsonify({"success": False, "error": "Failed to initialize Spotify client for user"}), 500
+
+    try:
+        current_spotify_user_id = user_specific_sp.me()['id']
+    except Exception as e:
+        print(f"Error fetching user's Spotify ID: {e}")
+        return jsonify({"success": False, "error": "Failed to verify Spotify user identity"}), 500
+
+    playlist_owner_id = spotify_client.get_playlist_owner_id(user_specific_sp, playlist_id)
+
+    if not playlist_owner_id:
+        return jsonify({"success": False, "error": "Could not verify playlist ownership"}), 500 # Or 404/403
+
+    if current_spotify_user_id != playlist_owner_id:
+        return jsonify({"success": False, "error": "You do not own this playlist"}), 403
+
+    if spotify_client.upload_custom_playlist_cover(user_specific_sp, playlist_id, image_path):
+        return jsonify({"success": True, "message": "Playlist cover updated successfully"})
+    else:
+        return jsonify({"success": False, "error": "Failed to update playlist cover"}), 500
 
 # OTHER ROUTES (login, logout, profile, etc. - keep existing)
 @app.route('/login', methods=['GET', 'POST'])

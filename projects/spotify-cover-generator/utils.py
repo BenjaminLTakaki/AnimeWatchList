@@ -111,71 +111,94 @@ def extract_playlist_id(playlist_url):
     return None
 
 def get_available_loras():
-    """Get list of available LoRAs from database and file system."""
-    loras = []
+    """Get list of available LoRAs from config, database, and file system."""
+    loaded_loras_by_name = {}
     
+    # Import here to avoid circular imports
+    from app import LoraModelDB, db, app # app needed for app_context
+    from models import LoraModel
+
+    # 1. Load LoRAs from lora_config.json
     try:
-        # First, get local LoRAs from the file system
-        local_loras = []
+        lora_config_path = Path(__file__).parent / "lora_config.json"
+        if lora_config_path.exists():
+            with open(lora_config_path, 'r') as f:
+                config_data = json.load(f)
+                if "loras" in config_data:
+                    for lora_data_from_json in config_data["loras"]:
+                        lora_model = LoraModel.from_dict(lora_data_from_json)
+                        if lora_model.name not in loaded_loras_by_name:
+                            loaded_loras_by_name[lora_model.name] = lora_model
+                        else:
+                            print(f"LoRA name conflict: '{lora_model.name}' from JSON config already loaded. Skipping.")
+    except Exception as e:
+        print(f"Error loading LoRAs from lora_config.json: {e}")
+
+    # 2. Get local LoRAs from the file system
+    try:
+        fs_lora_files = []
         for ext in [".safetensors", ".ckpt", ".pt"]:
-            local_loras.extend(list(LORA_DIR.glob(f"*{ext}")))
+            fs_lora_files.extend(list(LORA_DIR.glob(f"*{ext}")))
         
-        # Import here to avoid circular imports
-        from app import LoraModelDB, db, app
-        from models import LoraModel
-        
-        # Convert file system LoRAs to LoraModel objects
-        local_lora_names = []
-        for lora in local_loras:
-            local_lora_names.append(lora.stem)
-            loras.append(LoraModel(
-                name=lora.stem,
-                source_type="local",
-                path=str(lora),
-                url="",
-                trigger_words=[],
-                strength=0.7
-            ))
-        
-        # Get LoRAs from database (primarily link-type LoRAs)
+        for lora_file_path in fs_lora_files:
+            lora_name = lora_file_path.stem
+            if lora_name not in loaded_loras_by_name:
+                loaded_loras_by_name[lora_name] = LoraModel(
+                    name=lora_name,
+                    source_type="local",
+                    path=str(lora_file_path),
+                    trigger_words=[], # Default, can be enhanced if conventions exist
+                    strength=0.7      # Default
+                )
+            else:
+                # If name conflict, config one is kept. If existing is local, update path if current is local.
+                # This prioritizes JSON config for metadata, but filesystem for path if both are "local".
+                if loaded_loras_by_name[lora_name].source_type == "local":
+                     loaded_loras_by_name[lora_name].path = str(lora_file_path) # Ensure path is from actual file
+
+    except Exception as e:
+        print(f"Error scanning filesystem for LoRAs: {e}")
+
+    # 3. Get LoRAs from database
+    try:
         with app.app_context():
             db_loras = LoraModelDB.query.all()
-            for db_lora in db_loras:                # Skip if we already have this from the file system
-                if db_lora.source_type == "local" and db_lora.name in local_lora_names:
-                    continue
-                
-                loras.append(LoraModel(
-                    name=db_lora.name,
-                    source_type=db_lora.source_type,
-                    path=db_lora.path,
-                    url="",  # No URL attribute in LoraModelDB
-                    trigger_words=[],  # No trigger_words attribute in LoraModelDB
-                    strength=0.7  # Default strength
-                ))
-        
-        # Sort by name
-        loras.sort(key=lambda x: x.name)
-        return loras
+            for db_lora in db_loras:
+                if db_lora.name not in loaded_loras_by_name:
+                    # If it's a local LoRA from DB, ensure its file exists
+                    if db_lora.source_type == "local":
+                        if not db_lora.path or not os.path.exists(db_lora.path):
+                            print(f"Local LoRA '{db_lora.name}' found in DB but file missing at path: {db_lora.path}. Skipping.")
+                            continue
+
+                    # For link types from DB, or valid local ones from DB.
+                    # LoraModelDB doesn't have url, trigger_words, strength anymore.
+                    # So, creating LoraModel from it will use defaults for those.
+                    loaded_loras_by_name[db_lora.name] = LoraModel(
+                        name=db_lora.name,
+                        source_type=db_lora.source_type, # "local" or "link"
+                        path=db_lora.path, # Stored path for "local"
+                        # url, trigger_words, strength will take defaults from LoraModel constructor
+                    )
+                else:
+                    # Name conflict: LoRA already loaded from JSON or filesystem.
+                    # If DB one is local and existing one is local, ensure path from DB (if valid) is considered or updated.
+                    # This part can be complex depending on desired override behavior.
+                    # For now, if JSON/FS loaded it, that takes precedence.
+                    # If the loaded one is "local" and from JSON (no path), and DB has a path:
+                    if loaded_loras_by_name[db_lora.name].source_type == "local" and \
+                       not loaded_loras_by_name[db_lora.name].path and \
+                       db_lora.source_type == "local" and db_lora.path and os.path.exists(db_lora.path):
+                        print(f"Updating path for LoRA '{db_lora.name}' from DB record.")
+                        loaded_loras_by_name[db_lora.name].path = db_lora.path
+
+
     except Exception as e:
-        print(f"Error getting LoRAs: {e}")
-        # If database fails, try to get just file system LoRAs
-        try:
-            from models import LoraModel
-            local_loras = []
-            for ext in [".safetensors", ".ckpt", ".pt"]:
-                local_loras.extend(list(LORA_DIR.glob(f"*{ext}")))
-            
-            return [LoraModel(
-                name=lora.stem,
-                source_type="local",
-                path=str(lora),
-                url="",
-                trigger_words=[],
-                strength=0.7
-            ) for lora in local_loras]
-        except Exception as inner_e:
-            print(f"Error getting local LoRAs: {inner_e}")
-            return []
+        print(f"Error getting LoRAs from database: {e}")
+
+    # Convert dict values to list and sort
+    final_lora_list = sorted(list(loaded_loras_by_name.values()), key=lambda x: x.name)
+    return final_lora_list
 
 def add_lora_link(name, url, trigger_words=None, strength=0.7):
     """Add a LoRA via link to the database."""

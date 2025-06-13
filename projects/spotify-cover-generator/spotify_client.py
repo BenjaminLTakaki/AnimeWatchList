@@ -21,6 +21,13 @@ except ImportError:
 # Global Spotify client
 sp = None
 
+# Function to get a Spotify client authenticated with a user's access token
+def get_user_specific_client(access_token):
+    if not access_token:
+        print("No access token provided for user-specific client")
+        return None
+    return spotipy.Spotify(auth=access_token)
+
 def initialize_spotify(use_oauth=False):
     """Initialize Spotify API client"""
     global sp
@@ -365,6 +372,68 @@ def search_spotify_content(query, content_type="playlist", limit=10):
         return []
     
     return []
+
+@monitor_api_calls("spotify")
+@fault_tolerant_api_call("spotify")
+def update_playlist_details(sp_client, playlist_id, name=None, description=None):
+    """Updates the name and/or description of a playlist using a provided Spotipy client."""
+    if not sp_client:
+        print("Spotipy client not provided for update_playlist_details.")
+        return False
+    try:
+        if name is None and description is None:
+            print("No changes requested for playlist details.")
+            return False # Or perhaps True, as no operation failed
+        sp_client.playlist_change_details(playlist_id, name=name, description=description)
+        print(f"Playlist {playlist_id} details updated successfully.")
+        return True
+    except spotipy.exceptions.SpotifyException as e:
+        print(f"Error updating playlist details: {e}")
+        return False
+    except Exception as e:
+        print(f"An unexpected error occurred in update_playlist_details: {e}")
+        return False
+
+@monitor_api_calls("spotify")
+@fault_tolerant_api_call("spotify")
+def upload_custom_playlist_cover(sp_client, playlist_id, image_path):
+    """Uploads a custom cover image for a playlist using a provided Spotipy client."""
+    if not sp_client:
+        print("Spotipy client not provided for upload_custom_playlist_cover.")
+        return False
+    try:
+        import base64
+        with open(image_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read())
+        sp_client.playlist_upload_cover_image(playlist_id, encoded_string)
+        print(f"Custom cover image uploaded for playlist {playlist_id}.")
+        return True
+    except FileNotFoundError:
+        print(f"Error: Image file not found at {image_path}")
+        return False
+    except spotipy.exceptions.SpotifyException as e:
+        print(f"Error uploading playlist cover: {e}")
+        return False
+    except Exception as e:
+        print(f"An unexpected error occurred in upload_custom_playlist_cover: {e}")
+        return False
+
+@monitor_api_calls("spotify")
+@fault_tolerant_api_call("spotify")
+def get_playlist_owner_id(sp_client, playlist_id):
+    """Gets the owner ID of a playlist using a provided Spotipy client."""
+    if not sp_client:
+        print("Spotipy client not provided for get_playlist_owner_id.")
+        return None
+    try:
+        playlist_info = sp_client.playlist(playlist_id, fields="owner.id")
+        return playlist_info['owner']['id']
+    except spotipy.exceptions.SpotifyException as e:
+        print(f"Error getting playlist owner ID: {e}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred in get_playlist_owner_id: {e}")
+        return None
 
 # Helper function for debugging
 def debug_spotify_connection():
