@@ -43,7 +43,7 @@ def inject_template_vars():
     }
 
 # Import and initialize auth system
-from auth import init_auth
+from projects.animewatchlist.auth import init_auth
 db = init_auth(app, get_url_for, lambda user_id: (0, 0))  # Temporary function, will be replaced
 migrate = Migrate(app, db) # ADDED: Initialize Flask-Migrate
 
@@ -52,7 +52,7 @@ with app.app_context():
     db.create_all()  # Create user tables
 
 # Now that the database is initialized, we can import the User model
-from auth import User
+from projects.animewatchlist.auth import User
 
 # Import and initialize user data AFTER db is initialized
 from user_data import init_user_data, get_user_anime_list, get_status_counts
@@ -63,8 +63,8 @@ Anime, UserAnimeList = init_user_data(db)
 
 # Now that user_data is initialized with the real get_status_counts,
 # let's update auth's reference to it
-import auth
-auth.get_status_counts = get_status_counts
+import projects.animewatchlist.auth as auth_module
+auth_module.get_status_counts = get_status_counts
 
 # Create all tables again to ensure all models are registered
 with app.app_context():

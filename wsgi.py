@@ -4,6 +4,8 @@ import datetime
 from flask import Flask, send_from_directory, redirect, request
 from dotenv import load_dotenv
 from flask_migrate import Migrate
+import importlib.util
+import importlib.machinery
 
 # Load environment variables
 load_dotenv()
@@ -77,20 +79,57 @@ projects_path = os.path.join(project_root, 'projects') # Ensure this is added to
 # Example: if projects_path not in sys.path: sys.path.insert(0, projects_path)
 # This is usually done earlier, e.g., before importing skillstown.
 
-print("Attempting Spotify app import with corrected logic - v2") # New unique print statement
-
+has_spotify_app = False
+spotify_app = None
+print("Attempting Spotify app import using importlib for projects/spotify-cover-generator/app.py")
 try:
-    print(f"Setting up Spotify app from module: projects.spotify_cover_generator")
-    # The import should be direct, relying on 'projects' being in sys.path
-    from projects.spotify_cover_generator.app import app as spotify_app
-    
-    print("✅ Spotify app imported successfully (v2)")
-    has_spotify_app = True
+    spotify_app_path = os.path.join(project_root, 'projects', 'spotify-cover-generator', 'app.py')
+    if not os.path.exists(spotify_app_path):
+        print(f"❌ Spotify app file not found at {spotify_app_path}")
+    else:
+        # Use a unique module name for importlib, e.g., 'spotify_cover_generator_app_module'
+        module_name = "spotify_cover_generator_app_module"
+        spec = importlib.util.spec_from_file_location(module_name, spotify_app_path)
+        if spec and spec.loader:
+            spotify_module = importlib.util.module_from_spec(spec)
+            # Add the 'projects' directory to sys.path temporarily if it helps resolution within the module
+            # This is because the spotify app itself might have imports like 'from projects.spotify-cover-generator import ...'
+            # which won't work. It more likely has relative imports like 'from . import models'
+            # For importlib, the module's __name__ will be `module_name` not `projects.spotify-cover-generator.app`
+            # The key is how internal imports within spotify-cover-generator/app.py are handled.
+            # Let's ensure the parent directory of 'spotify-cover-generator' is in sys.path
+            spotify_project_parent_dir = os.path.join(project_root, 'projects')
+            if spotify_project_parent_dir not in sys.path:
+                sys.path.insert(0, spotify_project_parent_dir)
+            # Also add the actual app's directory to sys.path as it might do 'from . import ...'
+            spotify_app_dir = os.path.join(project_root, 'projects', 'spotify-cover-generator')
+            if spotify_app_dir not in sys.path:
+                sys.path.insert(0, spotify_app_dir)
+
+            # Crucially, for relative imports within the loaded module to work as if it's part of a package,
+            # its __name__ should be set as if it's part of 'projects.spotify-cover-generator'
+            # However, spec_from_file_location sets __name__ to the first arg.
+            # For simplicity now, let's see if direct execution works.
+            # If there are issues with relative imports inside spotify_cover_generator/app.py,
+            # we might need to adjust its __package__ or __name__ before exec_module.
+            # Example: spotify_module.__name__ = 'projects.spotify_cover_generator.app'
+            # spotify_module.__package__ = 'projects.spotify_cover_generator'
+
+            spec.loader.exec_module(spotify_module)
+            if hasattr(spotify_module, 'app'):
+                spotify_app = spotify_module.app
+                print("✅ Spotify app imported successfully using importlib and 'app' attribute found.")
+                has_spotify_app = True
+            else:
+                print("❌ Spotify app loaded via importlib, but 'app' attribute not found in the module.")
+        else:
+            print(f"❌ Could not create spec or loader for Spotify app at {spotify_app_path}")
 except Exception as e:
-    print(f"❌ Could not import Spotify app (v2): {e}")
-    print(f"Error type: {type(e).__name__}")
+    print(f"❌ Error during importlib loading of Spotify app: {e}")
     import traceback
     print(f"Full traceback: {traceback.format_exc()}")
+    # Ensure spotify_app is None if it failed
+    spotify_app = None
     has_spotify_app = False
 
 # Configure context processors
