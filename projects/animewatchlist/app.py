@@ -55,8 +55,8 @@ with app.app_context():
 from projects.animewatchlist.auth import User
 
 # Import and initialize user data AFTER db is initialized
-from user_data import init_user_data, get_user_anime_list, get_status_counts
-from user_data import mark_anime_for_user, change_anime_status_for_user, get_anime_status_for_user
+from projects.animewatchlist.user_data import init_user_data, get_user_anime_list, get_status_counts
+from projects.animewatchlist.user_data import mark_anime_for_user, change_anime_status_for_user, get_anime_status_for_user
 
 # Initialize user data models with the database from auth
 Anime, UserAnimeList = init_user_data(db)

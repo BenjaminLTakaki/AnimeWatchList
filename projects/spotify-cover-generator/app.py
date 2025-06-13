@@ -670,6 +670,7 @@ def generate():
 
     if request.method == "POST":
         try:
+            global generator_available, spotify_client_available # Moved here
             # Check if core generation modules are available
             # These globals (generator_available, etc.) are set by initialize_app()
             if not (generator_available and spotify_client_available):
@@ -681,9 +682,7 @@ def generate():
                     # Use relative imports for on-demand re-import
                     from . import generator
                     from . import spotify_client
-                    # Re-set global flags if successful, though ideally initialize_app handles this.
-                    # This is a fallback.
-                    global generator_available, spotify_client_available
+                    # No need for another global declaration here if it's at the top of the try block
                     generator_available = True # Mark as available if re-import succeeds
                     spotify_client_available = True # Mark as available
                     app_logger.info("generation_modules_reimported_on_demand_relatively")
