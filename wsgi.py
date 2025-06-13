@@ -115,6 +115,7 @@ try:
             # Example: spotify_module.__name__ = 'projects.spotify_cover_generator.app'
             # spotify_module.__package__ = 'projects.spotify_cover_generator'
 
+            setattr(spotify_module, '__package__', module_name) # Or spotify_module.__package__ = module_name
             spec.loader.exec_module(spotify_module)
             if hasattr(spotify_module, 'app'):
                 spotify_app = spotify_module.app
