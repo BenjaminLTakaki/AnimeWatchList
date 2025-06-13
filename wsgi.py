@@ -67,46 +67,31 @@ except Exception as e:
     has_animewatchlist_app = True
 
 # Spotify Cover Generator app setup
-spotify_path = os.path.join(project_root, 'projects/spotify-cover-generator')
+spotify_path = os.path.join(project_root, 'projects/spotify-cover-generator') # Keep this for reference if needed by other parts, or for AppDispatcher
+projects_path = os.path.join(project_root, 'projects') # Ensure this is added to sys.path if not already done earlier for skillstown
 
-# Import Spotify app - FIXED PATH HANDLING
+# Ensure the 'projects' directory is in sys.path (it should be from skillstown setup)
+# If not, add it:
+# if projects_path not in sys.path:
+#     sys.path.insert(0, projects_path)
+
 try:
-    print(f"Setting up Spotify app from path: {spotify_path}")
+    print(f"Setting up Spotify app from module: projects.spotify_cover_generator")
+    # No more chdir, no more direct spotify_path insertion if projects_path is there.
+    # No more original_sys_path restoration needed here as we are not heavily modifying it temporarily.
+
+    # The import should be direct, relying on 'projects' being in sys.path
+    from projects.spotify_cover_generator.app import app as spotify_app
     
-    # Store original sys.path to restore later
-    original_sys_path = sys.path.copy()
-    
-    # Add the spotify project directory to the path FIRST
-    # This ensures all imports within the spotify app work correctly
-    if spotify_path not in sys.path:
-        sys.path.insert(0, spotify_path)
-    
-    print(f"Added Spotify path to sys.path: {spotify_path}")
-    print(f"Current working directory: {os.getcwd()}")
-    print(f"Spotify directory contents: {os.listdir(spotify_path) if os.path.exists(spotify_path) else 'Directory not found'}")
-    
-    # Change the working directory temporarily for the import
-    old_cwd = os.getcwd()
-    os.chdir(spotify_path)
-    
-    try:
-        # Now import the app - this should work because we're in the right directory
-        # and the path is set correctly
-        from app import app as spotify_app
-        print("✅ Spotify app imported successfully")
-        has_spotify_app = True
-    finally:
-        # Always restore the working directory
-        os.chdir(old_cwd)
-        
+    print("✅ Spotify app imported successfully")
+    has_spotify_app = True
 except Exception as e:
     print(f"❌ Could not import Spotify app: {e}")
     print(f"Error type: {type(e).__name__}")
     import traceback
     print(f"Full traceback: {traceback.format_exc()}")
     has_spotify_app = False
-    # Restore the original path if import failed
-    sys.path = original_sys_path
+    # No sys.path restoration here as we didn't store 'original_sys_path' in this block
 
 # Configure context processors
 @skillstown_app.context_processor
@@ -239,13 +224,8 @@ class AppDispatcher:
             script_name = '/spotify'
             environ['SCRIPT_NAME'] = script_name
             environ['PATH_INFO'] = path_info[len(script_name):]
-            # IMPORTANT: Set the working directory for Spotify app requests
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(spotify_path)
-                return spotify_app(environ, start_response)
-            finally:
-                os.chdir(old_cwd)
+            # No more chdir needed here
+            return spotify_app(environ, start_response)
             
         # Everything else goes to the main app
         return main_app(environ, start_response)

@@ -57,7 +57,7 @@ from .fault_handling import (
 print("✅ Successfully imported monitoring and fault_handling modules.")
 
 # Direct configuration import
-from config import (
+from .config import (
     BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY,
     SPOTIFY_DB_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET,
     SPOTIFY_REDIRECT_URI, GEMINI_API_KEY, STABILITY_API_KEY
@@ -321,59 +321,67 @@ def initialize_app():
     
     # Global variables to track what's available
     global spotify_client_available, models_available, utils_available, generator_available
+    global title_generator_available, image_generator_available, chart_generator_available # Add for more granular checks if needed
     spotify_client_available = False
     models_available = False
-    utils_available = False
+    utils_available = False # This will track the import of the 'utils' module as a whole
     generator_available = False
+    title_generator_available = False
+    image_generator_available = False
+    chart_generator_available = False
+
+    # Try importing modules using relative imports
+    try:
+        from . import spotify_client
+        app_logger.info("module_import_success", module="spotify_client")
+        spotify_client_available = True
+    except ImportError as e:
+        app_logger.warning("module_import_failed", module="spotify_client", error=str(e))
+        
+    try:
+        from . import models
+        app_logger.info("module_import_success", module="models")
+        models_available = True
+    except ImportError as e:
+        app_logger.warning("module_import_failed", module="models", error=str(e))
+        
+    try:
+        # Attempt to import the utils module itself. Specific functions are already imported at the top.
+        # This is for checking availability of the module if it's used like 'utils.some_function()'
+        from . import utils as initialize_app_utils # Use an alias to avoid conflict if 'utils' name is used elsewhere
+        app_logger.info("module_import_success", module="utils")
+        utils_available = True # Flag that the utils module (aliased) is available
+    except ImportError as e:
+        app_logger.warning("module_import_failed", module="utils", error=str(e))
     
-    # Get the current working directory for imports
-    original_cwd = os.getcwd()
-    module_level_current_dir = os.path.dirname(os.path.abspath(__file__))
+    try:
+        from . import generator
+        app_logger.info("module_import_success", module="generator")
+        generator_available = True
+    except ImportError as e:
+        app_logger.warning("module_import_failed", module="generator", error=str(e))
 
     try:
-        # Change to the spotify app directory for imports
-        os.chdir(module_level_current_dir)
-        
-        # Try importing modules
-        try:
-            import spotify_client
-            app_logger.info("module_import_success", module="spotify_client")
-            spotify_client_available = True
-        except ImportError as e:
-            app_logger.warning("module_import_failed", module="spotify_client", error=str(e))
-            
-        try:
-            import models
-            app_logger.info("module_import_success", module="models")
-            models_available = True
-        except ImportError as e:
-            app_logger.warning("module_import_failed", module="models", error=str(e))
-            
-        try:
-            import utils
-            app_logger.info("module_import_success", module="utils")
-            utils_available = True
-        except ImportError as e:
-            app_logger.warning("module_import_failed", module="utils", error=str(e))
-        
-        try:
-            import generator
-            app_logger.info("module_import_success", module="generator")
-            generator_available = True
-        except ImportError as e:
-            app_logger.warning("module_import_failed", module="generator", error=str(e))
-        
-        try:
-            import title_generator
-            import image_generator
-            import chart_generator
-            app_logger.info("module_import_success", modules=["title_generator", "image_generator", "chart_generator"])
-        except ImportError as e:
-            app_logger.warning("module_import_failed", modules=["title_generator", "image_generator", "chart_generator"], error=str(e))
-            
-    finally:
-        os.chdir(original_cwd)
-    
+        from . import title_generator
+        app_logger.info("module_import_success", module="title_generator")
+        title_generator_available = True
+    except ImportError as e:
+        app_logger.warning("module_import_failed", module="title_generator", error=str(e))
+
+    try:
+        from . import image_generator
+        app_logger.info("module_import_success", module="image_generator")
+        image_generator_available = True
+    except ImportError as e:
+        app_logger.warning("module_import_failed", module="image_generator", error=str(e))
+
+    try:
+        from . import chart_generator
+        app_logger.info("module_import_success", module="chart_generator")
+        chart_generator_available = True
+    except ImportError as e:
+        app_logger.warning("module_import_failed", module="chart_generator", error=str(e))
+
     app_logger.info("module_import_completed")
     
     # Initialize Spotify client if available
@@ -630,9 +638,33 @@ def generate():
     loras = []
     if user_info['can_use_loras']:
         try:
-            if 'utils_available' in globals() and utils_available: # utils should be imported at top now
-                # import utils # No longer needed here if utils is imported at top
-                loras = utils.get_available_loras() # Assumes utils is already imported
+            # utils_available is set in initialize_app based on 'from . import utils as initialize_app_utils'
+            # Specific utils functions are imported at the top of app.py
+            # If get_available_loras is a function in utils.py, we use the alias.
+            if 'utils_available' in globals() and utils_available:
+                # If initialize_app_utils.get_available_loras() is how it's meant to be called:
+                # from . import utils as initialize_app_utils # This is in initialize_app()
+                # loras = initialize_app_utils.get_available_loras()
+                # However, if get_available_loras is not part of the top-level utils imports,
+                # and initialize_app makes 'utils' (the module) available, this is how it would be called.
+                # Let's assume initialize_app makes 'utils' (the module) available via 'initialize_app_utils'
+                # And 'get_available_loras' is a function within that module.
+                # The alias 'initialize_app_utils' is defined in 'initialize_app'
+                # For this to work here, initialize_app_utils must be global or passed around.
+                # Simpler: if 'utils_available' is True, it means 'from . import utils as initialize_app_utils' succeeded.
+                # We need to ensure 'initialize_app_utils' is accessible here or change how 'get_available_loras' is called.
+                # For now, let's assume 'initialize_app_utils' is made global from initialize_app, or this part needs a direct import.
+                # Given the current structure, it's better if initialize_app sets a global alias or generate() imports it.
+                # To ensure utils.get_available_loras() works, 'utils' module itself needs to be imported.
+                # The top level has 'from .utils import ... specific functions ...'
+                # Let's ensure 'utils' module is imported in 'initialize_app' and made available,
+                # e.g. by 'global initialize_app_utils' and then using 'initialize_app_utils.get_available_loras()'
+                # For now, will try to import it directly here if utils_available is true.
+                if utils_available: # utils_available is set by initialize_app
+                    from . import utils as route_utils # Import utils for this route's scope
+                    loras = route_utils.get_available_loras()
+        except ImportError as e:
+            app_logger.warning("get_loras_import_failed_in_route", error=str(e), exc_info=True)
         except Exception as e:
             app_logger.warning("get_loras_failed", error=str(e), exc_info=True)
 
@@ -646,16 +678,17 @@ def generate():
                                    spotify_client_available=spotify_client_available)
                 # Attempt re-import or fail gracefully
                 try:
-                    import generator # These should be top-level if always needed
-                    import spotify_client
-                    # Re-set flags if successful, though ideally initialize_app handles this
-                    # For now, this is a fallback within the request if initial load failed.
-                    global generator_available_local, spotify_client_available_local
-                    generator_available_local = True
-                    spotify_client_available_local = True
-                    app_logger.info("generation_modules_reimported_on_demand")
+                    # Use relative imports for on-demand re-import
+                    from . import generator
+                    from . import spotify_client
+                    # Re-set global flags if successful, though ideally initialize_app handles this.
+                    # This is a fallback.
+                    global generator_available, spotify_client_available
+                    generator_available = True # Mark as available if re-import succeeds
+                    spotify_client_available = True # Mark as available
+                    app_logger.info("generation_modules_reimported_on_demand_relatively")
                 except ImportError as import_e:
-                    app_logger.error("core_generation_modules_reimport_failed", error=str(import_e))
+                    app_logger.error("core_generation_modules_reimport_failed_relatively", error=str(import_e))
                     return render_template(
                         "index.html",
                         error="Core generation modules are not available. The system is still starting up - please try again in a moment.",
@@ -690,7 +723,8 @@ def generate():
                 )
             
             # Generate the cover
-            import generator
+            # generator module should be available if generator_available is True
+            from . import generator # Ensure it's imported for this scope
             user_id = user_info['user'].id if user_info['type'] == 'user' else None
             result = generator.generate_cover(playlist_url, user_mood, lora_input, 
                                 negative_prompt=negative_prompt, user_id=user_id) 
@@ -713,10 +747,15 @@ def generate():
             genre_percentages_data = []
             
             try:
-                import chart_generator # Consider moving to top if always used
-                genres_chart_data = chart_generator.generate_genre_chart(result.get("all_genres", []))
-            except ImportError:
-                app_logger.warning("chart_generator_unavailable")
+                # chart_generator module should be available if chart_generator_available is True from initialize_app
+                if chart_generator_available:
+                    from . import chart_generator # Ensure it's imported for this scope
+                    genres_chart_data = chart_generator.generate_genre_chart(result.get("all_genres", []))
+                else:
+                    app_logger.warning("chart_generator_module_not_available_for_chart")
+                    genres_chart_data = None
+            except ImportError: # Fallback if direct import fails
+                app_logger.warning("chart_generator_unavailable_on_import_in_route")
             except Exception as e:
                 app_logger.error("genre_chart_generation_failed", error=str(e), exc_info=True)
 
@@ -1388,10 +1427,12 @@ def handle_generic_error(e):
         # Create user-friendly error message
         user_info = get_current_user_or_guest()
         
-        # Import FaultContext here to avoid import issues
+        # FaultContext and create_user_friendly_error_messages are imported at the top of the file
+        # from .fault_handling import FaultContext, create_user_friendly_error_messages
+        # No need to re-import here if top-level import is successful and they are in scope.
         try:
-            from fault_handling import FaultContext, create_user_friendly_error_messages
-            context = FaultContext(
+            # from fault_handling import FaultContext, create_user_friendly_error_messages # This line is removed
+            context = FaultContext( # This should work if top-level import was successful
                 function_name="web_request",
                 attempt_number=1,
                 error=e,
