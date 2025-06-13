@@ -11,23 +11,28 @@ from spotify_client import extract_playlist_data
 from image_generator import create_prompt_from_data, generate_cover_image
 from title_generator import generate_title
 from chart_generator import generate_genre_chart
+import json # For fallback file saving
 from utils import create_image_filename, get_available_loras
-from models import GenerationResult
-from config import COVERS_DIR
+from models import GenerationResult # This is likely the dataclass, not DB model
+from config import COVERS_DIR, DATA_DIR # Added DATA_DIR for save_generation_data_with_user
 
 # Monitoring and Fault Handling Imports
 from .monitoring_system import app_logger, monitor_performance
 # from .fault_handling import fault_tolerant_api_call, GracefulDegradation # If needed later
 
+# Project-specific DB and App context imports
+from .database_models import GenerationResultDB
+from .extensions import db
+from flask import current_app
+
+
 @monitor_performance
 def save_generation_data_with_user(data, user_id=None):
     """Save generation data to database with user tracking"""
     try:
-        # Import here to avoid circular imports if app calls this,
-        # though ideally db operations are further abstracted or use current_app.
-        from app import GenerationResultDB, db, app
+        # Removed local imports for GenerationResultDB, db, app
         
-        with app.app_context(): # Ensure app context for db operations
+        with current_app.app_context(): # Changed to current_app.app_context()
             new_result = GenerationResultDB(
                 title=data.get("title", "New Album"),
                 output_path=data.get("output_path", ""),
@@ -50,8 +55,7 @@ def save_generation_data_with_user(data, user_id=None):
     except Exception as e:
         app_logger.error("save_generation_to_db_failed", error=str(e), user_id=user_id, exc_info=True)
         try:
-            from config import DATA_DIR # Keep import local if only used here
-            import json # Keep import local
+            # config.DATA_DIR is now imported at the top. json is imported at the top.
             
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             safe_name = "".join(c for c in data.get("item_name", "unknown_item") if c.isalnum() or c in [' ', '-', '_']).strip()

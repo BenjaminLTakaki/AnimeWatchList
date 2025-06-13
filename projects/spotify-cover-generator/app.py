@@ -1261,12 +1261,12 @@ if not any(rule.endpoint == 'health_check' for rule in app.url_map.iter_rules())
                 } for name, result in health_results.items()}
             }
             return jsonify(response_data), 200 if all_healthy else 503
-    except Exception as e: # Catch if health_checker itself fails
-        app_logger.critical("health_check_endpoint_failed", error=str(e), exc_info=True)
+        except Exception as e: # Catch if health_checker itself fails
+            app_logger.critical("health_check_endpoint_failed", error=str(e), exc_info=True)
             return jsonify({
                 "status": "error", 
-            "error": "Health check system failed",
-            "details": str(e),
+                "error": "Health check system failed", # Generic error message
+                "details": str(e), # Specific error details for logging/debugging
                 "timestamp": datetime.datetime.utcnow().isoformat()
             }), 500
 
