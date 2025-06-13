@@ -13,10 +13,13 @@ main_app = Flask(__name__, static_folder='.')
 
 # Set the Python path to include the project directories
 project_root = os.path.dirname(os.path.abspath(__file__))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+print(f"Inserted project_root into sys.path: {project_root}") # Diagnostic print
 
 # SkillsTown app setup
 skillstown_path = os.path.join(project_root, 'projects/skillstown')
-sys.path.insert(0, skillstown_path)
+# sys.path.insert(0, skillstown_path) # Removed: project_root is now in sys.path
 
 # Define the paths to ensure they exist before import
 os.makedirs(os.path.join(skillstown_path, 'uploads'), exist_ok=True)
@@ -26,12 +29,12 @@ os.makedirs(os.path.join(skillstown_path, 'static'), exist_ok=True)
 # Import SkillsTown app with factory pattern
 skillstown_error = None
 try:
-    # First add the projects directory to the path
-    projects_path = os.path.join(project_root, 'projects')
-    if projects_path not in sys.path:
-        sys.path.insert(0, projects_path)
+    # First add the projects directory to the path - This specific insertion is now removed.
+    # projects_path = os.path.join(project_root, 'projects') # Definition can be kept if used elsewhere
+    # if projects_path not in sys.path: # Removed: project_root is now in sys.path
+    #     sys.path.insert(0, projects_path)
     
-    from skillstown.app import create_app
+    from projects.skillstown.app import create_app # Changed to projects.skillstown.app
     skillstown_app = create_app('production')
     print("SkillsTown app imported successfully")
 except Exception as e:
@@ -47,7 +50,7 @@ except Exception as e:
 
 # AnimeWatchList app setup
 animewatchlist_path = os.path.join(project_root, 'projects/animewatchlist')
-sys.path.insert(0, animewatchlist_path)
+# sys.path.insert(0, animewatchlist_path) # Removed: project_root is now in sys.path
 
 # Import the AnimeWatchList app with error handling
 try:
@@ -71,27 +74,24 @@ spotify_path = os.path.join(project_root, 'projects/spotify-cover-generator') # 
 projects_path = os.path.join(project_root, 'projects') # Ensure this is added to sys.path if not already done earlier for skillstown
 
 # Ensure the 'projects' directory is in sys.path (it should be from skillstown setup)
-# If not, add it:
-# if projects_path not in sys.path:
-#     sys.path.insert(0, projects_path)
+# Example: if projects_path not in sys.path: sys.path.insert(0, projects_path)
+# This is usually done earlier, e.g., before importing skillstown.
+
+print("Attempting Spotify app import with corrected logic - v2") # New unique print statement
 
 try:
     print(f"Setting up Spotify app from module: projects.spotify_cover_generator")
-    # No more chdir, no more direct spotify_path insertion if projects_path is there.
-    # No more original_sys_path restoration needed here as we are not heavily modifying it temporarily.
-
     # The import should be direct, relying on 'projects' being in sys.path
     from projects.spotify_cover_generator.app import app as spotify_app
     
-    print("✅ Spotify app imported successfully")
+    print("✅ Spotify app imported successfully (v2)")
     has_spotify_app = True
 except Exception as e:
-    print(f"❌ Could not import Spotify app: {e}")
+    print(f"❌ Could not import Spotify app (v2): {e}")
     print(f"Error type: {type(e).__name__}")
     import traceback
     print(f"Full traceback: {traceback.format_exc()}")
     has_spotify_app = False
-    # No sys.path restoration here as we didn't store 'original_sys_path' in this block
 
 # Configure context processors
 @skillstown_app.context_processor
