@@ -366,13 +366,13 @@ function updateIndicators() {
     }
 }
 
-// FIXED GitHub Repositories Fetch Function
+// GitHub Repositories Fetch Function 
 async function fetchGitHubRepos() {
     const reposContainer = document.getElementById('github-repos');
     if (!reposContainer) return;
 
     try {
-        const response = await fetch('https://api.github.com/users/BenjaminLTakaki/repos?sort=updated&per_page=50');
+        const response = await fetch('https://api.github.com/users/BenjaminLTakaki/repos?sort=updated&per_page=100');
 
         if (!response.ok) {
             throw new Error(`GitHub API request failed: ${response.status}`);
@@ -383,22 +383,37 @@ async function fetchGitHubRepos() {
         // Clear loading indicator
         reposContainer.innerHTML = '';
 
-        // Filter out certain repos and ensure descriptions exist
+        // Less restrictive filtering - only filter out forks and specific main projects
         const filteredRepos = allRepos
-            .filter(repo => 
-                !repo.fork &&
-                repo.name.toLowerCase() !== 'animewatchlist' &&
-                repo.name.toLowerCase() !== 'portfoliowebsite' &&
-                repo.name.toLowerCase() !== 'skillstownrecommender' &&
-                repo.name.toLowerCase() !== 'spotify-cover-generator' &&
-                repo.description && 
-                repo.description.trim() !== ''
-            );
+            .filter(repo => {
+                const repoName = repo.name.toLowerCase();
+                
+                // Keep if it's not a fork AND not one of the main portfolio projects
+                return !repo.fork && 
+                       repoName !== 'portfoliowebsite' &&
+                       repoName !== 'benjamintakaki.github.io' &&
+                       // Only filter out the exact main project names, allow variations
+                       !repoName.includes('portfolio-website') &&
+                       !repoName.includes('portfolio_website');
+            })
+            .sort((a, b) => {
+                // Sort by: has description first, then by updated date
+                const aHasDesc = a.description && a.description.trim() !== '';
+                const bHasDesc = b.description && b.description.trim() !== '';
+                
+                if (aHasDesc && !bHasDesc) return -1;
+                if (!aHasDesc && bHasDesc) return 1;
+                
+                // Then sort by last updated
+                return new Date(b.updated_at) - new Date(a.updated_at);
+            });
 
         repos = filteredRepos;
 
+        console.log(`Found ${repos.length} repositories to display`); // Debug log
+
         if (repos.length === 0) {
-            reposContainer.innerHTML = '<p class="no-repos">No additional GitHub projects to display.</p>';
+            reposContainer.innerHTML = '<p class="no-repos">No GitHub projects to display.</p>';
             return;
         }
 
@@ -410,22 +425,27 @@ async function fetchGitHubRepos() {
             // Get language color
             const langColor = getLanguageColor(repo.language);
 
+            // Handle description - provide fallback if none exists
+            let description = repo.description || `A ${repo.language || 'code'} project with ${repo.size > 1000 ? 'substantial' : 'focused'} implementation.`;
+            
             // Truncate description if too long
-            let description = repo.description || 'No description available';
             if (description.length > 120) {
                 description = description.substring(0, 117) + '...';
             }
 
+            // Format the repository name
+            const formattedName = formatRepoName(repo.name);
+
             card.innerHTML = `
-                <h4 title="${formatRepoName(repo.name)}">${formatRepoName(repo.name)}</h4>
-                <p title="${repo.description || 'No description available'}">${description}</p>
+                <h4 title="${formattedName}">${formattedName}</h4>
+                <p title="${repo.description || description}">${description}</p>
                 <div class="repo-meta">
                     ${repo.language ? 
                         `<span class="language">
                             <span class="lang-color" style="background-color: ${langColor}"></span>
                             ${repo.language}
                         </span>` : 
-                        ''
+                        '<span class="language">Multi-language</span>'
                     }
                 </div>
                 <div class="repo-links">
@@ -467,21 +487,35 @@ async function fetchGitHubRepos() {
         reposContainer.innerHTML = `
             <div class="error-message">
                 <i class="fas fa-exclamation-triangle"></i>
-                Could not load GitHub projects at this time.
+                Could not load GitHub projects at this time. Please check your internet connection.
             </div>
         `;
     }
 }
 
-// Function to format repository names
+// Enhanced function to format repository names
 function formatRepoName(name) {
     return name
-        .split(/[-_]/)
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .split(/[-_\s]/)
+        .map(word => {
+            // Handle common programming terms
+            const lowerWord = word.toLowerCase();
+            if (lowerWord === 'api') return 'API';
+            if (lowerWord === 'ui') return 'UI';
+            if (lowerWord === 'ux') return 'UX';
+            if (lowerWord === 'ai') return 'AI';
+            if (lowerWord === 'ml') return 'ML';
+            if (lowerWord === 'css') return 'CSS';
+            if (lowerWord === 'html') return 'HTML';
+            if (lowerWord === 'js') return 'JS';
+            if (lowerWord === 'app') return 'App';
+            
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        })
         .join(' ');
 }
 
-// Function to get language color
+// Enhanced function to get language color with more languages
 function getLanguageColor(language) {
     const colors = {
         'JavaScript': '#f1e05a',
@@ -493,13 +527,25 @@ function getLanguageColor(language) {
         'TypeScript': '#2b7489',
         'PHP': '#4F5D95',
         'C++': '#f34b7d',
+        'C': '#555555',
         'Ruby': '#701516',
         'Go': '#00ADD8',
         'Rust': '#dea584',
         'Swift': '#fa7343',
         'Kotlin': '#F18E33',
         'Vue': '#4FC08D',
-        'React': '#61DAFB'
+        'React': '#61DAFB',
+        'Shell': '#89e051',
+        'Dockerfile': '#384d54',
+        'Jupyter Notebook': '#DA5B0B',
+        'R': '#198CE7',
+        'MATLAB': '#e16737',
+        'Dart': '#00B4AB',
+        'Scala': '#c22d40',
+        'Perl': '#0298c3',
+        'Lua': '#000080',
+        'Assembly': '#6E4C13',
+        'SQL': '#e38c00'
     };
 
     return colors[language] || '#8e8e8e';
