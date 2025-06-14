@@ -121,7 +121,65 @@
                 <!-- Course Recommendation Project -->
                 <div class="project-card">
                     <div class="project-image">
-                        <img src="projects/skillstown/static/images/preview.jpg" alt="SkillsTown Course Recommender Preview" onerror="this.src='https://via.placeholder.com/600x400/1a1a1a/3b82f6?text=SkillsTown+Course+Recommender'">
+                        <svg class="project-svg" viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="skillsGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+                                </linearGradient>
+                                <filter id="glow">
+                                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                                    <feMerge> 
+                                        <feMergeNode in="coloredBlur"/>
+                                        <feMergeNode in="SourceGraphic"/>
+                                    </feMerge>
+                                </filter>
+                            </defs>
+                            
+                            <!-- Background -->
+                            <rect width="600" height="400" fill="url(#skillsGradient)" opacity="0.1"/>
+                            
+                            <!-- CV Document -->
+                            <rect x="80" y="80" width="120" height="160" fill="#ffffff" stroke="url(#skillsGradient)" stroke-width="2" rx="8"/>
+                            <line x1="100" y1="110" x2="180" y2="110" stroke="url(#skillsGradient)" stroke-width="2"/>
+                            <line x1="100" y1="130" x2="170" y2="130" stroke="url(#skillsGradient)" stroke-width="1"/>
+                            <line x1="100" y1="150" x2="175" y2="150" stroke="url(#skillsGradient)" stroke-width="1"/>
+                            <line x1="100" y1="170" x2="160" y2="170" stroke="url(#skillsGradient)" stroke-width="1"/>
+                            
+                            <!-- Arrow -->
+                            <path d="M220 160 L280 160" stroke="url(#skillsGradient)" stroke-width="3" marker-end="url(#arrowhead)" filter="url(#glow)"/>
+                            <defs>
+                                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="url(#skillsGradient)" />
+                                </marker>
+                            </defs>
+                            
+                            <!-- AI Brain -->
+                            <circle cx="350" cy="160" r="40" fill="none" stroke="url(#skillsGradient)" stroke-width="3" filter="url(#glow)"/>
+                            <circle cx="335" cy="145" r="4" fill="url(#skillsGradient)"/>
+                            <circle cx="365" cy="145" r="4" fill="url(#skillsGradient)"/>
+                            <circle cx="350" cy="175" r="6" fill="url(#skillsGradient)"/>
+                            <path d="M330 160 Q350 180 370 160" stroke="url(#skillsGradient)" stroke-width="2" fill="none"/>
+                            
+                            <!-- Course Recommendations -->
+                            <rect x="420" y="100" width="100" height="25" fill="#ffffff" stroke="url(#skillsGradient)" stroke-width="1" rx="4"/>
+                            <text x="470" y="117" text-anchor="middle" font-family="Inter" font-size="10" fill="url(#skillsGradient)">Python Course</text>
+                            
+                            <rect x="420" y="140" width="100" height="25" fill="#ffffff" stroke="url(#skillsGradient)" stroke-width="1" rx="4"/>
+                            <text x="470" y="157" text-anchor="middle" font-family="Inter" font-size="10" fill="url(#skillsGradient)">Web Dev</text>
+                            
+                            <rect x="420" y="180" width="100" height="25" fill="#ffffff" stroke="url(#skillsGradient)" stroke-width="1" rx="4"/>
+                            <text x="470" y="197" text-anchor="middle" font-family="Inter" font-size="10" fill="url(#skillsGradient)">Data Science</text>
+                            
+                            <!-- Connecting lines -->
+                            <line x1="390" y1="150" x2="420" y2="112" stroke="url(#skillsGradient)" stroke-width="1" opacity="0.7"/>
+                            <line x1="390" y1="160" x2="420" y2="152" stroke="url(#skillsGradient)" stroke-width="1" opacity="0.7"/>
+                            <line x1="390" y1="170" x2="420" y2="192" stroke="url(#skillsGradient)" stroke-width="1" opacity="0.7"/>
+                            
+                            <!-- Title -->
+                            <text x="300" y="50" text-anchor="middle" font-family="Inter" font-size="18" font-weight="bold" fill="url(#skillsGradient)">SkillsTown</text>
+                            <text x="300" y="320" text-anchor="middle" font-family="Inter" font-size="14" fill="url(#skillsGradient)">AI-Powered Course Recommendations</text>
+                        </svg>
                     </div>
                     <div class="project-details">
                         <h3>SkillsTown Course Recommender</h3>
@@ -143,7 +201,66 @@
                 <!-- AnimeWatchList Project -->
                 <div class="project-card">
                     <div class="project-image">
-                        <img src="projects/animewatchlist/static/images/preview.jpg" alt="AnimeWatchList Preview" onerror="this.src='https://via.placeholder.com/600x400/1a1a1a/06b6d4?text=AnimeWatchList'">
+                        <svg class="project-svg" viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="animeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+                                </linearGradient>
+                                <filter id="animeGlow">
+                                    <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                                    <feMerge> 
+                                        <feMergeNode in="coloredBlur"/>
+                                        <feMergeNode in="SourceGraphic"/>
+                                    </feMerge>
+                                </filter>
+                            </defs>
+                            
+                            <!-- Background -->
+                            <rect width="600" height="400" fill="url(#animeGradient)" opacity="0.1"/>
+                            
+                            <!-- Anime Cards -->
+                            <rect x="80" y="100" width="80" height="120" fill="#ffffff" stroke="url(#animeGradient)" stroke-width="2" rx="8" filter="url(#animeGlow)"/>
+                            <rect x="90" y="110" width="60" height="80" fill="url(#animeGradient)" opacity="0.3" rx="4"/>
+                            <circle cx="120" cy="140" r="8" fill="#ffffff"/>
+                            <circle cx="115" cy="137" r="2" fill="url(#animeGradient)"/>
+                            <circle cx="125" cy="137" r="2" fill="url(#animeGradient)"/>
+                            <path d="M112 145 Q120 150 128 145" stroke="url(#animeGradient)" stroke-width="1" fill="none"/>
+                            
+                            <rect x="200" y="100" width="80" height="120" fill="#ffffff" stroke="url(#animeGradient)" stroke-width="2" rx="8" filter="url(#animeGlow)"/>
+                            <rect x="210" y="110" width="60" height="80" fill="url(#animeGradient)" opacity="0.2" rx="4"/>
+                            <circle cx="240" cy="140" r="8" fill="#ffffff"/>
+                            <circle cx="235" cy="137" r="2" fill="url(#animeGradient)"/>
+                            <circle cx="245" cy="137" r="2" fill="url(#animeGradient)"/>
+                            <path d="M232 145 Q240 150 248 145" stroke="url(#animeGradient)" stroke-width="1" fill="none"/>
+                            
+                            <rect x="320" y="100" width="80" height="120" fill="#ffffff" stroke="url(#animeGradient)" stroke-width="2" rx="8" filter="url(#animeGlow)"/>
+                            <rect x="330" y="110" width="60" height="80" fill="url(#animeGradient)" opacity="0.4" rx="4"/>
+                            <circle cx="360" cy="140" r="8" fill="#ffffff"/>
+                            <circle cx="355" cy="137" r="2" fill="url(#animeGradient)"/>
+                            <circle cx="365" cy="137" r="2" fill="url(#animeGradient)"/>
+                            <path d="M352 145 Q360 150 368 145" stroke="url(#animeGradient)" stroke-width="1" fill="none"/>
+                            
+                            <!-- Status indicators -->
+                            <circle cx="150" cy="80" r="6" fill="#10b981"/>
+                            <text x="165" y="85" font-family="Inter" font-size="10" fill="url(#animeGradient)">Watched</text>
+                            
+                            <circle cx="270" cy="80" r="6" fill="#f59e0b"/>
+                            <text x="285" y="85" font-family="Inter" font-size="10" fill="url(#animeGradient)">Watching</text>
+                            
+                            <circle cx="390" cy="80" r="6" fill="#ef4444"/>
+                            <text x="405" y="85" font-family="Inter" font-size="10" fill="url(#animeGradient)">To Watch</text>
+                            
+                            <!-- Search bar -->
+                            <rect x="150" y="260" width="200" height="30" fill="#ffffff" stroke="url(#animeGradient)" stroke-width="2" rx="15"/>
+                            <circle cx="330" cy="275" r="8" fill="url(#animeGradient)"/>
+                            <line x1="336" y1="281" x2="342" y2="287" stroke="#ffffff" stroke-width="2"/>
+                            <text x="165" y="280" font-family="Inter" font-size="12" fill="url(#animeGradient)" opacity="0.7">Search anime...</text>
+                            
+                            <!-- Title -->
+                            <text x="300" y="50" text-anchor="middle" font-family="Inter" font-size="18" font-weight="bold" fill="url(#animeGradient)">AnimeWatchList</text>
+                            <text x="300" y="330" text-anchor="middle" font-family="Inter" font-size="14" fill="url(#animeGradient)">Track Your Anime Journey</text>
+                        </svg>
                     </div>
                     <div class="project-details">
                         <h3>AnimeWatchList</h3>
@@ -165,88 +282,32 @@
                 <!-- Spotify Cover Generator Project -->
                 <div class="project-card">
                     <div class="project-image">
-                        <img src="projects/spotify-cover-generator/static/images/preview.jpg" alt="Spotify Cover Generator Preview" onerror="this.src='https://via.placeholder.com/600x400/1a1a1a/3b82f6?text=Spotify+Cover+Generator'">
-                    </div>
-                    <div class="project-details">
-                        <h3>Spotify Cover Generator</h3>
-                        <p>Generate custom album artwork and titles based on your Spotify playlists using AI. Analyze genres and create cover art that matches your music's style.</p>
-                        <div class="project-tags">
-                            <span class="tag">Python</span>
-                            <span class="tag">Flask</span>
-                            <span class="tag">Spotify API</span>
-                            <span class="tag">AI</span>
-                        </div>
-                        <div class="project-links">
-                            <a href="/spotify" class="btn btn-primary" onclick="showLoading(event)">
-                                <i class="fas fa-external-link-alt"></i> View Project
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- GitHub Repositories Section - Displaying top 3 repos -->
-                <div id="github-projects" class="github-section">
-                    <h3 class="github-heading">From My GitHub</h3>
-                    <div id="github-repos" class="repo-grid">
-                        <div class="loading">Loading GitHub repositories...</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Contact Section -->
-    <section id="contact" class="contact">
-        <div class="container">
-            <h2>Contact Me</h2>
-            <p>If you'd like to get in touch, feel free to send me a message!</p>
-            <form id="contact-form" class="contact-form">
-                <input type="text" name="name" placeholder="Your Name" required aria-label="Your Name" />
-                <input type="email" name="email" placeholder="Your Email" required aria-label="Your Email" />
-                <textarea name="message" placeholder="Your Message" required aria-label="Your Message"></textarea>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-paper-plane"></i>
-                    Send Message
-                </button>
-            </form>
-        </div>
-    </section>
-
-    <!-- Back to Top Button -->
-    <button class="back-to-top" aria-label="Back to top">
-        <i class="fas fa-arrow-up"></i>
-    </button>
-
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <p>&copy; 2024 Benjamin Takaki. All rights reserved.</p>
-        </div>
-    </footer>
-
-    <!-- Scripts -->
-    <!-- EmailJS SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
-    <script src="script.js"></script>
-
-    <script>
-        // Enhanced loading function
-        function showLoading(event) {
-            const loadingOverlay = document.createElement('div');
-            loadingOverlay.className = 'loading-overlay';
-            loadingOverlay.innerHTML = `
-                <div class="loading-spinner"></div>
-                <p>Loading project...</p>
-            `;
-            document.body.appendChild(loadingOverlay);
-            
-            // Remove loading overlay after 3 seconds if still present
-            setTimeout(() => {
-                if (loadingOverlay.parentNode) {
-                    loadingOverlay.remove();
-                }
-            }, 3000);
-        }
-    </script>
-</body>
-</html>
+                        <svg class="project-svg" viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="spotifyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#1db954;stop-opacity:1" />
+                                    <stop offset="50%" style="stop-color:#3b82f6;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+                                </linearGradient>
+                                <filter id="spotifyGlow">
+                                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                                    <feMerge> 
+                                        <feMergeNode in="coloredBlur"/>
+                                        <feMergeNode in="SourceGraphic"/>
+                                    </feMerge>
+                                </filter>
+                                <radialGradient id="albumGradient" cx="50%" cy="50%" r="50%">
+                                    <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:url(#spotifyGradient);stop-opacity:1" />
+                                </radialGradient>
+                            </defs>
+                            
+                            <!-- Background -->
+                            <rect width="600" height="400" fill="url(#spotifyGradient)" opacity="0.1"/>
+                            
+                            <!-- Spotify Logo Area -->
+                            <circle cx="150" cy="120" r="30" fill="#1db954"/>
+                            <path d="M135 110 Q150 100 165 110 M135 120 Q150 110 165 120 M135 130 Q150 120 165 130" stroke="#ffffff" stroke-width="3" fill="none"/>
+                            
+                            <!-- Arrow -->
+                            <path d="M200 120 L250 120" stroke="url(#spotifyGradient)" stroke-width

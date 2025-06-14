@@ -1,3 +1,8 @@
+// Carousel variables
+let currentIndex = 0;
+let repos = [];
+let reposPerView = 3;
+
 // Run when DOM is loaded
 document.addEventListener('DOMContentLoaded', function () {
     // Initialize theme
@@ -41,10 +46,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
         
         if (scrollTop > 100) {
-            header.style.background = 'rgba(10, 10, 10, 0.95)';
-            header.style.boxShadow = '0 2px 20px rgba(0, 0, 0, 0.3)';
+            header.style.background = getComputedStyle(document.documentElement).getPropertyValue('--background-dark') === '#fafbfc' 
+                ? 'rgba(250, 251, 252, 0.95)' 
+                : 'rgba(10, 10, 10, 0.95)';
+            header.style.boxShadow = '0 2px 20px rgba(0, 0, 0, 0.1)';
         } else {
-            header.style.background = 'rgba(10, 10, 10, 0.9)';
+            header.style.background = getComputedStyle(document.documentElement).getPropertyValue('--background-dark') === '#fafbfc' 
+                ? 'rgba(250, 251, 252, 0.9)' 
+                : 'rgba(10, 10, 10, 0.9)';
             header.style.boxShadow = 'none';
         }
 
@@ -150,6 +159,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // Fetch GitHub Repositories
     fetchGitHubRepos();
 
+    // Initialize carousel controls
+    initializeCarousel();
+
     // Smooth scrolling for anchor links
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         anchor.addEventListener('click', function (e) {
@@ -191,12 +203,16 @@ document.addEventListener('DOMContentLoaded', function () {
     }, observerOptions);
 
     // Observe sections for animations
-    document.querySelectorAll('section, .project-card, .repo-card').forEach(el => {
+    document.querySelectorAll('section, .project-card').forEach(el => {
         el.style.opacity = '0';
         el.style.transform = 'translateY(30px)';
         el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
         observer.observe(el);
     });
+
+    // Update repos per view based on screen size
+    updateReposPerView();
+    window.addEventListener('resize', updateReposPerView);
 });
 
 // Theme Management Functions
@@ -225,12 +241,12 @@ function setTheme(theme) {
     // Update meta theme-color for mobile browsers
     const metaThemeColor = document.querySelector('meta[name=theme-color]');
     if (metaThemeColor) {
-        metaThemeColor.setAttribute('content', theme === 'dark' ? '#0a0a0a' : '#ffffff');
+        metaThemeColor.setAttribute('content', theme === 'dark' ? '#0a0a0a' : '#fafbfc');
     } else {
         // Create meta theme-color if it doesn't exist
         const meta = document.createElement('meta');
         meta.name = 'theme-color';
-        meta.content = theme === 'dark' ? '#0a0a0a' : '#ffffff';
+        meta.content = theme === 'dark' ? '#0a0a0a' : '#fafbfc';
         document.head.appendChild(meta);
     }
 }
@@ -256,6 +272,99 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
     }
 });
 
+// Carousel Functions
+function initializeCarousel() {
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    if (prevBtn && nextBtn) {
+        prevBtn.addEventListener('click', () => moveToPrev());
+        nextBtn.addEventListener('click', () => moveToNext());
+    }
+}
+
+function updateReposPerView() {
+    const width = window.innerWidth;
+    if (width < 480) {
+        reposPerView = 1;
+    } else if (width < 768) {
+        reposPerView = 1;
+    } else if (width < 1024) {
+        reposPerView = 2;
+    } else {
+        reposPerView = 3;
+    }
+    
+    if (repos.length > 0) {
+        updateCarousel();
+    }
+}
+
+function moveToPrev() {
+    if (currentIndex > 0) {
+        currentIndex--;
+        updateCarousel();
+    }
+}
+
+function moveToNext() {
+    const maxIndex = Math.max(0, repos.length - reposPerView);
+    if (currentIndex < maxIndex) {
+        currentIndex++;
+        updateCarousel();
+    }
+}
+
+function moveToIndex(index) {
+    const maxIndex = Math.max(0, repos.length - reposPerView);
+    currentIndex = Math.min(index, maxIndex);
+    updateCarousel();
+}
+
+function updateCarousel() {
+    const wrapper = document.querySelector('.carousel-wrapper');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    
+    if (!wrapper) return;
+
+    // Calculate translateX based on card width and gap
+    const cardWidth = 320; // min-width of repo-card
+    const gap = window.innerWidth < 768 ? 16 : 32; // gap between cards
+    const translateX = -(currentIndex * (cardWidth + gap));
+    
+    wrapper.style.transform = `translateX(${translateX}px)`;
+
+    // Update button states
+    if (prevBtn) {
+        prevBtn.disabled = currentIndex === 0;
+    }
+    if (nextBtn) {
+        const maxIndex = Math.max(0, repos.length - reposPerView);
+        nextBtn.disabled = currentIndex >= maxIndex;
+    }
+
+    // Update indicators
+    updateIndicators();
+}
+
+function updateIndicators() {
+    const indicatorsContainer = document.getElementById('indicators');
+    if (!indicatorsContainer) return;
+
+    const maxIndex = Math.max(0, repos.length - reposPerView);
+    const totalPages = maxIndex + 1;
+
+    indicatorsContainer.innerHTML = '';
+
+    for (let i = 0; i <= maxIndex; i++) {
+        const dot = document.createElement('div');
+        dot.className = `carousel-dot ${i === currentIndex ? 'active' : ''}`;
+        dot.addEventListener('click', () => moveToIndex(i));
+        indicatorsContainer.appendChild(dot);
+    }
+}
+
 // Function to fetch and display GitHub repositories
 async function fetchGitHubRepos() {
     const reposContainer = document.getElementById('github-repos');
@@ -268,13 +377,13 @@ async function fetchGitHubRepos() {
             throw new Error(`GitHub API request failed: ${response.status}`);
         }
 
-        const repos = await response.json();
+        const allRepos = await response.json();
 
         // Clear loading indicator
         reposContainer.innerHTML = '';
 
-        // Filter out certain repos and get top 3
-        const filteredRepos = repos
+        // Filter out certain repos
+        const filteredRepos = allRepos
             .filter(repo => 
                 !repo.fork &&
                 repo.name.toLowerCase() !== 'animewatchlist' &&
@@ -282,19 +391,19 @@ async function fetchGitHubRepos() {
                 repo.name.toLowerCase() !== 'skillstownrecommender' &&
                 repo.name.toLowerCase() !== 'spotify-cover-generator' &&
                 repo.description // Only show repos with descriptions
-            )
-            .slice(0, 3);
+            );
 
-        if (filteredRepos.length === 0) {
+        repos = filteredRepos;
+
+        if (repos.length === 0) {
             reposContainer.innerHTML = '<p class="no-repos">No additional GitHub projects to display.</p>';
             return;
         }
 
-        // Display each repo
-        filteredRepos.forEach((repo, index) => {
+        // Create repo cards
+        repos.forEach((repo, index) => {
             const card = document.createElement('div');
             card.className = 'repo-card';
-            card.style.animationDelay = `${index * 0.1}s`;
 
             // Get language color
             const langColor = getLanguageColor(repo.language);
@@ -319,6 +428,30 @@ async function fetchGitHubRepos() {
             `;
 
             reposContainer.appendChild(card);
+        });
+
+        // Initialize carousel after repos are loaded
+        currentIndex = 0;
+        updateCarousel();
+
+        // Add intersection observer for repo cards
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        });
+
+        document.querySelectorAll('.repo-card').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(30px)';
+            el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            observer.observe(el);
         });
 
     } catch (error) {
