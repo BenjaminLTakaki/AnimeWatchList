@@ -738,6 +738,7 @@ section > p {
     color: var(--text-primary);
     margin-bottom: 2rem;
     position: relative;
+    text-align: center;
 }
 
 .github-heading::after {
@@ -755,17 +756,20 @@ section > p {
 /* Carousel Container */
 .carousel-container {
     position: relative;
-    max-width: 1000px;
+    max-width: 1200px;
     margin: 2rem auto;
     overflow: hidden;
+    padding: 0 20px;
 }
 
 .carousel-wrapper {
     display: flex;
-    transition: transform 0.3s ease;
+    transition: transform 0.4s ease-in-out;
     gap: 2rem;
+    width: max-content;
 }
 
+/* Fixed Repo Cards - Equal Heights */
 .repo-card {
     background: var(--background-card);
     border-radius: 16px;
@@ -774,8 +778,14 @@ section > p {
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
-    min-width: 320px;
+    
+    /* Consistent sizing */
+    width: 320px;
+    height: 280px;
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    
     box-shadow: var(--shadow-light);
 }
 
@@ -816,22 +826,41 @@ section > p {
     margin-bottom: 0.75rem;
     position: relative;
     z-index: 1;
+    
+    /* Prevent title from wrapping */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .repo-card p {
     color: var(--text-secondary);
-    margin-bottom: 1.5rem;
     line-height: 1.5;
     position: relative;
     z-index: 1;
+    flex-grow: 1;
+    
+    /* FIXED: Consistent description area */
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+    
+    /* Limit description to 3 lines */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3; /* Added standard property */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 4.5em; /* 3 lines * 1.5 line-height */
 }
 
 .repo-meta {
     display: flex;
     align-items: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
     position: relative;
     z-index: 1;
+    margin-top: auto;
 }
 
 .language {
@@ -851,9 +880,10 @@ section > p {
 .repo-links {
     position: relative;
     z-index: 1;
+    margin-top: auto;
 }
 
-/* Carousel Navigation */
+/* Carousel Navigation - FIXED */
 .carousel-nav {
     display: flex;
     justify-content: center;
@@ -877,7 +907,7 @@ section > p {
     box-shadow: var(--shadow-light);
 }
 
-.carousel-btn:hover {
+.carousel-btn:hover:not(:disabled) {
     background: var(--accent-primary);
     color: white;
     transform: translateY(-2px);
@@ -887,12 +917,6 @@ section > p {
 .carousel-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-}
-
-.carousel-btn:disabled:hover {
-    background: var(--background-card);
-    color: var(--text-primary);
-    transform: none;
 }
 
 .carousel-indicators {
@@ -911,317 +935,86 @@ section > p {
 
 .carousel-dot.active {
     background: var(--accent-primary);
+    transform: scale(1.2);
 }
 
-/* Contact Section */
-.contact {
-    background: linear-gradient(135deg, rgba(26, 26, 26, 0.5) 0%, rgba(22, 22, 22, 0.5) 100%);
-    border-top: 1px solid var(--border-color);
+.carousel-dot:hover {
+    background: var(--accent-secondary);
 }
 
-[data-theme="light"] .contact {
-    background: linear-gradient(135deg, rgba(241, 245, 249, 0.6) 0%, rgba(250, 251, 252, 0.8) 100%);
-}
-
-.contact-form {
-    max-width: 600px;
-    margin: 3rem auto 0;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.contact-form input,
-.contact-form textarea {
-    width: 100%;
-    padding: 1rem 1.5rem;
-    border: 2px solid var(--border-color);
-    border-radius: 12px;
-    background: var(--background-card);
-    color: var(--text-primary);
-    font-size: 1rem;
-    font-family: inherit;
-    transition: all 0.3s ease;
-    resize: none;
-    box-shadow: var(--shadow-light);
-}
-
-.contact-form input:focus,
-.contact-form textarea:focus {
-    outline: none;
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-[data-theme="light"] .contact-form input:focus,
-[data-theme="light"] .contact-form textarea:focus {
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
-}
-
-.contact-form textarea {
-    min-height: 150px;
-}
-
-.contact-form input::placeholder,
-.contact-form textarea::placeholder {
-    color: var(--text-secondary);
-}
-
-.contact-form button {
-    align-self: center;
-    margin-top: 1rem;
-}
-
-/* Success/Error Messages */
-.success-message,
-.error-message {
-    padding: 1rem 1.5rem;
-    margin-top: 1rem;
-    border-radius: 12px;
+/* Loading state */
+.loading {
     text-align: center;
-    font-weight: 500;
-    animation: slideIn 0.3s ease;
-    box-shadow: var(--shadow-light);
+    color: var(--text-secondary);
+    padding: 2rem;
+    font-style: italic;
 }
 
-.success-message {
-    background: rgba(16, 185, 129, 0.1);
-    color: var(--success-color);
-    border: 1px solid rgba(16, 185, 129, 0.2);
-}
-
+/* Error message */
 .error-message {
-    background: rgba(239, 68, 68, 0.1);
+    text-align: center;
     color: var(--error-color);
+    padding: 2rem;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 12px;
     border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
-[data-theme="light"] .success-message {
-    background: rgba(5, 150, 105, 0.08);
-    border: 1px solid rgba(5, 150, 105, 0.15);
-}
-
-[data-theme="light"] .error-message {
-    background: rgba(220, 38, 38, 0.08);
-    border: 1px solid rgba(220, 38, 38, 0.15);
-}
-
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Back to Top Button */
-.back-to-top {
-    position: fixed;
-    bottom: 2rem;
-    right: 2rem;
-    background: var(--accent-gradient);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 50px;
-    height: 50px;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: var(--shadow-medium);
-    transition: all 0.3s ease;
-    z-index: 999;
-}
-
-.back-to-top.show {
-    display: flex;
-}
-
-.back-to-top:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-heavy);
-}
-
-/* Footer */
-.footer {
+/* No repos message */
+.no-repos {
     text-align: center;
-    padding: 3rem 0;
-    background: var(--background-secondary);
     color: var(--text-secondary);
-    border-top: 1px solid var(--border-color);
+    padding: 2rem;
+    font-style: italic;
 }
 
-/* Loading overlay */
-.loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(10, 10, 10, 0.9);
-    backdrop-filter: blur(10px);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-    color: var(--text-primary);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-[data-theme="light"] .loading-overlay {
-    background: rgba(250, 251, 252, 0.95);
-}
-
-.loading-spinner {
-    width: 50px;
-    height: 50px;
-    border: 3px solid var(--border-color);
-    border-top: 3px solid var(--accent-primary);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 1rem;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-/* SVG Project Images */
-.project-svg {
-    width: 100%;
-    height: 100%;
-    background: var(--background-secondary);
-}
-
-/* Responsive Design */
+/* Responsive Design for Carousel */
 @media screen and (max-width: 1024px) {
-    .project-card {
-        grid-template-columns: 1fr;
-    }
-    
-    .project-card:nth-child(even) .project-image,
-    .project-card:nth-child(even) .project-details {
-        order: unset;
-    }
-
-    .carousel-wrapper {
-        gap: 1rem;
-    }
-
     .repo-card {
-        min-width: 280px;
+        width: 280px;
+        height: 260px;
     }
 }
 
 @media screen and (max-width: 768px) {
-    .container {
-        padding: 0 1rem;
-    }
-    
-    .hero .container {
-        grid-template-columns: 1fr;
-        gap: 2rem;
-        text-align: center;
-    }
-    
-    .hero-content {
-        text-align: center;
-    }
-    
-    .hero-image {
-        order: -1;
-    }
-    
-    .sidebar {
-        display: none;
-    }
-    
-    .nav-menu {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background: rgba(26, 26, 26, 0.95);
-        backdrop-filter: blur(20px);
-        border-top: 1px solid var(--border-color);
-        display: none;
-        padding: 1rem 0;
-    }
-    
-    [data-theme="light"] .nav-menu {
-        background: rgba(255, 255, 255, 0.95);
-    }
-    
-    .nav-menu.active {
-        display: block;
-    }
-    
-    .nav-menu ul {
-        flex-direction: column;
+    .carousel-wrapper {
         gap: 1rem;
-        padding: 0 2rem;
-    }
-    
-    .nav-toggle {
-        display: flex;
-    }
-    
-    .nav-right {
-        gap: 1rem;
-    }
-    
-    .project-details {
-        padding: 2rem 1.5rem;
-        text-align: center;
-    }
-    
-    .project-links {
-        justify-content: center;
     }
     
     .repo-card {
-        min-width: 250px;
+        width: 260px;
+        height: 240px;
+        padding: 1.5rem;
     }
     
-    .cta-buttons {
-        justify-content: center;
+    .repo-card h4 {
+        font-size: 1.1rem;
     }
-
-    .carousel-nav {
-        flex-wrap: wrap;
+    
+    .repo-card p {
+        font-size: 0.85rem;
+        height: 3.8em;
     }
 }
 
 @media screen and (max-width: 480px) {
-    .container {
-        padding: 0 1rem;
-    }
-    
-    section {
-        padding: 3rem 0;
-    }
-    
-    .project-details {
-        padding: 1.5rem 1rem;
+    .carousel-container {
+        padding: 0 10px;
     }
     
     .repo-card {
-        padding: 1.5rem;
-        min-width: 200px;
+        width: 240px;
+        height: 220px;
+        padding: 1.25rem;
     }
     
-    .hero {
-        padding: 100px 0 60px;
-    }
-
-    .carousel-wrapper {
+    .carousel-nav {
+        flex-wrap: wrap;
         gap: 0.5rem;
+    }
+    
+    .carousel-btn {
+        width: 40px;
+        height: 40px;
     }
 }

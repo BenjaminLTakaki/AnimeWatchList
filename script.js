@@ -156,12 +156,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 5000);
     }
 
-    // Fetch GitHub Repositories
-    fetchGitHubRepos();
-
     // Initialize carousel controls
     initializeCarousel();
-
+    
+    // Fetch GitHub Repositories
+    fetchGitHubRepos();
+    
     // Smooth scrolling for anchor links
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         anchor.addEventListener('click', function (e) {
@@ -209,10 +209,6 @@ document.addEventListener('DOMContentLoaded', function () {
         el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
         observer.observe(el);
     });
-
-    // Update repos per view based on screen size
-    updateReposPerView();
-    window.addEventListener('resize', updateReposPerView);
 });
 
 // Theme Management Functions
@@ -272,7 +268,10 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
     }
 });
 
-// Carousel Functions
+// FIXED CAROUSEL FUNCTIONS
+// Carousel variables are already defined at the top of the script.
+
+// Initialize carousel controls
 function initializeCarousel() {
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
@@ -281,6 +280,10 @@ function initializeCarousel() {
         prevBtn.addEventListener('click', () => moveToPrev());
         nextBtn.addEventListener('click', () => moveToNext());
     }
+
+    // Update repos per view based on screen size
+    updateReposPerView();
+    window.addEventListener('resize', updateReposPerView);
 }
 
 function updateReposPerView() {
@@ -329,8 +332,8 @@ function updateCarousel() {
     if (!wrapper) return;
 
     // Calculate translateX based on card width and gap
-    const cardWidth = 320; // min-width of repo-card
-    const gap = window.innerWidth < 768 ? 16 : 32; // gap between cards
+    const cardWidth = 320; // Fixed width from CSS
+    const gap = 32; // 2rem gap from CSS
     const translateX = -(currentIndex * (cardWidth + gap));
     
     wrapper.style.transform = `translateX(${translateX}px)`;
@@ -353,8 +356,6 @@ function updateIndicators() {
     if (!indicatorsContainer) return;
 
     const maxIndex = Math.max(0, repos.length - reposPerView);
-    const totalPages = maxIndex + 1;
-
     indicatorsContainer.innerHTML = '';
 
     for (let i = 0; i <= maxIndex; i++) {
@@ -365,7 +366,7 @@ function updateIndicators() {
     }
 }
 
-// Function to fetch and display GitHub repositories
+// FIXED GitHub Repositories Fetch Function
 async function fetchGitHubRepos() {
     const reposContainer = document.getElementById('github-repos');
     if (!reposContainer) return;
@@ -382,7 +383,7 @@ async function fetchGitHubRepos() {
         // Clear loading indicator
         reposContainer.innerHTML = '';
 
-        // Filter out certain repos
+        // Filter out certain repos and ensure descriptions exist
         const filteredRepos = allRepos
             .filter(repo => 
                 !repo.fork &&
@@ -390,7 +391,8 @@ async function fetchGitHubRepos() {
                 repo.name.toLowerCase() !== 'portfoliowebsite' &&
                 repo.name.toLowerCase() !== 'skillstownrecommender' &&
                 repo.name.toLowerCase() !== 'spotify-cover-generator' &&
-                repo.description // Only show repos with descriptions
+                repo.description && 
+                repo.description.trim() !== ''
             );
 
         repos = filteredRepos;
@@ -400,7 +402,7 @@ async function fetchGitHubRepos() {
             return;
         }
 
-        // Create repo cards
+        // Create repo cards with consistent structure
         repos.forEach((repo, index) => {
             const card = document.createElement('div');
             card.className = 'repo-card';
@@ -408,9 +410,15 @@ async function fetchGitHubRepos() {
             // Get language color
             const langColor = getLanguageColor(repo.language);
 
+            // Truncate description if too long
+            let description = repo.description || 'No description available';
+            if (description.length > 120) {
+                description = description.substring(0, 117) + '...';
+            }
+
             card.innerHTML = `
-                <h4>${formatRepoName(repo.name)}</h4>
-                <p>${repo.description || 'No description available'}</p>
+                <h4 title="${formatRepoName(repo.name)}">${formatRepoName(repo.name)}</h4>
+                <p title="${repo.description || 'No description available'}">${description}</p>
                 <div class="repo-meta">
                     ${repo.language ? 
                         `<span class="language">
