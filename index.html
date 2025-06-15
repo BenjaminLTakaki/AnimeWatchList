@@ -35,9 +35,8 @@
     </aside>
 
     <!-- Header -->
-    <header class="header">
-        <div class="container">
-            <div class="logo">Benjamin Takaki</div>
+    <header class="header">        <div class="container">
+            <div class="logo" id="portfolio-name">Benjamin Takaki</div>
             <div class="nav-right">
                 <nav class="nav-menu">
                     <ul>
@@ -46,8 +45,7 @@
                         <li><a href="#projects">Projects</a></li>
                         <li><a href="#contact">Contact</a></li>
                     </ul>
-                </nav>
-                <div class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+                </nav>                <div class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
                     <div class="theme-toggle-slider">
                         <svg class="theme-icon moon" viewBox="0 0 24 24">
                             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
@@ -65,6 +63,9 @@
                         </svg>
                     </div>
                 </div>
+                <a href="/cms" class="cms-admin-access" target="_blank" rel="noopener noreferrer" title="Content Management System">
+                    <i class="fas fa-cog"></i>
+                </a>
                 <button class="nav-toggle" aria-label="Toggle navigation">
                     <span class="hamburger"></span>
                 </button>
@@ -73,50 +74,45 @@
     </header>
 
     <!-- Hero Section -->
-    <section class="hero" id="home">
-        <div class="container">
+    <section class="hero" id="home">        <div class="container">
             <div class="hero-content">
-                <h1>Hello! I'm <span class="highlight">Benjamin Takaki</span></h1>
-                <p>I am an ICT student passionate about programming and leveraging technology to solve real-world challenges.</p>
+                <h1>Hello! I'm <span class="highlight" id="hero-name">Benjamin Takaki</span></h1>
+                <p id="hero-description">I am an ICT student passionate about programming and leveraging technology to solve real-world challenges.</p>
                 <div class="cta-buttons">
                     <a href="resume.pdf" target="_blank" class="btn btn-primary">
                         <i class="fas fa-download"></i>
-                        Get Resume
+                        <span id="resume-btn-text">Get Resume</span>
                     </a>
                     <a href="#about" class="btn btn-secondary">
                         <i class="fas fa-arrow-down"></i>
-                        Learn More
+                        <span id="learn-more-btn-text">Learn More</span>
                     </a>
                 </div>
             </div>
             <div class="hero-image">
-                <img src="styles/ben_photo.jpg" alt="Portrait of Benjamin Takaki" />
+                <img id="hero-image" src="styles/ben_photo.jpg" alt="Portrait of Benjamin Takaki" />
             </div>
         </div>
-    </section>
-
-    <!-- About Me Section -->
+    </section>    <!-- About Me Section -->
     <section id="about" class="about">
         <div class="container">
-            <h2>About Me</h2>
-            <p>
+            <h2 id="about-title">About Me</h2>
+            <p id="about-paragraph-1">
                 I am a first-year student at Fontys University of Applied Sciences, pursuing an ICT degree with a focus on programming and innovative technology.
                 My educational journey, which includes graduating from the Lycée Français International de Tokyo and excelling in the American Section of the International Option of the French Baccalaureate, has honed my analytical thinking and problem-solving skills.
             </p>
-            <p>
+            <p id="about-paragraph-2">
                 In my studies, I have worked on Python projects such as labyrinth solvers, image pixelators, and a Space Invaders clone.
                 I am interested in software development and how ICT can tackle real-world problems. International experiences and roles as a camp counselor and waiter have helped me develop strong interpersonal and cross-cultural communication skills.
             </p>
-            <p>
+            <p id="about-paragraph-3">
                 Fluent in English, French, and conversant in Japanese, I thrive in diverse environments. I am excited to continue growing my technical expertise and contributing to meaningful, innovative projects.
             </p>
         </div>
-    </section>
-
-    <!-- Projects Section -->
+    </section>    <!-- Projects Section -->
     <section id="projects" class="projects">
         <div class="container">
-            <h2>My Projects</h2>
+            <h2 id="projects-title">My Projects</h2>
             <div class="project-list">
                 <!-- Course Recommendation Project -->
                 <div class="project-card">
@@ -124,8 +120,8 @@
                         <img src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&h=400&fit=crop" alt="SkillsTown Course Recommender Preview" onerror="this.src='https://via.placeholder.com/600x400/1a1a1a/3b82f6?text=SkillsTown+Course+Recommender'">
                     </div>
                     <div class="project-details">
-                        <h3>SkillsTown Course Recommender</h3>
-                        <p>A web application that analyzes your CV to recommend relevant courses from SkillsTown's catalog. Built with Python Flask and NLP technology to extract skills and provide personalized course suggestions.</p>
+                        <h3 id="project-1-title">SkillsTown Course Recommender</h3>
+                        <p id="project-1-description">A web application that analyzes your CV to recommend relevant courses from SkillsTown's catalog. Built with Python Flask and NLP technology to extract skills and provide personalized course suggestions.</p>
                         <div class="project-tags">
                             <span class="tag">Python</span>
                             <span class="tag">Flask</span>
@@ -144,10 +140,9 @@
                 <div class="project-card">
                     <div class="project-image">
                         <img src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=600&h=400&fit=crop" alt="AnimeWatchList Preview" onerror="this.src='https://via.placeholder.com/600x400/1a1a1a/06b6d4?text=AnimeWatchList'">
-                    </div>
-                    <div class="project-details">
-                        <h3>AnimeWatchList</h3>
-                        <p>A web application for tracking anime you've watched and want to watch. Built with Python Flask, this app allows users to discover, search, and categorize anime series.</p>
+                    </div>                    <div class="project-details">
+                        <h3 id="project-2-title">AnimeWatchList</h3>
+                        <p id="project-2-description">A web application for tracking anime you've watched and want to watch. Built with Python Flask, this app allows users to discover, search, and categorize anime series.</p>
                         <div class="project-tags">
                             <span class="tag">Python</span>
                             <span class="tag">Flask</span>
@@ -166,10 +161,9 @@
                 <div class="project-card">
                     <div class="project-image">
                         <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&h=400&fit=crop" alt="Spotify Cover Generator Preview" onerror="this.src='https://via.placeholder.com/600x400/1a1a1a/3b82f6?text=Spotify+Cover+Generator'">
-                    </div>
-                    <div class="project-details">
-                        <h3>Spotify Cover Generator</h3>
-                        <p>Generate custom album artwork and titles based on your Spotify playlists using AI. Analyze genres and create cover art that matches your music's style.</p>
+                    </div>                    <div class="project-details">
+                        <h3 id="project-3-title">Spotify Cover Generator</h3>
+                        <p id="project-3-description">Generate custom album artwork and titles based on your Spotify playlists using AI. Analyze genres and create cover art that matches your music's style.</p>
                         <div class="project-tags">
                             <span class="tag">Python</span>
                             <span class="tag">Flask</span>
@@ -204,20 +198,18 @@
                 </div>
             </div>
         </div>
-    </section>
-
-    <!-- Contact Section -->
+    </section>    <!-- Contact Section -->
     <section id="contact" class="contact">
         <div class="container">
-            <h2>Contact Me</h2>
-            <p>If you'd like to get in touch, feel free to send me a message!</p>
+            <h2 id="contact-title">Contact Me</h2>
+            <p id="contact-description">If you'd like to get in touch, feel free to send me a message!</p>
             <form id="contact-form" class="contact-form">
                 <input type="text" name="name" placeholder="Your Name" required aria-label="Your Name" />
                 <input type="email" name="email" placeholder="Your Email" required aria-label="Your Email" />
                 <textarea name="message" placeholder="Your Message" required aria-label="Your Message"></textarea>
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-paper-plane"></i>
-                    Send Message
+                    <span id="contact-btn-text">Send Message</span>
                 </button>
             </form>
         </div>
@@ -238,9 +230,7 @@
     <!-- Scripts -->
     <!-- EmailJS SDK -->
     <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
-    <script src="script.js"></script>
-
-    <script>
+    <script src="script.js"></script>    <script>
         // Enhanced loading function
         function showLoading(event) {
             const loadingOverlay = document.createElement('div');
@@ -269,6 +259,163 @@
                 }
             }, 5000);
         }
+
+        // Enhanced loadCMSContent function for external CMS
+        async function loadCMSContent() {
+            try {
+                // First try to load from your API endpoint (which proxies to external CMS)
+                const response = await fetch('/api/content');
+                if (!response.ok) {
+                    console.log('CMS content not available, using static content');
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('Loaded CMS content:', data);
+                
+                // Update hero section
+                if (data.site_content?.hero) {
+                    const hero = data.site_content.hero;
+                    if (hero.name) {
+                        const nameElement = document.getElementById('hero-name');
+                        const portfolioNameElement = document.getElementById('portfolio-name');
+                        if (nameElement) nameElement.textContent = hero.name;
+                        if (portfolioNameElement) portfolioNameElement.textContent = hero.name;
+                    }
+                    if (hero.description) {
+                        const descElement = document.getElementById('hero-description');
+                        if (descElement) descElement.textContent = hero.description;
+                    }
+                    if (hero.resume_btn_text) {
+                        const resumeBtnElement = document.getElementById('resume-btn-text');
+                        if (resumeBtnElement) resumeBtnElement.textContent = hero.resume_btn_text;
+                    }
+                    if (hero.learn_more_btn_text) {
+                        const learnMoreBtnElement = document.getElementById('learn-more-btn-text');
+                        if (learnMoreBtnElement) learnMoreBtnElement.textContent = hero.learn_more_btn_text;
+                    }
+                }
+
+                // Update about section
+                if (data.about_content) {
+                    const about = data.about_content;
+                    if (about.title) {
+                        const titleElement = document.getElementById('about-title');
+                        if (titleElement) titleElement.textContent = about.title;
+                    }
+                    if (about.paragraphs && Array.isArray(about.paragraphs)) {
+                        about.paragraphs.forEach((paragraph, index) => {
+                            const paragraphElement = document.getElementById(`about-paragraph-${index + 1}`);
+                            if (paragraphElement) paragraphElement.textContent = paragraph;
+                        });
+                    }
+                }
+
+                // Update projects section
+                if (data.site_content?.projects) {
+                    const projects = data.site_content.projects;
+                    if (projects.title) {
+                        const titleElement = document.getElementById('projects-title');
+                        if (titleElement) titleElement.textContent = projects.title;
+                    }
+                    
+                    // Update individual project details
+                    ['project_1', 'project_2', 'project_3'].forEach((projectKey, index) => {
+                        if (projects[projectKey]) {
+                            const project = projects[projectKey];
+                            if (project.title) {
+                                const titleElement = document.getElementById(`project-${index + 1}-title`);
+                                if (titleElement) titleElement.textContent = project.title;
+                            }
+                            if (project.description) {
+                                const descElement = document.getElementById(`project-${index + 1}-description`);
+                                if (descElement) descElement.textContent = project.description;
+                            }
+                        }
+                    });
+                }
+
+                // Update contact section
+                if (data.site_content?.contact) {
+                    const contact = data.site_content.contact;
+                    if (contact.title) {
+                        const titleElement = document.getElementById('contact-title');
+                        if (titleElement) titleElement.textContent = contact.title;
+                    }
+                    if (contact.description) {
+                        const descElement = document.getElementById('contact-description');
+                        if (descElement) descElement.textContent = contact.description;
+                    }
+                    if (contact.btn_text) {
+                        const btnElement = document.getElementById('contact-btn-text');
+                        if (btnElement) btnElement.textContent = contact.btn_text;
+                    }
+                }
+
+                // Update images
+                if (data.images) {
+                    if (data.images.hero_image) {
+                        const heroImgElement = document.getElementById('hero-image');
+                        if (heroImgElement) heroImgElement.src = data.images.hero_image;
+                    }
+                }
+
+                // Show CMS connection status
+                showCMSStatus('connected');
+
+            } catch (error) {
+                console.log('Could not load CMS content:', error);
+                showCMSStatus('disconnected');
+                // Fail silently and use static content
+            }
+        }
+
+        // Function to show CMS connection status (optional)
+        function showCMSStatus(status) {
+            // Create or update status indicator
+            let statusIndicator = document.getElementById('cms-status');
+            if (!statusIndicator) {
+                statusIndicator = document.createElement('div');
+                statusIndicator.id = 'cms-status';
+                statusIndicator.style.cssText = `
+                    position: fixed;
+                    top: 10px;
+                    right: 10px;
+                    padding: 5px 10px;
+                    border-radius: 5px;
+                    font-size: 12px;
+                    z-index: 1001;
+                    transition: opacity 0.3s ease;
+                `;
+                document.body.appendChild(statusIndicator);
+            }
+            
+            if (status === 'connected') {
+                statusIndicator.textContent = '🟢 CMS Connected';
+                statusIndicator.style.background = 'rgba(16, 185, 129, 0.9)';
+                statusIndicator.style.color = 'white';
+                
+                // Hide after 3 seconds
+                setTimeout(() => {
+                    statusIndicator.style.opacity = '0';
+                }, 3000);
+            } else {
+                statusIndicator.textContent = '🔴 CMS Offline';
+                statusIndicator.style.background = 'rgba(239, 68, 68, 0.9)';
+                statusIndicator.style.color = 'white';
+                statusIndicator.style.opacity = '1';
+                
+                // Hide after 5 seconds
+                setTimeout(() => {
+                    statusIndicator.style.opacity = '0';
+                }, 5000);
+            }
+        }
+
+        // Load CMS content when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCMSContent();
+        });
     </script>
 </body>
 </html>

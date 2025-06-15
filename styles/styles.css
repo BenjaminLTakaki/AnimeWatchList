@@ -1249,3 +1249,43 @@ section > p {
         font-size: 1rem;
     }
 }
+
+/* CMS Admin Access Button */
+.cms-admin-access {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-left: 1rem;
+    background: var(--background-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.cms-admin-access:hover {
+    background: var(--hover-overlay);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+    transform: translateY(-2px);
+}
+
+.cms-admin-access i {
+    font-size: 16px;
+}
+
+@media (max-width: 768px) {
+    .cms-admin-access {
+        width: 35px;
+        height: 35px;
+        margin-left: 0.5rem;
+    }
+    
+    .cms-admin-access i {
+        font-size: 14px;
+    }
+}
