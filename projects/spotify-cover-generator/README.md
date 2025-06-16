@@ -132,3 +132,5 @@ python app.py --help
 
 ## License
 MIT License
+
+<!-- Project overview and setup instructions will be detailed here. -->

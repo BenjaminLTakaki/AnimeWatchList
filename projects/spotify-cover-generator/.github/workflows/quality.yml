@@ -1,0 +1,41 @@
+name: Code Quality
+on: [push, pull_request]
+
+jobs:
+  quality-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.9' # Assuming 3.9 from ci.yml, adjust if needed
+      - name: Install quality tools
+        run: |
+          pip install flake8 black pytest-cov bandit safety
+      - name: Run Black (formatting)
+        working-directory: ./projects/spotify-cover-generator
+        run: black --check .
+      - name: Run Flake8 (linting)
+        working-directory: ./projects/spotify-cover-generator
+        run: flake8 . --max-line-length=88
+      - name: Run Bandit (security)
+        working-directory: ./projects/spotify-cover-generator
+        run: bandit -r . -x tests/
+      - name: Run Safety (dependencies)
+        # Assuming requirements.txt is at projects/spotify-cover-generator/requirements.txt
+        # Safety check needs to be run in the directory containing requirements.txt or specify the file
+        run: |
+          pip install -r projects/spotify-cover-generator/requirements.txt
+          safety check --file projects/spotify-cover-generator/requirements.txt
+      - name: Run tests with coverage
+        working-directory: ./projects/spotify-cover-generator
+        run: pytest --cov=. --cov-report=xml
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          # token: ${{ secrets.CODECOV_TOKEN }} # Only if needed for private repos
+          fail_ci_if_error: true
+          working-directory: ./projects/spotify-cover-generator
+          # files: ./coverage.xml # Default, but can be specified
+```
