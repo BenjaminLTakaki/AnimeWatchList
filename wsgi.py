@@ -236,12 +236,7 @@ class AppDispatcher:
             if has_spotify_app:
                 environ['SCRIPT_NAME'] = '/spotify'
                 environ['PATH_INFO'] = path[len('/spotify'): ] or '/'
-                old = os.getcwd()
-                os.chdir(spotify_path)
-                try:
-                    return spotify_app(environ, start_response)
-                finally:
-                    os.chdir(old)
+                return spotify_app(environ, start_response) # CWD is not changed
             return spotify_app(environ, start_response)
 
         if has_skillstown_app and (path == '/skillstown' or path.startswith('/skillstown/')):
