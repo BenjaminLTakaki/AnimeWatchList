@@ -4,10 +4,16 @@ import json
 import datetime
 import re
 import urllib.parse
-from pathlib import Path
+import sys
 import os
-import requests
+from pathlib import Path
 from collections import Counter
+
+# Ensure the project's own directory is prioritized for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 from config import DATA_DIR, LORA_DIR, COVERS_DIR
 
 def generate_random_string(size=10):
@@ -65,15 +71,16 @@ def save_generation_data(data, output_path=None):
 
 def calculate_genre_percentages(genres_list):
     """Calculate percentage distribution of genres"""
-    if not genres_list:
+    if not genres_list:        
         return []    
     try:
         # Attempt to use the more structured GenreAnalysis if available
-        # Fix import path for models
         try:
             from .models import GenreAnalysis
         except ImportError:
-            from models import GenreAnalysis
+            # Fallback for when relative import doesn't work
+            import models
+            GenreAnalysis = models.GenreAnalysis
         
         genre_analysis = GenreAnalysis.from_genre_list(genres_list)
         return genre_analysis.get_percentages(max_genres=5)
@@ -122,15 +129,16 @@ def get_available_loras():
         local_loras = []
         for ext in [".safetensors", ".ckpt", ".pt"]:
             local_loras.extend(list(LORA_DIR.glob(f"*{ext}")))
-        
-        # Import here to avoid circular imports
+          # Import here to avoid circular imports
         from app import LoraModelDB, db, app
         
         # Fix import path for models
         try:
             from .models import LoraModel
         except ImportError:
-            from models import LoraModel
+            # Fallback for when relative import doesn't work
+            import models
+            LoraModel = models.LoraModel
         
         # Convert file system LoRAs to LoraModel objects
         local_lora_names = []
@@ -164,14 +172,17 @@ def get_available_loras():
         # Sort by name
         loras.sort(key=lambda x: x.name)
         return loras
-    except Exception as e:
+    except Exception as e:        
         print(f"Error getting LoRAs: {e}")
-        # If database fails, try to get just file system LoRAs        try:
+        # If database fails, try to get just file system LoRAs
+        try:
             # Fix import path for models
             try:
                 from .models import LoraModel
             except ImportError:
-                from models import LoraModel
+                # Fallback for when relative import doesn't work
+                import models
+                LoraModel = models.LoraModel
             
             local_loras = []
             for ext in [".safetensors", ".ckpt", ".pt"]:

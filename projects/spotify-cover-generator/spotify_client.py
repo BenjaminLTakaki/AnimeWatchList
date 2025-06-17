@@ -1,12 +1,22 @@
+import sys
+import os
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
 from collections import Counter
+
+# Ensure the project's own directory is prioritized for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
 # Fix import path for models
 try:
     from .models import PlaylistData, GenreAnalysis
 except ImportError:
-    from models import PlaylistData, GenreAnalysis
+    # Fallback for when relative import doesn't work
+    import models
+    PlaylistData = models.PlaylistData
+    GenreAnalysis = models.GenreAnalysis
 
 from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
 

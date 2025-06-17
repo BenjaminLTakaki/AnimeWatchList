@@ -11,6 +11,11 @@ from pathlib import Path
 from urllib.parse import urlparse
 from functools import wraps
 
+# Ensure the project's own directory is prioritized for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 import requests
 import base64
 import secrets
@@ -251,8 +256,7 @@ class LoraModelDB(db.Model):
     __tablename__ = 'spotify_lora_models'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
-    source_type = db.Column(db.String(20), default='local')  # Only 'local' now    path = db.Column(db.String(500), default='')
-    file_size = db.Column(db.Integer, default=0)  # File size in bytes
+    source_type = db.Column(db.String(20), default='local')  # Only 'local' now    path = db.Column(db.String(500), default='')    file_size = db.Column(db.Integer, default=0)  # File size in bytes
     uploaded_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     uploaded_by = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=True)
     
@@ -261,7 +265,9 @@ class LoraModelDB(db.Model):
         try:
             from .models import LoraModel
         except ImportError:
-            from models import LoraModel
+            # Fallback for when relative import doesn't work
+            import models
+            LoraModel = models.LoraModel
         
         return LoraModel(
             name=self.name,
@@ -366,15 +372,15 @@ def get_current_user():
 def calculate_genre_percentages(genres_list):
     """Calculate percentage distribution of genres"""
     if not genres_list:
-        return []
-    
+        return []    
     try:
         # Attempt to use the more structured GenreAnalysis if available
-        # Fix import path for models
         try:
             from .models import GenreAnalysis
         except ImportError:
-            from models import GenreAnalysis
+            # Fallback for when relative import doesn't work
+            import models
+            GenreAnalysis = models.GenreAnalysis
         
         genre_analysis = GenreAnalysis.from_genre_list(genres_list)
         return genre_analysis.get_percentages(max_genres=5)
@@ -1722,7 +1728,9 @@ if __name__ == '__main__':
     try:
         from .models import initialize_app
     except ImportError:
-        from models import initialize_app
+        # Fallback for when relative import doesn't work
+        import models
+        initialize_app = models.initialize_app
     
     if initialize_app():
         print("Application initialized successfully")

@@ -1,11 +1,17 @@
 # Updated generator.py to include user tracking
 
 import os
+import sys
 import datetime
 import base64
 import io
 from pathlib import Path
 from PIL import Image
+
+# Ensure the project's own directory is prioritized for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
 from spotify_client import extract_playlist_data
 from image_generator import create_prompt_from_data, generate_cover_image
@@ -17,7 +23,9 @@ from utils import create_image_filename, get_available_loras
 try:
     from .models import GenerationResult
 except ImportError:
-    from models import GenerationResult
+    # Fallback for when relative import doesn't work
+    import models
+    GenerationResult = models.GenerationResult
 
 from config import COVERS_DIR
 
