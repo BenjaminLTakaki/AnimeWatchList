@@ -28,9 +28,9 @@ load_dotenv()
 
 # Add skillstown system directory to Python path (matches wsgi.py structure)
 project_root = os.path.dirname(os.path.abspath(__file__))
-skillstown_system_path = os.path.join(project_root, 'projects', 'skillstown', 'system')
-if skillstown_system_path not in sys.path:
-    sys.path.insert(0, skillstown_system_path)
+skillstown_app_path = os.path.join(project_root, 'projects', 'skillstown')
+if skillstown_app_path not in sys.path:
+    sys.path.insert(0, skillstown_app_path)
 
 # Import the app factory from the skillstown system directory with error handling
 try:
@@ -38,7 +38,7 @@ try:
     print("✅ SkillsTown app factory imported successfully for manage.py")
 except ImportError as e:
     print(f"❌ Could not import SkillsTown app factory: {e}")
-    print(f"Make sure the SkillsTown app is properly set up in: {skillstown_system_path}")
+    print(f"Make sure the SkillsTown app is properly set up in: {skillstown_app_path}")
     raise
 
 # Create an app instance using the factory.
