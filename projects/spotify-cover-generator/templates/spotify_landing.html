@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spotify Cover Generator</title>
-    <style>
-        body {
+    <style>        body {
             background-color: #191414; /* Spotify black */
             color: #FFFFFF; /* White text */
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -19,18 +18,35 @@
             text-align: center;
         }
         .container {
-            padding: 20px;
+            padding: 40px 20px;
+            max-width: 800px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
         }
         h1 {
             color: #1DB954; /* Spotify green */
             font-size: 2.5em;
             margin-bottom: 0.5em;
+            text-align: center;
         }
         p {
             font-size: 1.1em;
             line-height: 1.6;
-            margin-bottom: 1.5em;
+            margin: 0 auto 1.5em auto;
             max-width: 600px;
+            text-align: center;
+        }
+        .buttons {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
         }
         .buttons a {
             background-color: #1DB954; /* Spotify green */
@@ -40,8 +56,9 @@
             border-radius: 500px; /* Pill shape */
             font-weight: bold;
             font-size: 1em;
-            margin: 0 10px;
             transition: background-color 0.3s ease;
+            display: inline-block;
+            text-align: center;
         }
         .buttons a:hover {
             background-color: #1ED760; /* Lighter green on hover */
@@ -58,7 +75,7 @@
         </p>
         <div class="buttons">
             <a href="/spotify/login">Login</a>
-            <a href="/spotify/signup">Sign Up</a> 
+            <a href="/spotify/register">Sign Up</a> 
             <!-- Assuming /spotify/signup is the correct URL, otherwise it might also go to /spotify/login -->
         </div>
     </div>
