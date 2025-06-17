@@ -1,3 +1,17 @@
+import sys
+import os
+
+# Ensure the project's own directory is prioritized for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+# In a Render environment, the path might be slightly different,
+# let's also ensure the parent of 'projects' if spotify-cover-generator is a sub-module of a larger structure
+# For this specific issue, the error log indicates /opt/render/project/src/projects/skillstown/models.py
+# and we want /opt/render/project/src/projects/spotify-cover-generator/models.py
+# The `current_dir` should correctly point to /opt/render/project/src/projects/spotify-cover-generator
+# So, the initial insertion of `current_dir` should be sufficient.
+
 import os
 import sys
 import random
