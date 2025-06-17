@@ -1,0 +1,34 @@
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary and coverage profiles
+*.test
+*.out
+.env
+
+# Build output directories
+/bin/
+_build/
+
+# Vendor (if using)
+/vendor/
+
+# Local data storage (Qdrant)
+/qdrant_storage/
+
+# IDE and editor directories/files
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# PowerShell script staging
+*.log
+
+# Chisel binary
+/chisel.exe
