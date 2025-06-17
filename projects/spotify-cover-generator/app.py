@@ -356,7 +356,8 @@ def get_current_user():
                 user = login_session.user
                 if user:
                     # Restore session variables
-                    session['user_id'] = user.id                    session['user_session'] = session_token
+                    session['user_id'] = user.id                    
+                    session['user_session'] = session_token
                     return user
         except Exception as e:
             print(f"Error fetching user by cookie: {e}")
