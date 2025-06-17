@@ -19,6 +19,8 @@ Path structure:
 Updated: June 2025 - Refactored to match new workspace structure
 """
 
+# pyright: reportMissingImports=false
+
 import os
 import sys
 import datetime
@@ -53,7 +55,8 @@ try:
     # Add the skillstown system directory to the path
     if skillstown_system_path not in sys.path:
         sys.path.insert(0, skillstown_system_path)
-      # Import the create_app function from the skillstown system
+    
+    # Import the create_app function from the skillstown system
     from app import create_app
     skillstown_app = create_app('production')
     print("✅ SkillsTown app imported successfully")
@@ -95,7 +98,8 @@ except Exception as e:
     has_animewatchlist_app = False
     
     @animewatchlist_app.route('/')
-    def animewatchlist_index():        return "AnimeWatchList is currently unavailable. Database connection issues. Please check your PostgreSQL setup."
+    def animewatchlist_index():
+        return "AnimeWatchList is currently unavailable. Database connection issues. Please check your PostgreSQL setup."
 
 # ===================================================================
 # SPOTIFY COVER GENERATOR APP SETUP  
@@ -136,7 +140,8 @@ except Exception as e:
     print(f"Error type: {type(e).__name__}")
     import traceback
     print(f"Full traceback: {traceback.format_exc()}")
-    has_spotify_app = False    # Restore the original path if import failed
+    has_spotify_app = False
+    # Restore the original path if import failed
     sys.path = original_sys_path
 
 # ===================================================================
@@ -261,7 +266,9 @@ class AppDispatcher:
         
     def __call__(self, environ, start_response):
         # Get the request path
-        path_info = environ.get('PATH_INFO', '')        # Handle static file requests
+        path_info = environ.get('PATH_INFO', '')
+        
+        # Handle static file requests
         if has_skillstown_app and path_info.startswith('/skillstown/static/'):
             environ['PATH_INFO'] = path_info
             return main_app(environ, start_response)
