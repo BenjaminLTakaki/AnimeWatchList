@@ -880,12 +880,8 @@ def inject_template_vars():
 # ROUTES
 @app.route("/")
 def root():
-    """Root route - redirect to login if not authenticated, otherwise to main app"""
-    user = get_current_user()
-    if user:
-        return redirect(url_for('generate'))
-    else:
-        return redirect(url_for('login'))
+    """Root route - temporarily simplified for debugging"""
+    return "Spotify App Root Reached Successfully"
 
 @app.route("/generate", methods=["GET", "POST"])
 @limiter.limit("10 per hour", methods=["POST"])
