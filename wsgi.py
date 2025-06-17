@@ -140,9 +140,15 @@ except Exception as e:
     print(f"Error type: {type(e).__name__}")
     import traceback
     print(f"Full traceback: {traceback.format_exc()}")
+    print("Creating a stub Spotify app")
+    spotify_app = Flask("spotify_stub")
     has_spotify_app = False
     # Restore the original path if import failed
     sys.path = original_sys_path
+    
+    @spotify_app.route('/')
+    def spotify_index():
+        return f"Spotify Cover Generator is currently unavailable. Error: {str(e)}"
 
 # ===================================================================
 # FLASK APP CONFIGURATION
@@ -162,12 +168,12 @@ if has_animewatchlist_app:
             'current_year': datetime.datetime.now().year
         }
 
-if has_spotify_app:
-    @spotify_app.context_processor
-    def inject_spotify_vars():
-        return {
-            'current_year': datetime.datetime.now().year
-        }
+# Always configure Spotify context processor - even for stub app
+@spotify_app.context_processor
+def inject_spotify_vars():
+    return {
+        'current_year': datetime.datetime.now().year
+    }
 
 # Configure app roots
 if has_skillstown_app:
@@ -178,17 +184,17 @@ if has_animewatchlist_app:
     animewatchlist_app.config['APPLICATION_ROOT'] = '/animewatchlist'
     animewatchlist_app.config['PREFERRED_URL_SCHEME'] = 'https'
 
-if has_spotify_app:
-    spotify_app.config['APPLICATION_ROOT'] = '/spotify'
-    spotify_app.config['PREFERRED_URL_SCHEME'] = 'https'
+# Always configure Spotify app root - even for stub app
+spotify_app.config['APPLICATION_ROOT'] = '/spotify'
+spotify_app.config['PREFERRED_URL_SCHEME'] = 'https'
 
 # Define static folders explicitly
 if has_skillstown_app:
     SKILLSTOWN_APP_STATIC_DIR = os.path.join(skillstown_system_path, 'static')
 if has_animewatchlist_app:
     ANIMEWATCHLIST_APP_STATIC_DIR = os.path.join(animewatchlist_path, 'static')
-if has_spotify_app:
-    SPOTIFY_APP_STATIC_DIR = os.path.join(spotify_path, 'static')
+# Always define Spotify static dir - even if app failed to load
+SPOTIFY_APP_STATIC_DIR = os.path.join(spotify_path, 'static')
 
 # ===================================================================
 # MAIN APP ROUTES AND STATIC FILE SERVING
@@ -225,11 +231,15 @@ if has_animewatchlist_app:
     def animewatchlist_redirect():
         return redirect('/animewatchlist/')
 
-if has_spotify_app:
-    @main_app.route('/projects/spotify-cover-generator')
-    @main_app.route('/projects/spotify-cover-generator/')
-    def spotify_redirect():
-        return redirect('/spotify/')
+# Always register Spotify routes - even if the app failed to load
+@main_app.route('/projects/spotify-cover-generator')
+@main_app.route('/projects/spotify-cover-generator/')
+def spotify_redirect():
+    return redirect('/spotify/')
+
+@main_app.route('/spotify')
+def spotify_direct():
+    return redirect('/spotify/')
 
 # Handle static files from the main app
 if has_skillstown_app:
@@ -254,15 +264,18 @@ if has_animewatchlist_app:
             print(f"AnimeWatchList static file not found: {filename}")
             return f"Static file {filename} not found", 404
 
-if has_spotify_app:
-    @main_app.route('/spotify/static/<path:filename>')
-    def spotify_static(filename):
+# Always register Spotify static route - even if the app failed to load
+@main_app.route('/spotify/static/<path:filename>')
+def spotify_static(filename):
+    if has_spotify_app:
         print(f"Serving Spotify static file: {filename} from {SPOTIFY_APP_STATIC_DIR}")
         if os.path.exists(os.path.join(SPOTIFY_APP_STATIC_DIR, filename)):
             return send_from_directory(SPOTIFY_APP_STATIC_DIR, filename)
         else:
             print(f"Spotify static file not found: {filename}")
             return f"Static file {filename} not found", 404
+    else:
+        return f"Spotify app is not available", 503
 
 # ===================================================================
 # WSGI APPLICATION DISPATCHER
@@ -274,19 +287,17 @@ class AppDispatcher:
         
     def __call__(self, environ, start_response):
         path_info = environ.get('PATH_INFO', '')
-        
-        # Handle static file requests
+          # Handle static file requests
         if has_skillstown_app and path_info.startswith('/skillstown/static/'):
             environ['PATH_INFO'] = path_info
             return main_app(environ, start_response)
         elif has_animewatchlist_app and path_info.startswith('/animewatchlist/static/'):
             environ['PATH_INFO'] = path_info
             return main_app(environ, start_response)
-        elif has_spotify_app and path_info.startswith('/spotify/static/'):
+        elif path_info.startswith('/spotify/static/'):
             environ['PATH_INFO'] = path_info
             return main_app(environ, start_response)
-            
-        # Route requests to the appropriate app
+              # Route requests to the appropriate app
         if has_skillstown_app and path_info.startswith('/skillstown'):
             script_name = '/skillstown'
             environ['SCRIPT_NAME'] = script_name
@@ -297,7 +308,7 @@ class AppDispatcher:
             environ['SCRIPT_NAME'] = script_name
             environ['PATH_INFO'] = path_info[len(script_name):]
             return animewatchlist_app(environ, start_response)
-        elif has_spotify_app and path_info.startswith('/spotify'):
+        elif path_info.startswith('/spotify'):
             script_name = '/spotify'
             environ['SCRIPT_NAME'] = script_name
             environ['PATH_INFO'] = path_info[len(script_name):]
