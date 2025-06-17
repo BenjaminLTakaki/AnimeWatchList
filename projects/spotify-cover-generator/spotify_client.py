@@ -1,7 +1,13 @@
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
 from collections import Counter
-from models import PlaylistData, GenreAnalysis
+
+# Fix import path for models
+try:
+    from .models import PlaylistData, GenreAnalysis
+except ImportError:
+    from models import PlaylistData, GenreAnalysis
+
 from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
 
 # Monitoring imports with fallback

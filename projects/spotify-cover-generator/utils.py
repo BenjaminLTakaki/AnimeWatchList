@@ -66,11 +66,15 @@ def save_generation_data(data, output_path=None):
 def calculate_genre_percentages(genres_list):
     """Calculate percentage distribution of genres"""
     if not genres_list:
-        return []
-    
+        return []    
     try:
         # Attempt to use the more structured GenreAnalysis if available
-        from models import GenreAnalysis 
+        # Fix import path for models
+        try:
+            from .models import GenreAnalysis
+        except ImportError:
+            from models import GenreAnalysis
+        
         genre_analysis = GenreAnalysis.from_genre_list(genres_list)
         return genre_analysis.get_percentages(max_genres=5)
     except ImportError:
@@ -112,8 +116,7 @@ def extract_playlist_id(playlist_url):
 
 def get_available_loras():
     """Get list of available LoRAs from database and file system."""
-    loras = []
-    
+    loras = []    
     try:
         # First, get local LoRAs from the file system
         local_loras = []
@@ -122,7 +125,12 @@ def get_available_loras():
         
         # Import here to avoid circular imports
         from app import LoraModelDB, db, app
-        from models import LoraModel
+        
+        # Fix import path for models
+        try:
+            from .models import LoraModel
+        except ImportError:
+            from models import LoraModel
         
         # Convert file system LoRAs to LoraModel objects
         local_lora_names = []
@@ -158,9 +166,13 @@ def get_available_loras():
         return loras
     except Exception as e:
         print(f"Error getting LoRAs: {e}")
-        # If database fails, try to get just file system LoRAs
-        try:
-            from models import LoraModel
+        # If database fails, try to get just file system LoRAs        try:
+            # Fix import path for models
+            try:
+                from .models import LoraModel
+            except ImportError:
+                from models import LoraModel
+            
             local_loras = []
             for ext in [".safetensors", ".ckpt", ".pt"]:
                 local_loras.extend(list(LORA_DIR.glob(f"*{ext}")))

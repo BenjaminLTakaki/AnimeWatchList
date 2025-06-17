@@ -12,7 +12,13 @@ from image_generator import create_prompt_from_data, generate_cover_image
 from title_generator import generate_title
 from chart_generator import generate_genre_chart
 from utils import create_image_filename, get_available_loras
-from models import GenerationResult
+
+# Fix import path for models
+try:
+    from .models import GenerationResult
+except ImportError:
+    from models import GenerationResult
+
 from config import COVERS_DIR
 
 def save_generation_data_with_user(data, user_id=None):

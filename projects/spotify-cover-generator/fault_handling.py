@@ -196,11 +196,14 @@ class GracefulDegradation:
                 # Try to extract playlist ID for basic info
                 playlist_id = playlist_url.split("playlist/")[-1].split("?")[0]
                 playlist_name = f"Spotify Playlist ({playlist_id[:8]}...)"
-        except:
-            pass
+        except:            pass
             
         # Return fallback data structure
-        from models import PlaylistData, GenreAnalysis
+        # Fix import path for models
+        try:
+            from .models import PlaylistData, GenreAnalysis
+        except ImportError:
+            from models import PlaylistData, GenreAnalysis
         
         # Use generic genres based on common music styles
         fallback_genres = ["pop", "indie", "alternative", "electronic", "rock"]

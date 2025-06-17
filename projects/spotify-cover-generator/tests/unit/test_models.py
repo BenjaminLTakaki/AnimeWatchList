@@ -1,5 +1,16 @@
 import pytest
 from unittest.mock import patch, MagicMock
+
+# Fix import path for models
+import sys
+import os
+
+# Get the parent directory (spotify-cover-generator) to add to path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(os.path.dirname(current_dir))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
 from models import GenreAnalysis, PlaylistData, LoraModel
 
 class TestGenreAnalysis:
