@@ -181,14 +181,23 @@ def inject_spotify_vars():
 if has_skillstown_app:
     skillstown_app.config['APPLICATION_ROOT'] = '/skillstown'
     skillstown_app.config['PREFERRED_URL_SCHEME'] = 'https'
+    skillstown_app.url_map.strict_slashes = False
 
 if has_animewatchlist_app:
     animewatchlist_app.config['APPLICATION_ROOT'] = '/animewatchlist'
     animewatchlist_app.config['PREFERRED_URL_SCHEME'] = 'https'
+    animewatchlist_app.url_map.strict_slashes = False
 
-# Always configure Spotify app root - even for stub app
-spotify_app.config['APPLICATION_ROOT'] = '/spotify'
-spotify_app.config['PREFERRED_URL_SCHEME'] = 'https'
+# Configure Spotify app properly
+if has_spotify_app:
+    spotify_app.config['APPLICATION_ROOT'] = '/spotify'
+    spotify_app.config['PREFERRED_URL_SCHEME'] = 'https'
+    spotify_app.url_map.strict_slashes = False
+else:
+    # Even for stub app, configure it properly
+    spotify_app.config['APPLICATION_ROOT'] = '/spotify'
+    spotify_app.config['PREFERRED_URL_SCHEME'] = 'https'
+    spotify_app.url_map.strict_slashes = False
 
 # Define static folders explicitly
 if has_skillstown_app:
@@ -325,48 +334,53 @@ class AppDispatcher:
         print(f"🔍 DEBUG: has_animewatchlist_app = {has_animewatchlist_app}")
         print(f"🔍 DEBUG: has_spotify_app = {has_spotify_app}")
         
-        # Handle static file requests
+        # Handle static file requests FIRST
         if has_skillstown_app and path_info.startswith('/skillstown/static/'):
             print(f"🔍 DEBUG: Routing to SkillsTown static files")
-            environ['PATH_INFO'] = path_info
             return main_app(environ, start_response)
         elif has_animewatchlist_app and path_info.startswith('/animewatchlist/static/'):
             print(f"🔍 DEBUG: Routing to AnimeWatchList static files")
-            environ['PATH_INFO'] = path_info
             return main_app(environ, start_response)
         elif path_info.startswith('/spotify/static/'):
             print(f"🔍 DEBUG: Routing to Spotify static files")
-            environ['PATH_INFO'] = path_info
             return main_app(environ, start_response)
         
         # Route requests to the appropriate app
-        if has_skillstown_app and path_info.startswith('/skillstown'):
-            print(f"🔍 DEBUG: Routing to SkillsTown app")
-            script_name = '/skillstown'
-            environ['SCRIPT_NAME'] = script_name
-            environ['PATH_INFO'] = path_info[len(script_name):]
-            print(f"Debug: Routing to SkillsTown app, SCRIPT_NAME: {script_name}, PATH_INFO: {environ['PATH_INFO']}")
-            return skillstown_app(environ, start_response)
-        elif has_animewatchlist_app and path_info.startswith('/animewatchlist'):
-            print(f"🔍 DEBUG: Routing to AnimeWatchList app")
-            script_name = '/animewatchlist'
-            environ['SCRIPT_NAME'] = script_name
-            environ['PATH_INFO'] = path_info[len(script_name):]
-            print(f"Debug: Routing to AnimeWatchList app, SCRIPT_NAME: {script_name}, PATH_INFO: {environ['PATH_INFO']}")
-            return animewatchlist_app(environ, start_response)
-        elif path_info.startswith('/spotify'):
+        # IMPORTANT: Check for exact /spotify match AND /spotify/ prefix
+        if path_info == '/spotify' or path_info.startswith('/spotify/'):
             print(f"🔍 DEBUG: Routing to Spotify app (has_spotify_app = {has_spotify_app})")
+            if not has_spotify_app:
+                print("❌ Spotify app not available, serving error")
+                return spotify_app(environ, start_response)
+            
             script_name = '/spotify'
             environ['SCRIPT_NAME'] = script_name
-            environ['PATH_INFO'] = path_info[len(script_name):]
+            environ['PATH_INFO'] = path_info[len(script_name):] if path_info != '/spotify' else '/'
             print(f"Debug: Routing to Spotify app, SCRIPT_NAME: {script_name}, PATH_INFO: {environ['PATH_INFO']}")
-            # IMPORTANT: Set the working directory for Spotify app requests
+            
+            # Set the working directory for Spotify app requests
             old_cwd = os.getcwd()
             try:
                 os.chdir(spotify_path)
                 return spotify_app(environ, start_response)
             finally:
                 os.chdir(old_cwd)
+                
+        elif (path_info == '/skillstown' or path_info.startswith('/skillstown/')) and has_skillstown_app:
+            print(f"🔍 DEBUG: Routing to SkillsTown app")
+            script_name = '/skillstown'
+            environ['SCRIPT_NAME'] = script_name
+            environ['PATH_INFO'] = path_info[len(script_name):] if path_info != '/skillstown' else '/'
+            print(f"Debug: Routing to SkillsTown app, SCRIPT_NAME: {script_name}, PATH_INFO: {environ['PATH_INFO']}")
+            return skillstown_app(environ, start_response)
+            
+        elif (path_info == '/animewatchlist' or path_info.startswith('/animewatchlist/')) and has_animewatchlist_app:
+            print(f"🔍 DEBUG: Routing to AnimeWatchList app")
+            script_name = '/animewatchlist'
+            environ['SCRIPT_NAME'] = script_name
+            environ['PATH_INFO'] = path_info[len(script_name):] if path_info != '/animewatchlist' else '/'
+            print(f"Debug: Routing to AnimeWatchList app, SCRIPT_NAME: {script_name}, PATH_INFO: {environ['PATH_INFO']}")
+            return animewatchlist_app(environ, start_response)
             
         # Everything else goes to the main app
         print(f"🔍 DEBUG: Routing to main app (default)")
