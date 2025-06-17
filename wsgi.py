@@ -317,7 +317,8 @@ def debug_apps():
 class AppDispatcher:
     def __init__(self, app):
         self.app = app
-          def __call__(self, environ, start_response):
+    
+    def __call__(self, environ, start_response):
         path_info = environ.get('PATH_INFO', '')
         print(f"🔍 DEBUG: Routing request for path: {path_info}")
         print(f"🔍 DEBUG: has_skillstown_app = {has_skillstown_app}")
