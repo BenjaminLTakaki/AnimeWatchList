@@ -200,6 +200,14 @@ def index():
 
 @main_app.route('/<path:path>')
 def serve_static(path):
+    # Redirect project shortcuts
+    if path.startswith('projects/skillstown'):
+        return redirect('/skillstown/')
+    if path.startswith('projects/animewatchlist'):
+        return redirect('/animewatchlist/')
+    if path.startswith('projects/spotify-cover-generator'):
+        return redirect('/spotify/')
+    # Serve files
     if os.path.exists(path):
         return send_from_directory('.', path)
     return "File not found", 404
@@ -265,8 +273,13 @@ class AppDispatcher:
         self.app = app
         
     def __call__(self, environ, start_response):
-        # Get the request path
         path_info = environ.get('PATH_INFO', '')
+        # Directly route unprefixed skillstown endpoints
+        if has_skillstown_app and any(path_info.startswith(pref) for pref in ['/course', '/user', '/quiz', '/assessment', '/results', '/search', '/enroll']):
+            script_name = '/skillstown'
+            environ['SCRIPT_NAME'] = script_name
+            environ['PATH_INFO'] = path_info
+            return skillstown_app(environ, start_response)
         
         # Handle static file requests
         if has_skillstown_app and path_info.startswith('/skillstown/static/'):
