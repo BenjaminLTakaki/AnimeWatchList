@@ -234,16 +234,10 @@ if has_animewatchlist_app:
 def spotify_redirect():
     return redirect('/spotify/')
 
-@main_app.route('/spotify')
-def spotify_direct():
-    return redirect('/spotify/')
-
 # Catch-all route for static files (MUST be last)
 @main_app.route('/<path:path>')
 def serve_static(path):
     # Handle direct app routes first
-    if path == 'spotify':
-        return redirect('/spotify/')
     if path == 'skillstown':
         return redirect('/skillstown/')
     if path == 'animewatchlist':
@@ -333,8 +327,7 @@ class AppDispatcher:
         print(f"🔍 DEBUG: has_skillstown_app = {has_skillstown_app}")
         print(f"🔍 DEBUG: has_animewatchlist_app = {has_animewatchlist_app}")
         print(f"🔍 DEBUG: has_spotify_app = {has_spotify_app}")
-        
-        # Handle static file requests FIRST
+          # Handle static file requests FIRST
         if has_skillstown_app and path_info.startswith('/skillstown/static/'):
             print(f"🔍 DEBUG: Routing to SkillsTown static files")
             return main_app(environ, start_response)
@@ -344,9 +337,10 @@ class AppDispatcher:
         elif path_info.startswith('/spotify/static/'):
             print(f"🔍 DEBUG: Routing to Spotify static files")
             return main_app(environ, start_response)
-          # Route requests to the appropriate app
+        
+        # Route requests to the appropriate app
         # IMPORTANT: Check for exact /spotify match AND /spotify/ prefix
-        if path_info == '/spotify' or path_info.startswith('/spotify/'):
+        elif path_info == '/spotify' or path_info.startswith('/spotify/'):
             print(f"🔍 DEBUG: Routing to Spotify app (has_spotify_app = {has_spotify_app})")
             if has_spotify_app:
                 script_name = '/spotify'
