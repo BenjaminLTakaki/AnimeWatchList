@@ -48,7 +48,7 @@ try:
     app = create_skillstown_app(os.getenv('FLASK_CONFIG') or 'development')
     print("✅ SkillsTown app instance created successfully")
 except Exception as e:
-    print(f"❌ Could not create SkillsTown app instance: {e}")
+    print(f"❌ Could not create SkillsTown app instance: {e}") 
     raise
 
 # If you need to run shell commands with app context, you can do it here, e.g.:

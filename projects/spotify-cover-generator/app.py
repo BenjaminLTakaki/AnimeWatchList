@@ -880,8 +880,8 @@ def inject_template_vars():
 # ROUTES
 @app.route("/")
 def root():
-    """Root route - temporarily simplified for debugging"""
-    return "Spotify App Root Reached Successfully"
+    """Root route - now serves the Spotify landing page."""
+    return render_template("spotify_landing.html")
 
 @app.route("/generate", methods=["GET", "POST"])
 @limiter.limit("10 per hour", methods=["POST"])

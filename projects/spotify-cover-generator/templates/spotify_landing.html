@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Cover Generator</title>
+    <style>
+        body {
+            background-color: #191414; /* Spotify black */
+            color: #FFFFFF; /* White text */
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+        .container {
+            padding: 20px;
+        }
+        h1 {
+            color: #1DB954; /* Spotify green */
+            font-size: 2.5em;
+            margin-bottom: 0.5em;
+        }
+        p {
+            font-size: 1.1em;
+            line-height: 1.6;
+            margin-bottom: 1.5em;
+            max-width: 600px;
+        }
+        .buttons a {
+            background-color: #1DB954; /* Spotify green */
+            color: #FFFFFF;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 500px; /* Pill shape */
+            font-weight: bold;
+            font-size: 1em;
+            margin: 0 10px;
+            transition: background-color 0.3s ease;
+        }
+        .buttons a:hover {
+            background-color: #1ED760; /* Lighter green on hover */
+        }
+        /* Note: For more extensive styling, consider using the existing static/style.css */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to the Spotify Cover Generator!</h1>
+        <p>
+            This project helps you generate unique and creative covers for your Spotify playlists or tracks. 
+            Log in or sign up to get started and unleash your creativity.
+        </p>
+        <div class="buttons">
+            <a href="/spotify/login">Login</a>
+            <a href="/spotify/signup">Sign Up</a> 
+            <!-- Assuming /spotify/signup is the correct URL, otherwise it might also go to /spotify/login -->
+        </div>
+    </div>
+</body>
+</html>
