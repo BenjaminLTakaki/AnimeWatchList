@@ -274,12 +274,6 @@ class AppDispatcher:
         
     def __call__(self, environ, start_response):
         path_info = environ.get('PATH_INFO', '')
-        # Directly route unprefixed skillstown endpoints
-        if has_skillstown_app and any(path_info.startswith(pref) for pref in ['/course', '/user', '/quiz', '/assessment', '/results', '/search', '/enroll']):
-            script_name = '/skillstown'
-            environ['SCRIPT_NAME'] = script_name
-            environ['PATH_INFO'] = path_info
-            return skillstown_app(environ, start_response)
         
         # Handle static file requests
         if has_skillstown_app and path_info.startswith('/skillstown/static/'):
