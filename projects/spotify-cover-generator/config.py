@@ -35,10 +35,10 @@ if os.getenv("RENDER"):
     SPOTIFY_REDIRECT_URI = "https://www.benjamintakaki.com/spotify/spotify-callback"
 elif os.getenv("DEVELOPMENT"):
     # Local development
-    SPOTIFY_REDIRECT_URI = "http://localhost:5000/spotify/auth/spotify/callback"
+    SPOTIFY_REDIRECT_URI = "http://localhost:5000/spotify-callback"
 else:
     # Fallback - try to get from environment or use default
-    SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "https://www.benjamintakaki.com/spotify/auth/spotify/callback")
+    SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "https://www.benjamintakaki.com/spotify/spotify-callback")
 
 print(f"🔗 Using Spotify redirect URI: {SPOTIFY_REDIRECT_URI}")
 

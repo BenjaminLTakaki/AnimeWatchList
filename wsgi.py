@@ -204,21 +204,7 @@ SPOTIFY_APP_STATIC_DIR = os.path.join(spotify_path, 'static')
 def index():
     return send_from_directory('.', 'index.html')
 
-@main_app.route('/<path:path>')
-def serve_static(path):
-    # Redirect project shortcuts
-    if path.startswith('projects/skillstown'):
-        return redirect('/skillstown/')
-    if path.startswith('projects/animewatchlist'):
-        return redirect('/animewatchlist/')
-    if path.startswith('projects/spotify-cover-generator'):
-        return redirect('/spotify/')
-    # Serve files
-    if os.path.exists(path):
-        return send_from_directory('.', path)
-    return "File not found", 404
-
-# Create direct routes to the apps
+# Create direct routes to the apps BEFORE the catch-all route
 if has_skillstown_app:
     @main_app.route('/projects/skillstown')
     @main_app.route('/projects/skillstown/')
@@ -240,6 +226,29 @@ def spotify_redirect():
 @main_app.route('/spotify')
 def spotify_direct():
     return redirect('/spotify/')
+
+# Catch-all route for static files (MUST be last)
+@main_app.route('/<path:path>')
+def serve_static(path):
+    # Handle direct app routes first
+    if path == 'spotify':
+        return redirect('/spotify/')
+    if path == 'skillstown':
+        return redirect('/skillstown/')
+    if path == 'animewatchlist':
+        return redirect('/animewatchlist/')
+    
+    # Redirect project shortcuts
+    if path.startswith('projects/skillstown'):
+        return redirect('/skillstown/')
+    if path.startswith('projects/animewatchlist'):
+        return redirect('/animewatchlist/')
+    if path.startswith('projects/spotify-cover-generator'):
+        return redirect('/spotify/')
+    # Serve files
+    if os.path.exists(path):
+        return send_from_directory('.', path)
+    return "File not found", 404
 
 # Handle static files from the main app
 if has_skillstown_app:
