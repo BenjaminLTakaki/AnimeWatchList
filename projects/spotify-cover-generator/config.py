@@ -17,13 +17,23 @@ if os.getenv("RENDER"):
     TEMP_DIR = Path("/tmp")
     LORA_DIR = TEMP_DIR / "loras"
 else:
-    # Local development
+    # Local development - use local directory
     LORA_DIR = BASE_DIR / "loras"
 
 # Create necessary directories
 COVERS_DIR.mkdir(exist_ok=True)
 DATA_DIR.mkdir(exist_ok=True)
-LORA_DIR.mkdir(exist_ok=True)
+
+# Only create LORA_DIR if it's not in /tmp or if we can actually create it
+try:
+    LORA_DIR.mkdir(exist_ok=True)
+    print(f"✅ Created LORA_DIR: {LORA_DIR}")
+except (FileNotFoundError, OSError) as e:
+    print(f"⚠️ Could not create LORA_DIR {LORA_DIR}: {e}")
+    # Fallback to local directory
+    LORA_DIR = BASE_DIR / "loras"
+    LORA_DIR.mkdir(exist_ok=True)
+    print(f"✅ Using fallback LORA_DIR: {LORA_DIR}")
 
 # Spotify API - use environment variables from Render
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")

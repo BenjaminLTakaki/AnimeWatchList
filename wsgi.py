@@ -108,6 +108,7 @@ except Exception as e:
 spotify_path = os.path.join(project_root, 'projects/spotify-cover-generator')
 
 # Import Spotify app - FIXED PATH HANDLING
+spotify_error = None
 try:
     print(f"Setting up Spotify app from path: {spotify_path}")
     
@@ -136,6 +137,7 @@ try:
         os.chdir(old_cwd)
         
 except Exception as e:
+    spotify_error = str(e)
     print(f"❌ Could not import Spotify app: {e}")
     print(f"Error type: {type(e).__name__}")
     import traceback
@@ -286,6 +288,28 @@ def spotify_static(filename):
     else:
         return f"Spotify app is not available", 503
 
+# Debug route to check app loading status
+@main_app.route('/debug/apps')
+def debug_apps():
+    return f"""
+    <h2>App Status Debug</h2>
+    <ul>
+        <li><strong>SkillsTown:</strong> {'✅ Loaded' if has_skillstown_app else '❌ Failed'}</li>
+        <li><strong>AnimeWatchList:</strong> {'✅ Loaded' if has_animewatchlist_app else '❌ Failed'}</li>
+        <li><strong>Spotify:</strong> {'✅ Loaded' if has_spotify_app else '❌ Failed'}</li>
+    </ul>
+    <h3>Paths:</h3>
+    <ul>
+        <li><strong>SkillsTown Path:</strong> {skillstown_system_path}</li>
+        <li><strong>AnimeWatchList Path:</strong> {animewatchlist_path}</li>
+        <li><strong>Spotify Path:</strong> {spotify_path}</li>
+    </ul>
+    <h3>Spotify Error (if any):</h3>
+    <pre>{spotify_error if spotify_error else 'No error recorded'}</pre>
+    <h3>SkillsTown Error (if any):</h3>
+    <pre>{skillstown_error if skillstown_error else 'No error recorded'}</pre>
+    """
+
 # ===================================================================
 # WSGI APPLICATION DISPATCHER
 # ===================================================================
@@ -293,34 +317,48 @@ def spotify_static(filename):
 class AppDispatcher:
     def __init__(self, app):
         self.app = app
-        
-    def __call__(self, environ, start_response):
+          def __call__(self, environ, start_response):
         path_info = environ.get('PATH_INFO', '')
-          # Handle static file requests
+        print(f"🔍 DEBUG: Routing request for path: {path_info}")
+        print(f"🔍 DEBUG: has_skillstown_app = {has_skillstown_app}")
+        print(f"🔍 DEBUG: has_animewatchlist_app = {has_animewatchlist_app}")
+        print(f"🔍 DEBUG: has_spotify_app = {has_spotify_app}")
+        
+        # Handle static file requests
         if has_skillstown_app and path_info.startswith('/skillstown/static/'):
+            print(f"🔍 DEBUG: Routing to SkillsTown static files")
             environ['PATH_INFO'] = path_info
             return main_app(environ, start_response)
         elif has_animewatchlist_app and path_info.startswith('/animewatchlist/static/'):
+            print(f"🔍 DEBUG: Routing to AnimeWatchList static files")
             environ['PATH_INFO'] = path_info
             return main_app(environ, start_response)
         elif path_info.startswith('/spotify/static/'):
+            print(f"🔍 DEBUG: Routing to Spotify static files")
             environ['PATH_INFO'] = path_info
             return main_app(environ, start_response)
-              # Route requests to the appropriate app
+        
+        # Route requests to the appropriate app
         if has_skillstown_app and path_info.startswith('/skillstown'):
+            print(f"🔍 DEBUG: Routing to SkillsTown app")
             script_name = '/skillstown'
             environ['SCRIPT_NAME'] = script_name
             environ['PATH_INFO'] = path_info[len(script_name):]
+            print(f"Debug: Routing to SkillsTown app, SCRIPT_NAME: {script_name}, PATH_INFO: {environ['PATH_INFO']}")
             return skillstown_app(environ, start_response)
         elif has_animewatchlist_app and path_info.startswith('/animewatchlist'):
+            print(f"🔍 DEBUG: Routing to AnimeWatchList app")
             script_name = '/animewatchlist'
             environ['SCRIPT_NAME'] = script_name
             environ['PATH_INFO'] = path_info[len(script_name):]
+            print(f"Debug: Routing to AnimeWatchList app, SCRIPT_NAME: {script_name}, PATH_INFO: {environ['PATH_INFO']}")
             return animewatchlist_app(environ, start_response)
         elif path_info.startswith('/spotify'):
+            print(f"🔍 DEBUG: Routing to Spotify app (has_spotify_app = {has_spotify_app})")
             script_name = '/spotify'
             environ['SCRIPT_NAME'] = script_name
             environ['PATH_INFO'] = path_info[len(script_name):]
+            print(f"Debug: Routing to Spotify app, SCRIPT_NAME: {script_name}, PATH_INFO: {environ['PATH_INFO']}")
             # IMPORTANT: Set the working directory for Spotify app requests
             old_cwd = os.getcwd()
             try:
@@ -330,6 +368,8 @@ class AppDispatcher:
                 os.chdir(old_cwd)
             
         # Everything else goes to the main app
+        print(f"🔍 DEBUG: Routing to main app (default)")
+        print("Debug: Routing to main app")
         return main_app(environ, start_response)
 
 # Set up the WSGI application with our custom dispatcher
@@ -342,14 +382,3 @@ if __name__ == "__main__":
     from werkzeug.serving import run_simple
     run_simple('localhost', 5000, application, use_reloader=True)
 
-# ===================================================================
-# REFACTORING NOTES (June 2025)
-# ===================================================================
-# Key changes made to match new workspace structure:
-# 1. SkillsTown app moved from projects/skillstown/app.py to projects/skillstown/system/app.py
-# 2. Added proper error handling and conditional loading for all apps
-# 3. Fixed static file paths to match actual directory structure
-# 4. Added has_*_app flags to prevent errors when apps fail to load
-# 5. Improved logging with ✅/❌ indicators for better debugging
-# 6. Maintained backward compatibility with existing routes
-# ===================================================================
