@@ -75,18 +75,23 @@ try:
     original_sys_path = sys.path.copy()
     if spotify_path not in sys.path:
         sys.path.insert(0, spotify_path)
-    old_cwd = os.getcwd()
-    os.chdir(spotify_path)
-    from app import app as spotify_app
+    # old_cwd = os.getcwd() # Removed
+    # os.chdir(spotify_path) # Removed
+    from app import app as spotify_app # Import occurs with CWD as project root
     has_spotify_app = True
     print("✅ Spotify app imported successfully")
-    os.chdir(old_cwd)
+    # os.chdir(old_cwd) # Removed
 except Exception as e:
     spotify_error = str(e)
     has_spotify_app = False
     print(f"❌ Could not import Spotify: {e}")
-    os.chdir(old_cwd)
-    sys.path = original_sys_path
+    # No CWD change happened in the try block, so no explicit revert needed here for CWD.
+    # Restore sys.path
+    if 'original_sys_path' in locals(): # Check if original_sys_path was defined
+        sys.path = original_sys_path
+    elif spotify_path in sys.path: # Fallback if original_sys_path wasn't captured
+        sys.path.remove(spotify_path)
+
     spotify_app = Flask("spotify_stub")
     @spotify_app.route('/')
     def spotify_index():
