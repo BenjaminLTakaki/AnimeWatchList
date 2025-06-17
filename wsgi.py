@@ -66,47 +66,112 @@ except Exception as e:
     
     has_animewatchlist_app = True
 
-# Spotify Cover Generator app setup
+# Spotify Cover Generator app setup - FIXED VERSION
 spotify_path = os.path.join(project_root, 'projects/spotify-cover-generator')
 
-# Import Spotify app - FIXED PATH HANDLING
-try:
-    print(f"Setting up Spotify app from path: {spotify_path}")
-    
-    # Store original sys.path to restore later
-    original_sys_path = sys.path.copy()
-    
-    # Add the spotify project directory to the path FIRST
-    # This ensures all imports within the spotify app work correctly
-    if spotify_path not in sys.path:
-        sys.path.insert(0, spotify_path)
-    
-    print(f"Added Spotify path to sys.path: {spotify_path}")
-    print(f"Current working directory: {os.getcwd()}")
-    print(f"Spotify directory contents: {os.listdir(spotify_path) if os.path.exists(spotify_path) else 'Directory not found'}")
-    
-    # Change the working directory temporarily for the import
-    old_cwd = os.getcwd()
-    os.chdir(spotify_path)
-    
+def import_spotify_app():
+    """Safely import the Spotify app with proper error handling"""
     try:
-        # Now import the app - this should work because we're in the right directory
-        # and the path is set correctly
-        from app import app as spotify_app
-        print("✅ Spotify app imported successfully")
-        has_spotify_app = True
-    finally:
-        # Always restore the working directory
-        os.chdir(old_cwd)
+        print(f"Setting up Spotify app from path: {spotify_path}")
         
-except Exception as e:
-    print(f"❌ Could not import Spotify app: {e}")
-    print(f"Error type: {type(e).__name__}")
-    import traceback
-    print(f"Full traceback: {traceback.format_exc()}")
-    has_spotify_app = False
-    # Restore the original path if import failed
-    sys.path = original_sys_path
+        if not os.path.exists(spotify_path):
+            print(f"❌ Spotify path does not exist: {spotify_path}")
+            return None, False
+        
+        # Add the spotify project directory to the path
+        if spotify_path not in sys.path:
+            sys.path.insert(0, spotify_path)
+            print(f"✓ Added Spotify path to sys.path")
+        
+        # Change to spotify directory for import
+        old_cwd = os.getcwd()
+        os.chdir(spotify_path)
+        
+        try:
+            # Import with error handling
+            from app import app as spotify_app
+            
+            # Test basic app functionality
+            with spotify_app.app_context():
+                # Try a simple database operation to verify it works
+                try:
+                    from app import db
+                    db.session.execute(db.text('SELECT 1'))
+                    print("✓ Spotify app database connection verified")
+                except Exception as db_error:
+                    print(f"⚠️ Spotify database issue: {db_error}")
+                    # Continue anyway - the app might still work for basic functions
+            
+            print("✅ Spotify app imported successfully")
+            return spotify_app, True
+            
+        except ImportError as import_error:
+            print(f"❌ Spotify app import failed: {import_error}")
+            print("Creating stub Spotify app")
+            
+            # Create a stub app that shows an error message
+            stub_app = Flask("spotify_stub")
+            
+            @stub_app.route('/')
+            @stub_app.route('/<path:path>')
+            def spotify_error(path=None):
+                return f"""
+                <h1>Spotify Cover Generator - Temporarily Unavailable</h1>
+                <p>The Spotify Cover Generator is experiencing technical difficulties.</p>
+                <p>Error: {import_error}</p>
+                <p><a href=\"/\">Return to main site</a></p>
+                """
+            
+            return stub_app, False
+            
+        except Exception as e:
+            print(f"❌ Unexpected error importing Spotify app: {e}")
+            import traceback
+            print(f"Full traceback: {traceback.format_exc()}")
+            return None, False
+            
+        finally:
+            os.chdir(old_cwd)
+    
+    except Exception as e:
+        print(f"❌ Critical error in Spotify app setup: {e}")
+        return None, False
+
+# Use the safe import function
+spotify_app, has_spotify_app = import_spotify_app()
+
+# Configure Spotify app if it was imported successfully
+if has_spotify_app and spotify_app:
+    try:
+        spotify_app.config['APPLICATION_ROOT'] = '/spotify'
+        spotify_app.config['PREFERRED_URL_SCHEME'] = 'https'
+        
+        @spotify_app.context_processor
+        def inject_spotify_vars():
+            return {
+                'current_year': datetime.datetime.now().year
+            }
+        
+        print("✓ Spotify app configured successfully")
+    except Exception as config_error:
+        print(f"⚠️ Spotify app configuration warning: {config_error}")
+else:
+    print("⚠️ Spotify app not available")
+
+# Update the static file serving for Spotify
+if has_spotify_app:
+    SPOTIFY_APP_STATIC_DIR = os.path.join(spotify_path, 'static')
+    
+    @main_app.route('/spotify/static/<path:filename>')
+    def spotify_static(filename):
+        try:
+            if os.path.exists(os.path.join(SPOTIFY_APP_STATIC_DIR, filename)):
+                return send_from_directory(SPOTIFY_APP_STATIC_DIR, filename)
+            else:
+                return f"Static file {filename} not found", 404
+        except Exception as e:
+            print(f"Error serving Spotify static file {filename}: {e}")
+            return "Error serving file", 500
 
 # Configure context processors
 @skillstown_app.context_processor
@@ -193,16 +258,6 @@ def animewatchlist_static(filename):
     else:
         print(f"AnimeWatchList static file not found: {filename}")
         return f"Static file {filename} not found", 404
-
-if has_spotify_app:
-    @main_app.route('/spotify/static/<path:filename>')
-    def spotify_static(filename):
-        print(f"Serving Spotify static file: {filename} from {SPOTIFY_APP_STATIC_DIR}")
-        if os.path.exists(os.path.join(SPOTIFY_APP_STATIC_DIR, filename)):
-            return send_from_directory(SPOTIFY_APP_STATIC_DIR, filename)
-        else:
-            print(f"Spotify static file not found: {filename}")
-            return f"Static file {filename} not found", 404
 
 # Class to handle routing to the app
 class AppDispatcher:

@@ -14,9 +14,60 @@ try:
     from .models import PlaylistData, GenreAnalysis
 except ImportError:
     # Fallback for when relative import doesn't work
-    import models
-    PlaylistData = models.PlaylistData
-    GenreAnalysis = models.GenreAnalysis
+    try:
+        import models
+        PlaylistData = models.PlaylistData
+        GenreAnalysis = models.GenreAnalysis
+    except (ImportError, AttributeError):
+        # Ultimate fallback - create simple classes if models not available
+        print("⚠️ Models not available, creating fallback classes")
+        
+        class PlaylistData:
+            def __init__(self, item_name="", track_names=None, genre_analysis=None, 
+                        spotify_url="", found_genres=False, artist_ids=None):
+                self.item_name = item_name
+                self.track_names = track_names or []
+                self.genre_analysis = genre_analysis
+                self.spotify_url = spotify_url
+                self.found_genres = found_genres
+                self.artist_ids = artist_ids or []
+                
+            def to_dict(self):
+                return {
+                    "item_name": self.item_name,
+                    "track_names": self.track_names,
+                    "genres": getattr(self.genre_analysis, 'top_genres', []),
+                    "all_genres": getattr(self.genre_analysis, 'all_genres', []),
+                    "mood_descriptor": getattr(self.genre_analysis, 'mood', 'balanced'),
+                    "spotify_url": self.spotify_url,
+                    "found_genres": self.found_genres,
+                    "style_elements": [],
+                    "artist_ids": self.artist_ids
+                }
+        
+        class GenreAnalysis:
+            def __init__(self, top_genres=None, all_genres=None, mood="balanced"):
+                self.top_genres = top_genres or []
+                self.all_genres = all_genres or []
+                self.mood = mood
+                
+            @classmethod
+            def from_genre_list(cls, genres):
+                from collections import Counter
+                if not genres:
+                    return cls()
+                
+                genre_counter = Counter(genres)
+                top_genres = [genre for genre, _ in genre_counter.most_common(10)]
+                
+                return cls(
+                    top_genres=top_genres,
+                    all_genres=genres,
+                    mood="balanced"
+                )
+                
+            def get_style_elements(self):
+                return []
 
 from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
 

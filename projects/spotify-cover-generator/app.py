@@ -510,188 +510,53 @@ def migrate_lora_table():
         return False
 
 def initialize_app():
-    """Initialize the application's dependencies with better import handling"""
+    """Initialize the application's dependencies with safer error handling"""
     global initialized
     
     print("🔧 Initializing Spotify Cover Generator...")
     
-    # Make sure necessary directories exist first
+    # Create directories first
     try:
         os.makedirs(COVERS_DIR, exist_ok=True)
-        # Create LoRA directory for file uploads
         lora_dir = BASE_DIR / "loras"
         os.makedirs(lora_dir, exist_ok=True)
         print("✓ Created directories")
     except Exception as e:
         print(f"⚠️ Directory creation warning: {e}")
     
-    # Database setup
-    try:
-        with app.app_context():
-            print("📊 Setting up database...")
-            
-            # Test database connection
-            try:
-                with db.engine.connect() as connection:
-                    connection.execute(text('SELECT 1'))
-                print("✓ Database connection successful")
-            except Exception as e:
-                print(f"❌ Database connection failed: {e}")
-                return False
-            
-            # Check and create tables
-            inspector = db.inspect(db.engine)
-            existing_tables = inspector.get_table_names()
-            print(f"📋 Existing tables: {existing_tables}")
-            
-            db.create_all()
-            print("✓ db.create_all() executed")
-            
-            # Run LoRA table migration
-            migrate_lora_table()
-            
-            # Verify required tables exist
-            new_tables = inspector.get_table_names()
-            required_tables = [
-                'spotify_users', 
-                'spotify_login_sessions', 
-                'spotify_oauth_states',
-                'spotify_generation_results',
-                'spotify_lora_models'
-            ]
-            
-            missing_tables = [t for t in required_tables if t not in new_tables]
-            if missing_tables:
-                print(f"❌ Still missing tables: {', '.join(missing_tables)}")
-                try:
-                    create_tables_manually()
-                    final_tables = inspector.get_table_names()
-                    final_missing = [t for t in required_tables if t not in final_tables]
-                    if final_missing:
-                        print(f"❌ Manual creation also failed for: {', '.join(final_missing)}")
-                        return False
-                    else:
-                        print("✓ Manual table creation successful for missing tables")
-                except Exception as e_manual:
-                    print(f"❌ Manual table creation attempt failed: {e_manual}")
-                    return False
-            else:
-                print("✓ All required tables present")
-                
-    except Exception as e:
-        print(f"❌ Database setup failed: {e}")
+    # Initialize database safely
+    if not initialize_database_safely():
+        print("❌ Database initialization failed")
         return False
-    
-    # Import modules with better error handling
-    print("📦 Importing modules...")
-    
-    # Global variables to track what's available
-    global spotify_client_available, models_available, utils_available, generator_available
-    spotify_client_available = False
-    models_available = False
-    utils_available = False
-    generator_available = False
-    
-    # Get the current working directory for imports
-    original_cwd = os.getcwd()
-    module_level_current_dir = os.path.dirname(os.path.abspath(__file__))
 
+    # Test essential imports
     try:
-        # Change to the spotify app directory for imports
-        os.chdir(module_level_current_dir)
+        # Test if we can import the essential modules
+        import spotify_client
+        import generator
+        print("✓ Essential modules imported successfully")
         
-        # Try importing modules
-        try:
-            import spotify_client
-            print("✓ spotify_client imported")
-            spotify_client_available = True
-        except ImportError as e:
-            print(f"⚠️ spotify_client import failed: {e}")
+        # Test Spotify client initialization
+        if spotify_client.initialize_spotify():
+            print("✓ Spotify client initialized")
+        else:
+            print("⚠️ Spotify client initialization failed - continuing anyway")
             
-        try:
-            import models
-            print("✓ models imported")
-            models_available = True
-        except ImportError as e:
-            print(f"⚠️ models import failed: {e}")
-            
-        try:
-            import utils
-            print("✓ utils imported")
-            utils_available = True
-        except ImportError as e:
-            print(f"⚠️ utils import failed: {e}")
-        
-        try:
-            import generator
-            print("✓ generator imported")
-            generator_available = True
-        except ImportError as e:
-            print(f"⚠️ generator import failed: {e}")
-        
-        try:
-            import title_generator
-            import image_generator
-            import chart_generator
-            print("✓ Additional generation modules imported")
-        except ImportError as e:
-            print(f"⚠️ Some generation modules unavailable: {e}")
-            
-    finally:
-        os.chdir(original_cwd)
-    
-    print("✓ Module imports completed")
-    
-    # Initialize Spotify client if available
-    if spotify_client_available:
-        print("🎵 Initializing Spotify client...")
-        try:
-            spotify_initialized = spotify_client.initialize_spotify()
-            if spotify_initialized:
-                print("✓ Spotify client initialized")
-            else:
-                print("⚠️ Spotify client initialization failed - continuing with limited functionality")
-        except Exception as e:
-            print(f"⚠️ Spotify initialization error: {e}")
-    else:
-        print("⚠️ Spotify client not available - skipping initialization")
+    except ImportError as e:
+        print(f"❌ Critical module import failed: {e}")
+        return False
+    except Exception as e:
+        print(f"⚠️ Module initialization warning: {e}")
     
     # Check environment variables
-    print("🔑 Checking environment variables...")
-    try:
-        from config import GEMINI_API_KEY, STABILITY_API_KEY
-    except ImportError:
-        GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-        STABILITY_API_KEY = os.environ.get('STABILITY_API_KEY')
-    
-    env_vars_present = all([
-        SPOTIFY_CLIENT_ID, 
-        SPOTIFY_CLIENT_SECRET, 
-        GEMINI_API_KEY, 
-        STABILITY_API_KEY
-    ])
-    
-    if not env_vars_present:
-        missing = []
-        if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
-            missing.append("Spotify API credentials")
-        if not GEMINI_API_KEY:
-            missing.append("Gemini API key")
-        if not STABILITY_API_KEY:
-            missing.append("Stable Diffusion API key")
-        print(f"❌ Missing environment variables: {', '.join(missing)}")
-    else:
-        print("✓ All environment variables present")
-    
-    # Set initialization status
-    initialized = env_vars_present and (spotify_client_available or models_available)
-    
-    if initialized:
-        print("🎉 Application initialized successfully!")
-    else:
-        print("⚠️ Application initialization completed with limited functionality")
-    
-    return initialized
+    required_vars = [SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET]
+    if not all(required_vars):
+        print("❌ Missing required Spotify credentials")
+        return False
+
+    initialized = True
+    print("🎉 Application initialized successfully!")
+    return True
 
 def create_tables_manually():
     """Manually create tables using SQLAlchemy 2.0+ compatible syntax"""
@@ -785,6 +650,58 @@ def create_tables_manually():
         ALTER TABLE spotify_generation_results 
         ADD CONSTRAINT IF NOT EXISTS fk_generation_results_user_id 
         FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE SET NULL;
+        ""
+        CREATE TABLE IF NOT EXISTS spotify_oauth_states (
+            id SERIAL PRIMARY KEY,
+            state VARCHAR(100) UNIQUE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            used BOOLEAN DEFAULT FALSE
+        );
+        """,
+        
+        # LoRA models table (UPDATED for file uploads only)
+        """
+        CREATE TABLE IF NOT EXISTS spotify_lora_models (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) UNIQUE NOT NULL,
+            source_type VARCHAR(20) DEFAULT 'local',
+            path VARCHAR(500) DEFAULT '',
+            file_size INTEGER DEFAULT 0,
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            uploaded_by INTEGER
+        );
+        """,
+        
+        # Generation results table
+        """
+        CREATE TABLE IF NOT EXISTS spotify_generation_results (
+            id SERIAL PRIMARY KEY,
+            title VARCHAR(500) NOT NULL,
+            output_path VARCHAR(1000) NOT NULL,
+            item_name VARCHAR(500),
+            genres JSON,
+            all_genres JSON,
+            style_elements JSON,
+            mood VARCHAR(1000),
+            energy_level VARCHAR(50),
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            spotify_url VARCHAR(1000),
+            lora_name VARCHAR(200),
+            lora_type VARCHAR(20),
+            lora_url VARCHAR(1000),
+            user_id INTEGER
+        );
+        """,
+          # Add foreign keys (simplified for better PostgreSQL compatibility)
+        """
+        ALTER TABLE spotify_login_sessions 
+        ADD CONSTRAINT IF NOT EXISTS fk_login_sessions_user_id 
+        FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE CASCADE;
+        """,
+        """
+        ALTER TABLE spotify_generation_results 
+        ADD CONSTRAINT IF NOT EXISTS fk_generation_results_user_id 
+        FOREIGN KEY (user_id) REFERENCES spotify_users(id) ON DELETE SET NULL;
         """,
         """
         ALTER TABLE spotify_lora_models 
@@ -812,6 +729,55 @@ def create_tables_manually():
             except Exception as e:
                 print(f"❌ SQL command {i+1} failed: {e}")
                 raise
+
+def initialize_database_safely():
+    """Safely initialize database with error handling"""
+    try:
+        with app.app_context():
+            print("📊 Initializing database...")
+            
+            # Test basic connection first
+            try:
+                db.session.execute(db.text('SELECT 1'))
+                print("✓ Database connection successful")
+            except Exception as e:
+                print(f"❌ Database connection failed: {e}")
+                return False
+            
+            # Create all tables
+            try:
+                db.create_all()
+                print("✓ Database tables created successfully")
+            except Exception as e:
+                print(f"⚠️ Error creating tables: {e}")
+                # Try to create tables manually
+                try:
+                    create_tables_manually()
+                    print("✓ Manual table creation successful")
+                except Exception as manual_error:
+                    print(f"❌ Manual table creation failed: {manual_error}")
+                    return False
+            
+            # Verify essential tables exist
+            inspector = db.inspect(db.engine)
+            existing_tables = inspector.get_table_names()
+            required_tables = [
+                'spotify_users', 
+                'spotify_login_sessions', 
+                'spotify_oauth_states'
+            ]
+            
+            missing_tables = [t for t in required_tables if t not in existing_tables]
+            if missing_tables:
+                print(f"⚠️ Missing essential tables: {missing_tables}")
+                return False
+            
+            print("✅ Database initialization complete")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+        return False
 
 # Guest session functions (unchanged)
 def get_or_create_guest_session():
