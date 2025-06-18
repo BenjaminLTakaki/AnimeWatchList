@@ -25,45 +25,29 @@ from flask import (Flask, request, render_template, send_from_directory, jsonify
                    session, redirect, url_for, flash, make_response)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from flask_sqlalchemy import SQLAlchemy # Keep for type hinting if necessary, or remove if not used directly
-from flask_migrate import Migrate # Keep for type hinting if necessary, or remove if not used directly
-from flask_limiter import Limiter # Keep for type hinting if necessary, or remove if not used directly
-from flask_limiter.util import get_remote_address # Keep if used by limiter instance in routes directly
+from flask_sqlalchemy import SQLAlchemy 
+from flask_migrate import Migrate 
+from flask_limiter import Limiter 
+from flask_limiter.util import get_remote_address
 from sqlalchemy import text
 
 # Import create_app from the package __init__
-from . import create_app
+from spotify_cover_generator.factory import create_app
 
 # Import necessary Flask components and other utilities
 from flask import request, render_template, send_from_directory, jsonify, session, redirect, url_for, flash, make_response # Added Flask here
 from werkzeug.security import generate_password_hash, check_password_hash # Keep for routes
 from werkzeug.utils import secure_filename # Keep for routes
 
-# Extensions and models will be used by routes, so they need to be available.
-# However, db, limiter are initialized in the factory.
-# Routes in this file will use the 'app' object created by create_app(),
-# which has extensions initialized.
-from .extensions import db, limiter # Keep for @limiter.limit decorator
-from .models import User, LoginSession, LoraModelDB, GenerationResultDB, SpotifyState # Keep for route logic
-from .auth_utils import get_current_user # Keep for route logic, though get_current_user_or_guest is in factory
-from .decorators import login_required, admin_required, permission_required # Keep for route decorators
+from spotify_cover_generator.extensions import db, limiter # Keep for @limiter.limit decorator
+from spotify_cover_generator.models import User, LoginSession, LoraModelDB, GenerationResultDB, SpotifyState # Keep for route logic
+from spotify_cover_generator.auth_utils import get_current_user # Keep for route logic, though get_current_user_or_guest is in factory
+from spotify_cover_generator.decorators import login_required, admin_required, permission_required # Keep for route decorators
 
-# Create the Flask app instance using the factory
 app = create_app()
 
-# Configuration and extension initialization is now done in create_app in factory.py / __init__.py
-# BASE_DIR, COVERS_DIR will be loaded from app.config if needed by routes, e.g., app.config['COVERS_DIR']
-# For direct use in this file (like old COVERS_DIR variable), need to access via app.config
-# Example: COVERS_DIR = app.config.get('COVERS_DIR')
-# However, serve_image uses send_from_directory which can take app.config['COVERS_DIR']
-
-# Global variables like MONITORING_AVAILABLE, FAULT_HANDLING_AVAILABLE are now app.config items
-# Example: MONITORING_AVAILABLE = app.config.get('MONITORING_AVAILABLE', False)
-# These should be accessed via app.config within routes if needed.
-
-# CRITICAL: Import monitoring system with fallback
 try:
-    from monitoring_system import (
+    from spotify_cover_generator.monitoring_system import (
         setup_monitoring, monitor_performance, monitor_api_calls,
         app_logger, alert_manager, system_monitor
     )
@@ -83,7 +67,7 @@ except ImportError as e:
 
 # Import fault handling with fallback
 try:
-    from fault_handling import (
+    from spotify_cover_generator.fault_handling import (
         fault_tolerant_api_call, GracefulDegradation, db_failover,
         create_user_friendly_error_messages, FaultContext, http_client
     )
@@ -125,7 +109,7 @@ def generate():
     loras = []
     if user_info['can_use_loras']:
         try:
-            from utils import get_available_loras
+            from spotify_cover_generator.utils import get_available_loras
             loras = get_available_loras()
         except Exception as e:
             print(f"⚠️ Error getting LoRAs: {e}")
@@ -135,7 +119,7 @@ def generate():
         try:
             # Import generator with error handling
             try:
-                import generator
+                from spotify_cover_generator import generator
                 GENERATOR_AVAILABLE = True
             except ImportError as e:
                 print(f"❌ Generator import failed: {e}")
@@ -213,13 +197,13 @@ def generate():
             genre_percentages_data = []
             
             try:
-                import chart_generator
+                from spotify_cover_generator import chart_generator
                 genres_chart_data = chart_generator.generate_genre_chart(result.get("all_genres", []))
             except Exception as e:
                 print(f"⚠️ Error generating genre chart: {e}")
 
             try:
-                from utils import calculate_genre_percentages
+                from spotify_cover_generator.utils import calculate_genre_percentages
                 genre_percentages_data = calculate_genre_percentages(result.get("all_genres", []))
             except Exception as e:
                 print(f"⚠️ Error calculating genre percentages: {e}")
@@ -227,7 +211,7 @@ def generate():
             # Extract playlist ID
             playlist_id = None
             try:
-                from utils import extract_playlist_id
+                from spotify_cover_generator.utils import extract_playlist_id
                 playlist_id = extract_playlist_id(playlist_url) if playlist_url and "playlist/" in playlist_url else None
             except Exception as e:
                 print(f"⚠️ Error extracting playlist ID: {e}")
@@ -949,14 +933,10 @@ def get_upload_info(user): # Added user argument
     except Exception as e:
         print(f"Upload info error: {e}")
         return jsonify({"error": "Internal server error"}), 500
-# Context processor is now in factory.py / __init__.py
-# Monitoring initialization is now in factory.py / __init__.py
-# Database models are in models.py
-# initialize_database_safely is now in factory.py / __init__.py and called during app creation.
+
 
 if __name__ == '__main__':
-    # app is already created by create_app() at the global scope of this file
-    # initialize_database_safely is now called within create_app.
+
     port = int(os.environ.get("PORT", 5000))
     # Consider app.config for DEBUG settings as well
     app.run(debug=app.config.get("DEBUG", False), host="0.0.0.0", port=port)
