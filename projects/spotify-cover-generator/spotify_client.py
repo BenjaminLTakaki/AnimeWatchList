@@ -5,10 +5,16 @@ from collections import Counter
 from models import PlaylistData, GenreAnalysis
 from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
 
+# Fault handling and retry imports
+from fault_handling import retry_with_exponential_backoff, GracefulDegradation
+from requests.exceptions import ConnectionError
+import time
+from spotipy.oauth2 import SpotifyClientCredentials # Already imported above, but good to note its use for auth type checking
+
 # Monitoring imports with fallback
 try:
     from monitoring_system import monitor_api_calls
-    from fault_handling import fault_tolerant_api_call
+    from fault_handling import fault_tolerant_api_call # This might be redundant if we use the new ones directly
 except ImportError:
     def monitor_api_calls(service_name):
         def decorator(func):
@@ -127,7 +133,8 @@ def extract_playlist_data(playlist_url):
     
     try:
         is_playlist = "playlist/" in playlist_url
-        
+        is_guest_session = isinstance(sp.auth_manager, SpotifyClientCredentials) if sp.auth_manager else False
+
         if is_playlist:
             # Extract playlist ID more robustly
             try:
@@ -135,24 +142,26 @@ def extract_playlist_data(playlist_url):
                     item_id = playlist_url.split("playlist/")[-1].split("?")[0].split("/")[0]
                 else:
                     return {"error": "Invalid playlist URL format"}
-                
+
                 print(f"🎵 Processing playlist ID: {item_id}")
-                
+
                 # Get playlist info
                 playlist_info = sp.playlist(item_id, fields="name,description,owner")
                 item_name = playlist_info.get("name", "Unknown Playlist")
-                
+
                 print(f"✓ Found playlist: {item_name}")
-                
+
                 # Get tracks to analyze genres
                 results = sp.playlist_tracks(
                     item_id,
                     fields="items(track(id,name,artists(id,name)))",
                     market="US",
-                    limit=50  
+                    limit=50
                 )
                 tracks = results.get("items", [])
-                
+
+            except ConnectionError as e:
+                return GracefulDegradation.handle_spotify_failure(playlist_url, e)
             except spotipy.exceptions.SpotifyException as e:
                 if e.http_status == 404:
                     return {"error": "Playlist not found. Please check if the playlist exists and is public."}
@@ -160,27 +169,30 @@ def extract_playlist_data(playlist_url):
                     return {"error": "Access denied. The playlist may be private or you may not have permission to access it."}
                 else:
                     return {"error": f"Spotify API error: {str(e)}"}
-            except Exception as e:
+            except Exception as e: # General exception for unforeseen issues
+                print(f"Error processing playlist URL for {playlist_url}: {str(e)}")
                 return {"error": f"Error processing playlist URL: {str(e)}"}
-                
-        else: 
+
+        else:
             # Handle album
             try:
                 if "album/" in playlist_url:
                     item_id = playlist_url.split("album/")[-1].split("?")[0].split("/")[0]
                 else:
                     return {"error": "Invalid album URL format"}
-                
+
                 print(f"💿 Processing album ID: {item_id}")
-                
+
                 album_info = sp.album(item_id)
                 item_name = album_info.get("name", "Unknown Album")
-                
+
                 print(f"✓ Found album: {item_name}")
-                
+
                 album_tracks = album_info.get("tracks", {}).get("items", [])[:50]
                 tracks = [{"track": track} for track in album_tracks]
-                
+
+            except ConnectionError as e:
+                return GracefulDegradation.handle_spotify_failure(playlist_url, e)
             except spotipy.exceptions.SpotifyException as e:
                 if e.http_status == 404:
                     return {"error": "Album not found. Please check if the album exists."}
@@ -188,7 +200,8 @@ def extract_playlist_data(playlist_url):
                     return {"error": "Access denied. You may not have permission to access this album."}
                 else:
                     return {"error": f"Spotify API error: {str(e)}"}
-            except Exception as e:
+            except Exception as e: # General exception for unforeseen issues
+                print(f"Error processing album URL for {playlist_url}: {str(e)}")
                 return {"error": f"Error processing album URL: {str(e)}"}
             
         print(f"Found {'playlist' if is_playlist else 'album'}: {item_name}")
@@ -220,13 +233,17 @@ def extract_playlist_data(playlist_url):
         # Get genres from artists with enhanced error handling
         genres = []
         unique_artist_ids = list(set(artists))[:50]  # Limit to 50 artists max for API calls
-        
+
+        @retry_with_exponential_backoff(max_retries=3, base_delay=2.0, exceptions=(ConnectionError, SpotifyException))
+        def _fetch_artist_genres_batch(artist_ids_batch):
+            return sp.artists(artist_ids_batch)
+
         # Process artists in batches (Spotify API allows up to 50 per request)
         for i in range(0, len(unique_artist_ids), 50):
             batch = unique_artist_ids[i:min(i+50, len(unique_artist_ids))]
             
             try:
-                artist_info_batch = sp.artists(batch)
+                artist_info_batch = _fetch_artist_genres_batch(batch)
                 if artist_info_batch and 'artists' in artist_info_batch:
                     for artist in artist_info_batch['artists']:
                         if artist:  # Check if artist data is not None
@@ -234,11 +251,16 @@ def extract_playlist_data(playlist_url):
                             genres.extend(artist_genres)
                             if artist_genres:
                                 print(f"  - {artist.get('name', 'Unknown')}: {', '.join(artist_genres[:3])}")
-            except spotipy.exceptions.SpotifyException as e:
-                print(f"⚠️ Error getting artist info for batch {i//50 + 1}: {e}")
-                continue
-            except Exception as e:
-                print(f"⚠️ Unexpected error processing artist batch: {e}")
+                
+                if is_guest_session:
+                    time.sleep(0.5) # Reduce request aggressiveness for guest sessions
+
+            except (ConnectionError, spotipy.exceptions.SpotifyException) as e:
+                print(f"⚠️ Warning: Failed to fetch a batch of artist genres for batch {i//50 + 1} after retries: {e}. Proceeding with genres collected so far.")
+                # Optionally, add more specific logging or handling here
+                continue # Continue to the next batch
+            except Exception as e: # Catch any other unexpected errors during batch processing
+                print(f"⚠️ Unexpected error processing artist batch {i//50 + 1}: {e}. Proceeding with genres collected so far.")
                 continue
         
         print(f"Total genres collected: {len(genres)}")
@@ -273,8 +295,16 @@ def extract_playlist_data(playlist_url):
             return {"error": "Content not found. Please check if the URL is correct and the content exists."}
         else:
             return {"error": f"Spotify API error ({e.http_status}): {str(e)}"}
+    except ConnectionError as e: # Explicitly handle ConnectionError if it bubbles up
+        print(f"A connection error occurred: {e}")
+        return GracefulDegradation.handle_spotify_failure(playlist_url, e)
     except Exception as e:
         print(f"Unexpected error extracting data: {e}")
+        # It's good practice to check if it's a ConnectionError that somehow slipped through,
+        # though earlier specific handlers should catch it.
+        if isinstance(e, ConnectionError):
+            return GracefulDegradation.handle_spotify_failure(playlist_url, e)
+        
         import traceback
         traceback.print_exc()
         return {"error": f"An unexpected error occurred while processing your request: {str(e)}"}
