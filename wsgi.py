@@ -287,13 +287,7 @@ class AppDispatcher:
             script_name = '/spotify'
             environ['SCRIPT_NAME'] = script_name
             environ['PATH_INFO'] = path_info[len(script_name):]
-            # IMPORTANT: Set the working directory for Spotify app requests
-            old_cwd = os.getcwd()
-            try:
-                os.chdir(spotify_path)
-                return spotify_app(environ, start_response)
-            finally:
-                os.chdir(old_cwd)
+            return spotify_app(environ, start_response) # <-- Simplified call
             
         # Everything else goes to the main app
         return main_app(environ, start_response)
