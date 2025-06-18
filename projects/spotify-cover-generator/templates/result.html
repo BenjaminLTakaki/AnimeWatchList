@@ -383,7 +383,7 @@
                 showStatus('Updating playlist title & description...', 'info');
                 setButtonsDisabled(true);
                 
-                return fetch('/spotify/api/playlist/edit', {
+                return fetch('/spotify/api/playlist/edit', { 
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -525,7 +525,7 @@
 
                 // The fetch call below already uses `imageData` which is now the resized data URL.
                 // The previous subtask "Fix: Send full data URL for playlist cover image" ensured this.
-                return fetch('/api/playlist/cover', { // Ensure this path is correct (no /spotify prefix)
+                return fetch('/spotify/api/playlist/cover', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
