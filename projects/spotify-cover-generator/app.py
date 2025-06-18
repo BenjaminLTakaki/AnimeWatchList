@@ -1082,7 +1082,7 @@ def generate():
         return render_template("index.html", loras=loras)
 
 # LoRA UPLOAD ROUTE (FIXED FOR FILE UPLOADS ONLY)
-@app.route('/spotify/api/upload_lora', methods=['POST'])
+@app.route('/api/upload_lora', methods=['POST'])
 @login_required
 @limiter.limit("5 per hour")
 def upload_lora():
@@ -1159,7 +1159,7 @@ def upload_lora():
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 # Add new LoRA management and upload info routes
-@app.route('/spotify/api/delete_lora', methods=['DELETE'])
+@app.route('/api/delete_lora', methods=['DELETE'])
 @login_required
 @limiter.limit("10 per hour")
 def delete_lora():
@@ -1200,7 +1200,7 @@ def get_user_lora_upload_info(user):
         return {"can_upload": True, "current_count": current_count, "limit": "unlimited", "is_premium": True}
     return {"can_upload": current_count < 2, "current_count": current_count, "limit": 2, "is_premium": False}
 
-@app.route('/spotify/api/upload_info')
+@app.route('/api/upload_info')
 @login_required
 def get_upload_info():
     """Get user's upload information"""
@@ -1209,7 +1209,7 @@ def get_upload_info():
         return jsonify({"error": "Not authenticated"}), 401
     return jsonify(get_user_lora_upload_info(user))
 
-@app.route('/spotify/api/loras')
+@app.route('/api/loras')
 def get_loras():
     """Get list of available LoRAs (file uploads only) with ownership info"""
     try:
@@ -1248,7 +1248,7 @@ def get_loras():
         return jsonify({"loras": []})
 
 # SPOTIFY PLAYLIST EDIT ROUTES
-@app.route('/spotify/api/playlist/edit', methods=['POST'])
+@app.route('/api/playlist/edit', methods=['POST'])
 @login_required
 @limiter.limit("10 per minute")
 @monitor_api_calls(service_name="spotify_playlist_edit")
@@ -1311,7 +1311,7 @@ def edit_playlist_details():
             user_message = "An unexpected error occurred while editing playlist details."
         return jsonify({"success": False, "error": user_message}), 500
 
-@app.route('/spotify/api/playlist/cover', methods=['POST'])
+@app.route('/api/playlist/cover', methods=['POST'])
 @login_required
 @limiter.limit("5 per minute")
 @monitor_api_calls(service_name="spotify_playlist_cover")
@@ -1379,7 +1379,7 @@ def update_playlist_cover():
         return jsonify({"success": False, "error": user_message}), 500
 
 # SPOTIFY AUTH ROUTES (FIXED)
-@app.route('/spotify-login')
+@app.route('/login')
 def spotify_login():
     """Initiate Spotify OAuth flow"""
     if not SPOTIFY_CLIENT_ID:
@@ -1407,7 +1407,7 @@ def spotify_login():
     
     return redirect(auth_url)
 
-@app.route('/spotify-callback')
+@app.route('/callback')
 def spotify_callback():
     """Handle Spotify OAuth callback - FIXED PREMIUM DETECTION"""
     try:
