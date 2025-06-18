@@ -45,6 +45,11 @@ except Exception as e:
     def skillstown_index():
         return f"SkillsTown is currently unavailable. Error: {skillstown_error}"
 
+# Add projects_path to sys.path for Spotify app
+projects_path = os.path.join(project_root, 'projects')
+if projects_path not in sys.path:
+    sys.path.insert(0, projects_path)
+
 # AnimeWatchList app setup
 animewatchlist_path = os.path.join(project_root, 'projects/animewatchlist')
 sys.path.insert(0, animewatchlist_path)
@@ -78,18 +83,9 @@ def import_spotify_app():
             print(f"❌ Spotify path does not exist: {spotify_path}")
             return None, False
         
-        # Add the spotify project directory to the path
-        if spotify_path not in sys.path:
-            sys.path.insert(0, spotify_path)
-            print(f"✓ Added Spotify path to sys.path")
-        
-        # Change to spotify directory for import
-        old_cwd = os.getcwd()
-        os.chdir(spotify_path)
-        
         try:
             # Import with error handling
-            from app import app as spotify_app
+            from spotify_cover_generator.app import app as spotify_app
             
             # Test basic app functionality
             with spotify_app.app_context():
@@ -130,9 +126,6 @@ def import_spotify_app():
             print(f"Full traceback: {traceback.format_exc()}")
             return None, False
             
-        finally:
-            os.chdir(old_cwd)
-    
     except Exception as e:
         print(f"❌ Critical error in Spotify app setup: {e}")
         return None, False
