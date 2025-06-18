@@ -1,6 +1,5 @@
 from flask import (current_app, redirect, url_for, render_template,
                    session, flash, request, make_response)
-from flask_login import login_user, logout_user, login_required, current_user
 import secrets
 import datetime
 from datetime import timedelta # Ensure timedelta is imported
@@ -158,7 +157,7 @@ def profile(user): # user object is passed by login_required
         flash('Error loading profile. Please try again.', 'error')
         return redirect(url_for('main.generate')) # Redirect to main.generate
 
-from ...decorators import admin_required # Ensure this is imported
+from ..decorators import admin_required # Ensure this is imported
 
 @bp.route('/admin-only-test')
 @login_required

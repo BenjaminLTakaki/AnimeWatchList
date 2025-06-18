@@ -9,7 +9,7 @@ from sqlalchemy import text # For health check db.session.execute
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
-from extensions import db, login_manager
+from extensions import db
 from models import User
 
 get_current_user_or_guest_global_ref = None
