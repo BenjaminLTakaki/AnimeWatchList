@@ -8,6 +8,10 @@ from flask import Flask, session, request, current_app, render_template, jsonify
 from sqlalchemy import text # For health check db.session.execute
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from config import Config
+from extensions import db, login_manager
+from models import User
+
 get_current_user_or_guest_global_ref = None
 
 def monitor_performance(f):

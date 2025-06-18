@@ -1,12 +1,13 @@
 from flask import (current_app, redirect, url_for, render_template,
                    session, flash, request, make_response)
+from flask_login import login_user, logout_user, login_required, current_user
 import secrets
 import datetime
 from datetime import timedelta # Ensure timedelta is imported
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from ..extensions import db
-from ..models import User, LoginSession, GenerationResultDB # GenerationResultDB for profile stats
+from extensions import db
+from models import User, LoginSession, GenerationResultDB # GenerationResultDB for profile stats
 from ..decorators import login_required
 # get_current_user is used by login_required, but if we need user obj directly without login_required:
 from ..auth_utils import get_current_user

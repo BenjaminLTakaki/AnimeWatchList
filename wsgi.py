@@ -76,20 +76,23 @@ def import_spotify_app():
             return None, False
         
         try:
-            # Import with error handling
-            print(f"Attempting Spotify import. sys.path: {sys.path}") # <-- ADD THIS LINE
-            from spotify_cover_generator.app import app as spotify_app
+            # Add spotify-cover-generator to Python path
+            if spotify_path not in sys.path:
+                sys.path.insert(0, spotify_path)
+            
+            print(f"Attempting Spotify import. sys.path: {sys.path}")
+            
+            # Import directly from app.py in the spotify-cover-generator directory
+            from app import app as spotify_app
             
             # Test basic app functionality
             with spotify_app.app_context():
-                # Try a simple database operation to verify it works
                 try:
-                    from app import db
+                    from extensions import db
                     db.session.execute(db.text('SELECT 1'))
                     print("✓ Spotify app database connection verified")
                 except Exception as db_error:
                     print(f"⚠️ Spotify database issue: {db_error}")
-                    # Continue anyway - the app might still work for basic functions
             
             print("✅ Spotify app imported successfully")
             return spotify_app, True
@@ -98,7 +101,6 @@ def import_spotify_app():
             print(f"❌ Spotify app import failed: {import_error}")
             print("Creating stub Spotify app")
             
-            # Create a stub app that shows an error message
             stub_app = Flask("spotify_stub")
             
             @stub_app.route('/')
