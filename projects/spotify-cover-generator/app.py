@@ -25,55 +25,41 @@ from flask import (Flask, request, render_template, send_from_directory, jsonify
                    session, redirect, url_for, flash, make_response)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-
+from flask_sqlalchemy import SQLAlchemy # Keep for type hinting if necessary, or remove if not used directly
+from flask_migrate import Migrate # Keep for type hinting if necessary, or remove if not used directly
+from flask_limiter import Limiter # Keep for type hinting if necessary, or remove if not used directly
+from flask_limiter.util import get_remote_address # Keep if used by limiter instance in routes directly
 from sqlalchemy import text
 
-# Configuration imports with proper fallbacks
-try:
-    from config import (
-        BASE_DIR, COVERS_DIR, FLASK_SECRET_KEY,
-        SPOTIFY_DB_URL, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET,
-        SPOTIFY_REDIRECT_URI
-    )
-    print("✅ Config imported successfully")
-except ImportError as e:
-    print(f"⚠️ Config import failed: {e}")
-    BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
-    COVERS_DIR = BASE_DIR / "generated_covers"
-    FLASK_SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'dev-key-' + ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=32)))
-    SPOTIFY_DB_URL = os.environ.get('DATABASE_URL', 'sqlite:///app.db')
-    SPOTIFY_CLIENT_ID = os.environ.get('SPOTIFY_CLIENT_ID')
-    SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET')
-    SPOTIFY_REDIRECT_URI = os.environ.get('SPOTIFY_REDIRECT_URI', 'http://localhost:5000/spotify-callback')
+# Import create_app from the package __init__
+from . import create_app
 
-# Fix DATABASE_URL for Render deployment
-if SPOTIFY_DB_URL and SPOTIFY_DB_URL.startswith('postgres://'):
-    SPOTIFY_DB_URL = SPOTIFY_DB_URL.replace('postgres://', 'postgresql://', 1)
+# Import necessary Flask components and other utilities
+from flask import request, render_template, send_from_directory, jsonify, session, redirect, url_for, flash, make_response # Added Flask here
+from werkzeug.security import generate_password_hash, check_password_hash # Keep for routes
+from werkzeug.utils import secure_filename # Keep for routes
 
-# Flask app initialization
-app = Flask(__name__,
-            template_folder=str(BASE_DIR / "templates"),
-            static_folder=str(BASE_DIR / "static"))
-app.secret_key = FLASK_SECRET_KEY
+# Extensions and models will be used by routes, so they need to be available.
+# However, db, limiter are initialized in the factory.
+# Routes in this file will use the 'app' object created by create_app(),
+# which has extensions initialized.
+from .extensions import db, limiter # Keep for @limiter.limit decorator
+from .models import User, LoginSession, LoraModelDB, GenerationResultDB, SpotifyState # Keep for route logic
+from .auth_utils import get_current_user # Keep for route logic, though get_current_user_or_guest is in factory
+from .decorators import login_required, admin_required, permission_required # Keep for route decorators
 
-# Database configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = SPOTIFY_DB_URL
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Create the Flask app instance using the factory
+app = create_app()
 
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
+# Configuration and extension initialization is now done in create_app in factory.py / __init__.py
+# BASE_DIR, COVERS_DIR will be loaded from app.config if needed by routes, e.g., app.config['COVERS_DIR']
+# For direct use in this file (like old COVERS_DIR variable), need to access via app.config
+# Example: COVERS_DIR = app.config.get('COVERS_DIR')
+# However, serve_image uses send_from_directory which can take app.config['COVERS_DIR']
 
-# Rate limiter
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["100 per hour"],
-    storage_uri="memory://"
-)
-limiter.init_app(app)
+# Global variables like MONITORING_AVAILABLE, FAULT_HANDLING_AVAILABLE are now app.config items
+# Example: MONITORING_AVAILABLE = app.config.get('MONITORING_AVAILABLE', False)
+# These should be accessed via app.config within routes if needed.
 
 # CRITICAL: Import monitoring system with fallback
 try:
@@ -318,10 +304,10 @@ def serve_image(filename):
 @app.route('/spotify/api/upload_lora', methods=['POST'])
 @login_required
 @limiter.limit("5 per hour")
-def upload_lora():
+def upload_lora(user): # Added user argument
     """FIXED LoRA upload endpoint"""
     try:
-        user = get_current_user()
+        # user = get_current_user() # Removed: user is now passed as an argument
         if not user:
             return jsonify({"success": False, "error": "User not authenticated"}), 401
         
@@ -425,10 +411,10 @@ def get_loras():
 @app.route('/spotify/api/delete_lora', methods=['DELETE'])
 @login_required
 @limiter.limit("10 per hour")
-def delete_lora():
+def delete_lora(user): # Added user argument
     """FIXED Delete LoRA endpoint"""
     try:
-        user = get_current_user()
+        # user = get_current_user() # Removed: user is now passed as an argument
         if not user:
             return jsonify({"success": False, "error": "User not authenticated"}), 401
         
@@ -462,71 +448,25 @@ def delete_lora():
         print(f"Error deleting LoRA: {e}")
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
-# FIXED HELPER FUNCTIONS
+# FIXED HELPER FUNCTIONS (Many of these are or should be moved to the factory or blueprints)
 
-def get_current_user_or_guest():
-    """FIXED Get current logged in user or return guest info"""
-    user = get_current_user()
-    if user:
-        return {
-            'type': 'user',
-            'user': user,
-            'display_name': user.display_name or user.username,
-            'is_premium': user.is_premium_user(),
-            'daily_limit': user.get_daily_generation_limit(),
-            'generations_today': user.get_generations_today(),
-            'can_generate': user.can_generate_today(),
-            'can_use_loras': True,
-            'can_edit_playlists': bool(user.spotify_access_token),
-            'show_upload': user.is_premium_user()
-        }
-    else:
-        get_or_create_guest_session()
-        return {
-            'type': 'guest',
-            'user': None,
-            'display_name': 'Guest',
-            'is_premium': False,
-            'daily_limit': 1,
-            'generations_today': get_guest_generations_today(),
-            'can_generate': can_guest_generate(),
-            'can_use_loras': False,
-            'can_edit_playlists': False,
-            'show_upload': False
-        }
+# get_current_user_or_guest is now in factory.py / __init__.py and registered via context_processor
+# get_current_user is in auth_utils.py (still used by routes directly sometimes, or by the new get_current_user_or_guest)
 
-def get_current_user():
-    """FIXED Get current logged in user"""
-    # Method 1: Check user_id in session
-    if 'user_id' in session:
-        try:
-            user = User.query.get(session['user_id'])
-            if user:
-                return user
-        except Exception as e:
-            print(f"Error fetching user by ID: {e}")
-            session.pop('user_id', None)
-    
-    # Method 2: Check session token
-    session_token = request.cookies.get('session_token')
-    if session_token:
-        try:
-            login_session = LoginSession.query.filter_by(
-                session_token=session_token, 
-                is_active=True
-            ).first()
-            
-            if login_session and login_session.expires_at > datetime.datetime.utcnow():
-                user = login_session.user
-                if user:
-                    session['user_id'] = user.id
-                    return user
-        except Exception as e:
-            print(f"Error fetching user by cookie: {e}")
-    
-    return None
+# Guest session functions: These are problematic if app.py is not the main execution scope for session.
+# For now, assuming they are called within Flask request context where 'session' is available.
+# Ideally, these would be part of a UserSession class or similar, managed by the app.
+# If get_current_user_or_guest (in factory) handles guest logic completely, these might not be directly called from app.py routes anymore.
 
-# Guest session functions
+# def get_or_create_guest_session(): ... # Potentially removed or refactored
+# def get_guest_generations_today(): ... # Potentially removed or refactored
+# def can_guest_generate(): ... # Potentially removed or refactored
+# def track_guest_generation(): ... # Potentially removed or refactored
+# These functions if still used by routes in app.py need to be evaluated.
+# The generate() route uses get_current_user_or_guest() which is now from the factory.
+# It also calls track_guest_generation(). This needs to be available.
+# Let's keep guest session functions for now, but acknowledge they are a bit misplaced.
+
 def get_or_create_guest_session():
     """Get or create a guest session"""
     if 'guest_session_id' not in session:
@@ -538,27 +478,34 @@ def get_or_create_guest_session():
 
 def get_guest_generations_today():
     """Get number of generations for guest today"""
-    if 'guest_session_id' not in session:
-        return 0
+    if 'guest_session_id' not in session: # Ensure session is available
+        get_or_create_guest_session() # Initialize if not found
     
-    if 'guest_last_generation' in session and session['guest_last_generation']:
-        last_gen = datetime.datetime.fromisoformat(session['guest_last_generation'])
-        if last_gen.date() != datetime.datetime.utcnow().date():
+    # Reset daily count if new day
+    if session.get('guest_last_generation'):
+        try:
+            last_gen_date = datetime.datetime.fromisoformat(session['guest_last_generation']).date()
+            if last_gen_date != datetime.datetime.utcnow().date():
+                session['guest_generations_today'] = 0
+        except ValueError: # Handle malformed date string
             session['guest_generations_today'] = 0
+            session['guest_last_generation'] = None # Clear malformed date
     
     return session.get('guest_generations_today', 0)
 
 def can_guest_generate():
-    """Check if guest can generate"""
+    """Check if guest can generate (based on a limit of 1 for this example)"""
     return get_guest_generations_today() < 1
 
 def track_guest_generation():
     """Track generation for guest"""
-    try:
-        session['guest_generations_today'] = get_guest_generations_today() + 1
-        session['guest_last_generation'] = datetime.datetime.utcnow().isoformat()
-    except Exception as e:
-        print(f"Error tracking guest generation: {e}")
+    # Ensure session is initialized
+    if 'guest_session_id' not in session:
+        get_or_create_guest_session()
+
+    current_gens = get_guest_generations_today() # Gets current count, handles daily reset
+    session['guest_generations_today'] = current_gens + 1
+    session['guest_last_generation'] = datetime.datetime.utcnow().isoformat()
 
 # Health check endpoint
 @app.route('/health')
@@ -774,11 +721,11 @@ def logout():
 
 @app.route('/profile')
 @login_required
-def profile():
+def profile(user): # Added user argument
     """User profile page"""
     try:
-        user = get_current_user()
-        if not user:
+        # user = get_current_user() # Removed: user is now passed as an argument
+        if not user: # Should not happen if login_required works
             return redirect(url_for('login'))
         
         # Get user statistics
@@ -964,21 +911,21 @@ def spotify_callback():
         return redirect(url_for('generate'))
 
 # Additional missing models
-class SpotifyState(db.Model):
-    __tablename__ = 'spotify_oauth_states'
-    id = db.Column(db.Integer, primary_key=True)
-    state = db.Column(db.String(100), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    used = db.Column(db.Boolean, default=False)
+# class SpotifyState(db.Model): # Removed: Moved to models.py
+#     __tablename__ = 'spotify_oauth_states'
+#     id = db.Column(db.Integer, primary_key=True)
+#     state = db.Column(db.String(100), unique=True, nullable=False)
+#     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+#     used = db.Column(db.Boolean, default=False)
 
 # Upload info route
 @app.route('/spotify/api/upload_info')
 @login_required
-def get_upload_info():
+def get_upload_info(user): # Added user argument
     """Get user's upload information"""
     try:
-        user = get_current_user()
-        if not user:
+        # user = get_current_user() # Removed: user is now passed as an argument
+        if not user: # Should not happen if login_required works
             return jsonify({"error": "Not authenticated"}), 401
         
         # Get current count
@@ -1002,132 +949,14 @@ def get_upload_info():
     except Exception as e:
         print(f"Upload info error: {e}")
         return jsonify({"error": "Internal server error"}), 500
-# Context processor
-@app.context_processor
-def inject_template_vars():
-    """Inject common variables into all templates"""
-    return {
-        'current_year': datetime.datetime.now().year,
-        'user_info': get_current_user_or_guest()
-    }
-
-# Initialize monitoring if available
-if MONITORING_AVAILABLE:
-    try:
-        setup_monitoring(app)
-        print("✅ Monitoring system setup complete")
-    except Exception as e:
-        print(f"⚠️ Monitoring setup failed: {e}")
-
-# Database models (add the missing ones)
-class User(db.Model):
-    __tablename__ = 'spotify_users'
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=True)
-    username = db.Column(db.String(80), unique=True, nullable=True)
-    password_hash = db.Column(db.String(200), nullable=True)
-    spotify_id = db.Column(db.String(100), unique=True, nullable=True)
-    spotify_username = db.Column(db.String(100), nullable=True)
-    spotify_access_token = db.Column(db.String(500), nullable=True)
-    spotify_refresh_token = db.Column(db.String(500), nullable=True)
-    spotify_token_expires = db.Column(db.DateTime, nullable=True)
-    display_name = db.Column(db.String(100), nullable=True)
-    is_premium = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    last_login = db.Column(db.DateTime, nullable=True)
-    is_active = db.Column(db.Boolean, default=True)
-
-    def is_premium_user(self):
-        premium_emails = ['bentakaki7@gmail.com']
-        premium_usernames = ['benthegamer']
-        if self.email and self.email.lower() in premium_emails:
-            return True
-        if self.spotify_username and self.spotify_username.lower() in premium_usernames:
-            return True
-        return False
-
-    def get_daily_generation_limit(self):
-        return 999 if self.is_premium_user() else 2
-
-    def can_generate_today(self):
-        today = datetime.datetime.utcnow().date()
-        count = GenerationResultDB.query.filter(
-            GenerationResultDB.user_id == self.id,
-            db.func.date(GenerationResultDB.timestamp) == today
-        ).count()
-        return count < self.get_daily_generation_limit()
-
-    def get_generations_today(self):
-        today = datetime.datetime.utcnow().date()
-        return GenerationResultDB.query.filter(
-            GenerationResultDB.user_id == self.id,
-            db.func.date(GenerationResultDB.timestamp) == today
-        ).count()
-
-class LoginSession(db.Model):
-    __tablename__ = 'spotify_login_sessions'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=False)
-    session_token = db.Column(db.String(100), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    expires_at = db.Column(db.DateTime, nullable=False)
-    is_active = db.Column(db.Boolean, default=True)
-    user = db.relationship('User', backref='sessions')
-
-class LoraModelDB(db.Model):
-    __tablename__ = 'spotify_lora_models'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    source_type = db.Column(db.String(20), default='local')
-    path = db.Column(db.String(500), default='')
-    file_size = db.Column(db.Integer, default=0)
-    uploaded_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    uploaded_by = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=True)
-
-class GenerationResultDB(db.Model):
-    __tablename__ = 'spotify_generation_results'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(500), nullable=False)
-    output_path = db.Column(db.String(1000), nullable=False)
-    item_name = db.Column(db.String(500))
-    genres = db.Column(db.JSON)
-    all_genres = db.Column(db.JSON)
-    style_elements = db.Column(db.JSON)
-    mood = db.Column(db.String(1000))
-    energy_level = db.Column(db.String(50))
-    timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
-    spotify_url = db.Column(db.String(1000))
-    lora_name = db.Column(db.String(200))
-    lora_type = db.Column(db.String(20))
-    lora_url = db.Column(db.String(1000))
-    user_id = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=True)
-
-def login_required(f):
-    """Decorator to require login"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        user = get_current_user()
-        if not user:
-            flash("Please log in to access this page.", "info")
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-# Initialize database
-def initialize_database_safely():
-    """Safely initialize database"""
-    try:
-        with app.app_context():
-            db.create_all()
-            print("✅ Database tables created successfully")
-            return True
-    except Exception as e:
-        print(f"❌ Database initialization failed: {e}")
-        return False
+# Context processor is now in factory.py / __init__.py
+# Monitoring initialization is now in factory.py / __init__.py
+# Database models are in models.py
+# initialize_database_safely is now in factory.py / __init__.py and called during app creation.
 
 if __name__ == '__main__':
-    with app.app_context():
-        initialize_database_safely()
-    
+    # app is already created by create_app() at the global scope of this file
+    # initialize_database_safely is now called within create_app.
     port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host="0.0.0.0", port=port)
+    # Consider app.config for DEBUG settings as well
+    app.run(debug=app.config.get("DEBUG", False), host="0.0.0.0", port=port)

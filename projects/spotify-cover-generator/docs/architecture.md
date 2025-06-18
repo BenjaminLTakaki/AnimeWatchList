@@ -32,23 +32,27 @@ graph TB
 ## Core Components
 
 ### 1. Web Application Layer
-**File:** `app.py`
+- **Application Factory:** `__init__.py` (primarily via `factory.py`)
+- **Main Application Runner:** `app.py` (uses the factory to create and run the app)
+- **Configuration:** `config.py` (loaded by the factory)
+- **Blueprints (for route handling):**
+    - `main/` (core app routes, error handlers)
+    - `auth/` (authentication, user profile routes)
+    - `spotify_routes/` (Spotify API interactions, LoRA management)
+- **Extensions:** `extensions.py` (SQLAlchemy, Migrate, Limiter instances)
+- **Database Models:** `models.py`
+- **Custom Decorators:** `decorators.py`
+- **Authentication Utilities:** `auth_utils.py`
 - **Framework:** Flask with Jinja2 templating
-- **Purpose:** Main application entry point and route handling
+- **Purpose:** Orchestrates application creation, configuration, and request handling through a modular structure.
 - **Key Features:**
-  - Request routing and validation
-  - Error handling and logging
+  - Request routing and validation (via Blueprints)
+  - Error handling and logging (centralized or in Blueprints)
   - Session management
   - Response formatting
 
-**Routes:**
-- `GET /` - Main application interface
-- `POST /generate` - Cover generation endpoint
-- `GET /health` - Health check endpoint
-- `GET /api/lora-models` - LoRA model listing
-
 ### 2. Authentication & Authorization
-**File:** `auth.py`
+- **Primary Logic:** `auth/` blueprint (routes), `auth_utils.py` (user fetching), `decorators.py` (access control decorators like `@login_required`).
 - **Method:** Spotify OAuth 2.0 PKCE flow
 - **Purpose:** Secure access to Spotify user data
 - **Implementation:**
@@ -75,7 +79,7 @@ def create_image_with_stability(prompt, lora_settings)
 ```
 
 ### 4. Data Models
-**File:** `models.py`
+**File:** `models.py` (SQLAlchemy models defined here)
 - **ORM:** SQLAlchemy
 - **Purpose:** Data structure definitions and database interactions
 
@@ -101,7 +105,7 @@ def create_image_with_stability(prompt, lora_settings)
 - **Circuit Breaker Pattern:** Fault tolerance for external API failures
 
 ### 6. Monitoring & Observability
-**File:** `monitoring_system.py`
+**File:** `monitoring_system.py` (if custom logic) or integrated via Flask extensions.
 - **Purpose:** Application health monitoring and performance tracking
 - **Components:**
   - Health check system
@@ -117,7 +121,7 @@ def create_image_with_stability(prompt, lora_settings)
 - Cache hit/miss ratios
 
 ### 7. Fault Handling
-**File:** `fault_handling.py`
+**File:** `fault_handling.py` (if custom logic) or integrated via Flask extensions/patterns.
 - **Pattern:** Circuit Breaker with fallback strategies
 - **Features:**
   - Automatic failure detection
