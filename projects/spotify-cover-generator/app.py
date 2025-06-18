@@ -27,6 +27,8 @@ from flask_limiter.util import get_remote_address
 
 from sqlalchemy import text
 
+import spotify_client # Added import
+
 # Monitoring and fault handling imports
 try:
     from monitoring_system import (
@@ -1244,6 +1246,137 @@ def get_loras():
     except Exception as e:
         print(f"Error getting LoRAs: {e}")
         return jsonify({"loras": []})
+
+# SPOTIFY PLAYLIST EDIT ROUTES
+@app.route('/spotify/api/playlist/edit', methods=['POST'])
+@login_required
+@limiter.limit("10 per minute")
+@monitor_api_calls(service_name="spotify_playlist_edit")
+def edit_playlist_details():
+    """Edit Spotify playlist details (name, description)"""
+    user = get_current_user()
+    if not user:
+        return jsonify({"success": False, "error": "User not authenticated"}), 401
+
+    if not user.spotify_access_token:
+        return jsonify({"success": False, "error": "Spotify account not connected or token missing"}), 403
+
+    if not user.refresh_spotify_token_if_needed():
+        return jsonify({"success": False, "error": "Failed to refresh Spotify token"}), 500
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "Invalid JSON payload"}), 400
+
+        playlist_id = data.get('playlist_id')
+        name = data.get('name')
+        description = data.get('description')
+
+        if not playlist_id:
+            return jsonify({"success": False, "error": "playlist_id is required"}), 400
+        
+        # Name and description can be empty strings to clear them, but should exist
+        if name is None or description is None:
+            return jsonify({"success": False, "error": "name and description are required (can be empty strings)"}), 400
+
+        # Call the (yet to be created) spotify_client function
+        # For now, this will likely error out as spotify_client.update_playlist_details doesn't exist
+        # We'll assume it returns True on success, or raises an exception on failure
+        spotify_client.update_playlist_details(
+            user.spotify_access_token,
+            playlist_id,
+            name,
+            description
+        )
+        
+        return jsonify({"success": True})
+
+    except AttributeError as ae: # Catch if update_playlist_details doesn't exist
+        print(f"AttributeError in edit_playlist_details: {ae}")
+        return jsonify({"success": False, "error": "Playlist editing function not yet implemented."}), 501
+    except Exception as e:
+        print(f"Error editing playlist details: {e}")
+        traceback.print_exc()
+        # Attempt to create a user-friendly message
+        try:
+            from fault_handling import FaultContext, create_user_friendly_error_messages
+            context = FaultContext(
+                function_name="edit_playlist_details",
+                error=e,
+                user_id=str(user.id) if user else None
+            )
+            user_message = create_user_friendly_error_messages(e, context)
+        except (ImportError, Exception):
+            user_message = "An unexpected error occurred while editing playlist details."
+        return jsonify({"success": False, "error": user_message}), 500
+
+@app.route('/spotify/api/playlist/cover', methods=['POST'])
+@login_required
+@limiter.limit("5 per minute")
+@monitor_api_calls(service_name="spotify_playlist_cover")
+def update_playlist_cover():
+    """Update Spotify playlist cover image"""
+    user = get_current_user()
+    if not user:
+        return jsonify({"success": False, "error": "User not authenticated"}), 401
+
+    if not user.spotify_access_token:
+        return jsonify({"success": False, "error": "Spotify account not connected or token missing"}), 403
+
+    if not user.refresh_spotify_token_if_needed():
+        return jsonify({"success": False, "error": "Failed to refresh Spotify token"}), 500
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "Invalid JSON payload"}), 400
+
+        playlist_id = data.get('playlist_id')
+        image_data_url = data.get('image_data') # Expects data:image/jpeg;base64,actual_base64_string
+
+        if not playlist_id:
+            return jsonify({"success": False, "error": "playlist_id is required"}), 400
+        if not image_data_url:
+            return jsonify({"success": False, "error": "image_data is required"}), 400
+
+        # Extract actual base64 string
+        # Format: data:[<mediatype>][;base64],<data>
+        try:
+            header, actual_base64_string = image_data_url.split(',', 1)
+            if not header.startswith("data:image") or ";base64" not in header:
+                raise ValueError("Invalid image data URL format")
+        except ValueError:
+            return jsonify({"success": False, "error": "Invalid image_data format. Expected data URL (e.g., data:image/jpeg;base64,...)"}), 400
+        
+        # Call the (yet to be created) spotify_client function
+        # For now, this will likely error out
+        spotify_client.update_playlist_cover_image(
+            user.spotify_access_token,
+            playlist_id,
+            actual_base64_string
+        )
+        
+        return jsonify({"success": True})
+
+    except AttributeError as ae: # Catch if update_playlist_cover_image doesn't exist
+        print(f"AttributeError in update_playlist_cover: {ae}")
+        return jsonify({"success": False, "error": "Playlist cover update function not yet implemented."}), 501
+    except Exception as e:
+        print(f"Error updating playlist cover: {e}")
+        traceback.print_exc()
+        # Attempt to create a user-friendly message
+        try:
+            from fault_handling import FaultContext, create_user_friendly_error_messages
+            context = FaultContext(
+                function_name="update_playlist_cover",
+                error=e,
+                user_id=str(user.id) if user else None
+            )
+            user_message = create_user_friendly_error_messages(e, context)
+        except (ImportError, Exception):
+            user_message = "An unexpected error occurred while updating playlist cover."
+        return jsonify({"success": False, "error": user_message}), 500
 
 # SPOTIFY AUTH ROUTES (FIXED)
 @app.route('/spotify-login')

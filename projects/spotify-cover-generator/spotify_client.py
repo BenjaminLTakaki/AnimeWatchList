@@ -1,5 +1,6 @@
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
+from spotipy.exceptions import SpotifyException
 from collections import Counter
 from models import PlaylistData, GenreAnalysis
 from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
@@ -365,6 +366,67 @@ def search_spotify_content(query, content_type="playlist", limit=10):
         return []
     
     return []
+
+def update_playlist_details(access_token: str, playlist_id: str, name: str, description: str = None) -> tuple[bool, str | None]:
+    """
+    Updates a Spotify playlist's details (name and optionally description).
+
+    Args:
+        access_token: The Spotify access token for authentication.
+        playlist_id: The ID of the playlist to update.
+        name: The new name for the playlist.
+        description: The new description for the playlist. If None or empty, it's not updated.
+
+    Returns:
+        A tuple (success: bool, error_message: str | None).
+    """
+    try:
+        sp_local = spotipy.Spotify(auth=access_token)
+        
+        payload = {"name": name}
+        if description is not None and description.strip() != "":
+             sp_local.playlist_change_details(playlist_id, name=name, description=description)
+        else:
+            if description is None:
+                 sp_local.playlist_change_details(playlist_id, name=name)
+            else: # description is likely an empty string here, meant to clear
+                 sp_local.playlist_change_details(playlist_id, name=name, description=description)
+
+        return True, None
+    except SpotifyException as e:
+        print(f"Error updating playlist details for {playlist_id}: {e}")
+        return False, str(e)
+    except Exception as e:
+        print(f"Unexpected error in update_playlist_details for {playlist_id}: {e}")
+        return False, f"An unexpected error occurred: {str(e)}"
+
+def update_playlist_cover_image(access_token: str, playlist_id: str, image_data_base64: str) -> tuple[bool, str | None]:
+    """
+    Updates a Spotify playlist's cover image using a base64 encoded image.
+
+    Args:
+        access_token: The Spotify access token for authentication.
+        playlist_id: The ID of the playlist to update.
+        image_data_base64: A base64 encoded string of the JPEG image.
+
+    Returns:
+        A tuple (success: bool, error_message: str | None).
+    """
+    try:
+        sp_local = spotipy.Spotify(auth=access_token)
+        # The spotipy documentation for playlist_upload_cover_image states:
+        # "image_b64: base64 encoded JPEG image data, maximum payload size is 256 KB"
+        sp_local.playlist_upload_cover_image(playlist_id, image_data_base64)
+        return True, None
+    except SpotifyException as e:
+        print(f"Error uploading playlist cover image for {playlist_id}: {e}")
+        # Check for specific error messages related to image upload if needed
+        if "image" in str(e).lower() or "payload" in str(e).lower():
+            return False, f"Spotify API error (image related): {str(e)}"
+        return False, str(e)
+    except Exception as e:
+        print(f"Unexpected error in update_playlist_cover_image for {playlist_id}: {e}")
+        return False, f"An unexpected error occurred: {str(e)}"
 
 # Helper function for debugging
 def debug_spotify_connection():

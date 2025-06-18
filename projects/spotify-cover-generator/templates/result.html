@@ -368,17 +368,22 @@
             }
             
             function updatePlaylistInfo() {
+                const titleBtn = document.getElementById('update-title-btn');
+                const coverBtn = document.getElementById('update-cover-btn');
+                const bothBtn = document.getElementById('update-both-btn');
+                
                 const title = document.getElementById('playlist-title').value;
                 const description = document.getElementById('playlist-description').value;
-                const statusDiv = document.getElementById('edit-status');
                 
                 if (!title.trim()) {
-                    showStatus('Please enter a title', 'error');
-                    return;
+                    showStatus('Please enter a title for the playlist.', 'error');
+                    return Promise.reject('Title is empty');
                 }
-                  showStatus('Updating playlist...', 'info');
                 
-                fetch('/spotify/api/playlist/edit', {
+                showStatus('Updating playlist title & description...', 'info');
+                setButtonsDisabled(true);
+                
+                return fetch('/spotify/api/playlist/edit', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -392,29 +397,37 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        showStatus('Playlist updated successfully!', 'success');
+                        showStatus('Playlist title & description updated successfully!', 'success');
                     } else {
-                        showStatus(data.error || 'Failed to update playlist', 'error');
+                        showStatus(data.error || 'Failed to update playlist info.', 'error');
+                        throw new Error(data.error || 'Failed to update playlist info.');
                     }
                 })
                 .catch(error => {
-                    showStatus('Error updating playlist', 'error');
+                    showStatus('Error updating playlist info: ' + error.message, 'error');
                     console.error('Error:', error);
+                    throw error; // Re-throw to be caught by caller if necessary
+                })
+                .finally(() => {
+                    // Re-enable buttons if this is the only operation
+                    // If called from updateBoth, updateBoth will handle re-enabling.
+                    if (document.activeElement.id === 'update-title-btn') {
+                         setButtonsDisabled(false);
+                    }
                 });
             }
             
             function updatePlaylistCover() {
                 const coverImg = document.getElementById('generated-cover');
-                const statusDiv = document.getElementById('edit-status');
                 
-                if (!coverImg.src) {
-                    showStatus('No cover image available', 'error');
-                    return;
+                if (!coverImg || !coverImg.src) {
+                    showStatus('No cover image available to update.', 'error');
+                    return Promise.reject('No cover image');
                 }
                 
-                showStatus('Updating playlist cover...', 'info');
+                showStatus('Updating playlist cover image...', 'info');
+                setButtonsDisabled(true);
                 
-                // Get image data
                 let imageData;
                 if (coverImg.src.startsWith('data:image')) {
                     imageData = coverImg.src;
@@ -425,16 +438,35 @@
                     canvas.width = coverImg.naturalWidth;
                     canvas.height = coverImg.naturalHeight;
                     ctx.drawImage(coverImg, 0, 0);
-                    imageData = canvas.toDataURL('image/jpeg', 0.8);                }
+                    imageData = canvas.toDataURL('image/jpeg', 0.8); // Quality set to 0.8 for JPEG
+                }
+
+                // Ensure imageData is not null or empty
+                if (!imageData) {
+                    showStatus('Could not retrieve image data.', 'error');
+                    setButtonsDisabled(false);
+                    return Promise.reject('Could not retrieve image data.');
+                }
+
+                const base64String = imageData.split(',')[1];
+                if (!base64String) {
+                    showStatus('Invalid image data format.', 'error');
+                    setButtonsDisabled(false);
+                    return Promise.reject('Invalid image data format.');
+                }
                 
-                fetch('/spotify/api/playlist/cover', {
+                // For debugging purposes:
+                console.log("Original image data URL length:", imageData.length);
+                console.log("Sending base64 string (first 50 chars):", base64String.substring(0, 50));
+                
+                return fetch('/spotify/api/playlist/cover', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
                         playlist_id: playlistId,
-                        image_data: imageData
+                        image_data: base64String 
                     })
                 })
                 .then(response => response.json())
@@ -442,62 +474,69 @@
                     if (data.success) {
                         showStatus('Playlist cover updated successfully!', 'success');
                     } else {
-                        showStatus(data.error || 'Failed to update cover', 'error');
+                        showStatus(data.error || 'Failed to update playlist cover.', 'error');
+                        throw new Error(data.error || 'Failed to update playlist cover.');
                     }
                 })
                 .catch(error => {
-                    showStatus('Error updating cover', 'error');
+                    showStatus('Error updating playlist cover: ' + error.message, 'error');
                     console.error('Error:', error);
+                    throw error; // Re-throw to be caught by caller if necessary
+                })
+                .finally(() => {
+                     // Re-enable buttons if this is the only operation
+                    if (document.activeElement.id === 'update-cover-btn') {
+                         setButtonsDisabled(false);
+                    }
                 });
             }
             
             function updateBoth() {
-                showStatus('Updating playlist and cover...', 'info');
+                showStatus('Starting playlist update process...', 'info');
+                setButtonsDisabled(true);
                 
-                // Update info first, then cover
-                const title = document.getElementById('playlist-title').value;
-                const description = document.getElementById('playlist-description').value;
-                
-                if (!title.trim()) {
-                    showStatus('Please enter a title', 'error');
-                    return;
-                }
-                  // Update playlist info
-                fetch('/spotify/api/playlist/edit', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        playlist_id: playlistId,
-                        name: title.trim(),
-                        description: description.trim()
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Now update cover
+                updatePlaylistInfo()
+                    .then(() => {
+                        // If updatePlaylistInfo was successful, it shows its own success message.
+                        // Now, proceed to update the cover.
+                        showStatus('Playlist info updated. Now updating cover...', 'info');
                         return updatePlaylistCover();
-                    } else {
-                        throw new Error(data.error || 'Failed to update playlist');
-                    }
-                })
-                .catch(error => {
-                    showStatus('Error updating playlist: ' + error.message, 'error');
-                    console.error('Error:', error);
-                });
+                    })
+                    .then(() => {
+                        // updatePlaylistCover shows its own success message.
+                        // Both operations successful.
+                        showStatus('Playlist info and cover updated successfully!', 'success');
+                    })
+                    .catch(error => {
+                        // An error in either updatePlaylistInfo or updatePlaylistCover will land here.
+                        // The specific error message should have already been shown by the failing function.
+                        console.error('Error during combined update:', error);
+                        showStatus('Update process failed. Check previous messages for details.', 'error');
+                    })
+                    .finally(() => {
+                        setButtonsDisabled(false);
+                    });
+            }
+
+            function setButtonsDisabled(disabled) {
+                document.getElementById('update-title-btn').disabled = disabled;
+                document.getElementById('update-cover-btn').disabled = disabled;
+                document.getElementById('update-both-btn').disabled = disabled;
             }
             
             function showStatus(message, type) {
                 const statusDiv = document.getElementById('edit-status');
                 statusDiv.textContent = message;
-                statusDiv.className = `edit-status ${type}`;
+                statusDiv.className = `edit-status ${type}`; // Applies 'success' or 'error' or 'info'
                 statusDiv.style.display = 'block';
                 
-                if (type === 'success') {
-                    setTimeout(() => {
-                        statusDiv.style.display = 'none';
+                // Keep error messages visible until next action
+                if (type === 'success' || type === 'info') {
+                     setTimeout(() => {
+                        // Clear only if it's still the same message, to avoid clearing a subsequent error.
+                        if (statusDiv.textContent === message) {
+                           statusDiv.style.display = 'none';
+                        }
                     }, 3000);
                 }
             }
