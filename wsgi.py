@@ -13,10 +13,12 @@ main_app = Flask(__name__, static_folder='.')
 
 # Set the Python path to include the project directories
 project_root = os.path.dirname(os.path.abspath(__file__))
+projects_dir = os.path.join(project_root, 'projects')
+if projects_dir not in sys.path:
+    sys.path.insert(0, projects_dir)
 
 # SkillsTown app setup
-skillstown_path = os.path.join(project_root, 'projects/skillstown')
-sys.path.insert(0, skillstown_path)
+skillstown_path = os.path.join(projects_dir, 'skillstown')
 
 # Define the paths to ensure they exist before import
 os.makedirs(os.path.join(skillstown_path, 'uploads'), exist_ok=True)
@@ -26,11 +28,7 @@ os.makedirs(os.path.join(skillstown_path, 'static'), exist_ok=True)
 # Import SkillsTown app with factory pattern
 skillstown_error = None
 try:
-    # First add the projects directory to the path
-    projects_path = os.path.join(project_root, 'projects')
-    if projects_path not in sys.path:
-        sys.path.insert(0, projects_path)
-    
+    # projects_dir is already in sys.path
     from skillstown.app import create_app
     skillstown_app = create_app('production')
     print("SkillsTown app imported successfully")
@@ -45,18 +43,12 @@ except Exception as e:
     def skillstown_index():
         return f"SkillsTown is currently unavailable. Error: {skillstown_error}"
 
-# Add projects_path to sys.path for Spotify app
-projects_path = os.path.join(project_root, 'projects')
-if projects_path not in sys.path:
-    sys.path.insert(0, projects_path)
-
 # AnimeWatchList app setup
-animewatchlist_path = os.path.join(project_root, 'projects/animewatchlist')
-sys.path.insert(0, animewatchlist_path)
+animewatchlist_path = os.path.join(projects_dir, 'animewatchlist')
 
 # Import the AnimeWatchList app with error handling
 try:
-    from projects.animewatchlist.app import app as animewatchlist_app, db as animewatchlist_db
+    from animewatchlist.app import app as animewatchlist_app, db as animewatchlist_db
     Migrate(animewatchlist_app, animewatchlist_db)
     print("AnimeWatchList app imported successfully")
     has_animewatchlist_app = True
@@ -72,7 +64,7 @@ except Exception as e:
     has_animewatchlist_app = True
 
 # Spotify Cover Generator app setup - FIXED VERSION
-spotify_path = os.path.join(project_root, 'projects/spotify-cover-generator')
+spotify_path = os.path.join(projects_dir, 'spotify-cover-generator')
 
 def import_spotify_app():
     """Safely import the Spotify app with proper error handling"""
@@ -85,6 +77,7 @@ def import_spotify_app():
         
         try:
             # Import with error handling
+            print(f"Attempting Spotify import. sys.path: {sys.path}") # <-- ADD THIS LINE
             from spotify_cover_generator.app import app as spotify_app
             
             # Test basic app functionality
