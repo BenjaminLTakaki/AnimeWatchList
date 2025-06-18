@@ -1407,7 +1407,7 @@ def spotify_login():
     
     return redirect(auth_url)
 
-@app.route('/callback')
+@app.route('/spotify-callback') 
 def spotify_callback():
     """Handle Spotify OAuth callback - FIXED PREMIUM DETECTION"""
     try:
