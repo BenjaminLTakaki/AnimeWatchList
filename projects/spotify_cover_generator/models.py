@@ -5,9 +5,126 @@ import re
 import math
 from functools import lru_cache
 import json
+from .extensions import db
+import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 
 
+class User(db.Model):
+    __tablename__ = 'users'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), unique=True, nullable=True)
+    username = db.Column(db.String(50), unique=True, nullable=True)
+    display_name = db.Column(db.String(100))
+    password_hash = db.Column(db.String(200))
+    
+    # Spotify OAuth fields
+    spotify_id = db.Column(db.String(100), unique=True, nullable=True)
+    spotify_username = db.Column(db.String(100))
+    spotify_access_token = db.Column(db.Text)
+    spotify_refresh_token = db.Column(db.Text)
+    spotify_token_expires = db.Column(db.DateTime)
+    
+    # User status
+    is_premium = db.Column(db.Boolean, default=False)
+    is_admin = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    last_login = db.Column(db.DateTime)
+    
+    # Relationships
+    login_sessions = db.relationship('LoginSession', backref='user', lazy='dynamic')
+    generation_results = db.relationship('GenerationResultDB', backref='user', lazy='dynamic')
+    
+    def is_premium_user(self):
+        """Check if user has premium access"""
+        if self.is_admin:
+            return True
+        if self.email and self.email.lower() == 'bentakaki7@gmail.com':
+            return True
+        if self.spotify_id and self.spotify_id.lower() == 'benthegamer':
+            return True
+        return self.is_premium
+    
+    def is_admin(self):
+        """Check if user is admin"""
+        return self.is_admin
+    
+    def get_daily_generation_limit(self):
+        """Get daily generation limit based on user type"""
+        if self.is_premium_user():
+            return float('inf')  # Unlimited
+        return 2  # Free user limit
+    
+    def get_generations_today(self):
+        """Get number of generations done today"""
+        today_start = datetime.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        return self.generation_results.filter(
+            GenerationResultDB.timestamp >= today_start
+        ).count()
+    
+    def can_generate_today(self):
+        """Check if user can generate today"""
+        return self.get_generations_today() < self.get_daily_generation_limit()
+    
+    def has_permission(self, permission):
+        """Check if user has specific permission"""
+        # Implement permission logic as needed
+        if self.is_admin:
+            return True
+        return False
 
+class LoginSession(db.Model):
+    __tablename__ = 'login_sessions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    session_token = db.Column(db.String(100), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    ip_address = db.Column(db.String(45))
+    user_agent = db.Column(db.String(200))
+    is_active = db.Column(db.Boolean, default=True)
+
+class LoraModelDB(db.Model):
+    __tablename__ = 'lora_models'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    source_type = db.Column(db.String(20), nullable=False)  # 'local' or 'link'
+    path = db.Column(db.Text, nullable=False)
+    file_size = db.Column(db.Integer)
+    uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    uploaded_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
+
+class GenerationResultDB(db.Model):
+    __tablename__ = 'generation_results'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255))
+    output_path = db.Column(db.String(500))
+    item_name = db.Column(db.String(255))
+    genres = db.Column(db.JSON)
+    all_genres = db.Column(db.JSON)
+    style_elements = db.Column(db.JSON)
+    mood = db.Column(db.String(100))
+    energy_level = db.Column(db.String(50))
+    spotify_url = db.Column(db.String(500))
+    lora_name = db.Column(db.String(100))
+    lora_type = db.Column(db.String(20))
+    lora_url = db.Column(db.String(500))
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+class SpotifyState(db.Model):
+    __tablename__ = 'spotify_oauth_states'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    state = db.Column(db.String(100), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    used = db.Column(db.Boolean, default=False)
+    
 @dataclass
 class LoraModel:
     """LoRA model information"""

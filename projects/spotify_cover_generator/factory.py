@@ -6,14 +6,10 @@ import uuid
 from pathlib import Path
 from flask import Flask, session, request, current_app, render_template, jsonify, redirect, url_for, flash, make_response # Added more flask imports
 from sqlalchemy import text # For health check db.session.execute
+from werkzeug.security import generate_password_hash, check_password_hash
 
-# --- Global placeholder for get_current_user_or_guest ---
-# This will be properly initialized within create_app
 get_current_user_or_guest_global_ref = None
 
-# --- monitor_performance placeholder ---
-# This can be replaced by a real monitoring setup if available
-# For now, main.routes imports it, so it needs to be available here or in a shared module.
 def monitor_performance(f):
     """Basic performance monitoring decorator (placeholder)."""
     import functools

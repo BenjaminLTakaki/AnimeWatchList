@@ -14,6 +14,10 @@ from ..decorators import login_required
 from ..auth_utils import get_current_user # For routes that might not be @login_required but need user
 
 from . import bp
+from ..models import LoginSession
+from flask import make_response
+
+BASE_DIR = Path(current_app.config.get('BASE_DIR', Path(__file__).parent.parent))
 
 @bp.route('/spotify/api/upload_lora', methods=['POST'])
 @login_required

@@ -1,4 +1,3 @@
-# projects/spotify-cover-generator/auth/routes.py
 from flask import (current_app, redirect, url_for, render_template,
                    session, flash, request, make_response)
 import secrets
@@ -13,7 +12,8 @@ from ..decorators import login_required
 from ..auth_utils import get_current_user
 
 from . import bp
-
+from ..models import LoginSession
+from flask import make_response
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':

@@ -1,4 +1,4 @@
-# projects/spotify-cover-generator/main/routes.py
+from ..app import track_guest_generation
 from flask import (current_app, redirect, url_for, render_template,
                    send_from_directory, jsonify, request, session) # Added session
 import datetime # For current_year in context processor, and guest logic
@@ -6,8 +6,6 @@ import uuid # For guest logic
 import os # For os.path.basename in generate()
 import traceback # For error handling in generate()
 
-# Assuming get_current_user_or_guest_global_ref is correctly set up in factory
-# and provides the necessary user/guest information.
 from ..factory import get_current_user_or_guest_global_ref as get_current_user_or_guest
 
 from ..extensions import db, limiter
@@ -42,9 +40,8 @@ except ImportError:
 
 
 from . import bp
+from ..app import track_guest_generation
 
-# --- Guest Session Helper Functions ---
-# These are needed by the generate route if a guest makes a POST request.
 def get_or_create_guest_session():
     if 'guest_session_id' not in session:
         session['guest_session_id'] = str(uuid.uuid4())

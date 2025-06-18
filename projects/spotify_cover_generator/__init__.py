@@ -1,2 +1,3 @@
-# This file marks the directory as a Python package
-# It allows using relative imports within the package
+from .factory import create_app
+
+__all__ = ['create_app']
