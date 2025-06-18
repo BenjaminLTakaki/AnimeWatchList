@@ -8,7 +8,7 @@ from flask import Flask, session, request, current_app, render_template, jsonify
 from sqlalchemy import text # For health check db.session.execute
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from config import Config
+from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI
 from extensions import db, login_manager
 from models import User
 
