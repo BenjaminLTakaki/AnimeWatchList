@@ -308,18 +308,15 @@ def login_required(f):
     return decorated_function
 
 def get_current_user():
-    """Get current logged in user"""
-    # Method 1: Check user_id in session (most direct)
+    """Fixed get current logged in user function"""
     if 'user_id' in session:
         try:
             user = User.query.get(session['user_id'])
-            if user:
+            if user and user.is_active:
                 return user
         except Exception as e:
             print(f"Error fetching user by ID from session: {e}")
             session.pop('user_id', None)
-    
-    # Method 2: Check user_session token in session
     if 'user_session' in session:
         try:
             session_token = session['user_session']
@@ -327,21 +324,16 @@ def get_current_user():
                 session_token=session_token, 
                 is_active=True
             ).first()
-            
             if login_session and login_session.expires_at > datetime.datetime.utcnow():
                 user = login_session.user
-                if user:
-                    # Cache user_id in session for faster future lookups
+                if user and user.is_active:
                     session['user_id'] = user.id
                     return user
             else:
-                # Clean up expired session
                 session.pop('user_session', None)
         except Exception as e:
             print(f"Error fetching user by session token: {e}")
             session.pop('user_session', None)
-    
-    # Method 3: Check session_token cookie as fallback
     session_token = request.cookies.get('session_token')
     if session_token:
         try:
@@ -349,17 +341,14 @@ def get_current_user():
                 session_token=session_token, 
                 is_active=True
             ).first()
-            
             if login_session and login_session.expires_at > datetime.datetime.utcnow():
                 user = login_session.user
-                if user:
-                    # Restore session variables
+                if user and user.is_active:
                     session['user_id'] = user.id
                     session['user_session'] = session_token
                     return user
         except Exception as e:
             print(f"Error fetching user by cookie: {e}")
-    
     return None
 
 def calculate_genre_percentages(genres_list):
@@ -882,12 +871,8 @@ def inject_template_vars():
 # ROUTES
 @app.route("/")
 def root():
-    """Root route - redirect to login if not authenticated, otherwise to main app"""
-    user = get_current_user()
-    if user:
-        return redirect(url_for('generate'))
-    else:
-        return redirect(url_for('login'))
+    """Root route - show main page instead of redirecting"""
+    return redirect(url_for('generate'))
 
 @app.route("/generate", methods=["GET", "POST"])
 @limiter.limit("10 per hour", methods=["POST"])
@@ -1379,23 +1364,23 @@ def update_playlist_cover():
         return jsonify({"success": False, "error": user_message}), 500
 
 # SPOTIFY AUTH ROUTES (FIXED)
-@app.route('/login')
+@app.route('/spotify-login')
 def spotify_login():
-    """Initiate Spotify OAuth flow"""
-    if not SPOTIFY_CLIENT_ID:
+    """Fixed Spotify OAuth initiation"""
+    if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
         flash('Spotify integration is not configured', 'error')
-        return redirect(url_for('generate'))
-    
-    # Generate state for CSRF protection
-    state = secrets.token_urlsafe(32)
-    oauth_state = SpotifyState(state=state)
-    db.session.add(oauth_state)
-    db.session.commit()
-    
-    # Spotify OAuth parameters
+        return redirect(url_for('login'))
+    try:
+        state = SpotifyState.create_state()
+    except Exception as e:
+        print(f"Error creating OAuth state: {e}")
+        flash('Error initiating Spotify login. Please try again.', 'error')
+        return redirect(url_for('login'))
     scope = 'playlist-read-private playlist-modify-public playlist-modify-private ugc-image-upload user-read-email user-read-private'
-    redirect_uri = SPOTIFY_REDIRECT_URI
-    
+    if os.getenv('RENDER'):
+        redirect_uri = 'https://www.benjamintakaki.com/spotify/spotify-callback'
+    else:
+        redirect_uri = 'http://localhost:5000/spotify/spotify-callback'
     auth_url = (
         'https://accounts.spotify.com/authorize?'
         f'client_id={SPOTIFY_CLIENT_ID}&'
@@ -1404,255 +1389,198 @@ def spotify_login():
         f'scope={scope}&'
         f'state={state}'
     )
-    
+    print(f"Redirecting to Spotify OAuth with redirect_uri: {redirect_uri}")
     return redirect(auth_url)
 
-@app.route('/spotify-callback') 
+@app.route('/spotify-callback')
 def spotify_callback():
-    """Handle Spotify OAuth callback - FIXED PREMIUM DETECTION"""
+    """Fixed Spotify OAuth callback"""
     try:
         code = request.args.get('code')
         state = request.args.get('state')
         error = request.args.get('error')
-        
         if error:
             flash(f'Spotify authorization failed: {error}', 'error')
-            return redirect(url_for('generate'))
-        
+            return redirect(url_for('login'))
         if not code or not state:
-            flash('Invalid Spotify callback', 'error')
-            return redirect(url_for('generate'))
-        
-        # Verify state
+            flash('Invalid Spotify callback - missing parameters', 'error')
+            return redirect(url_for('login'))
         if not SpotifyState.verify_and_use_state(state):
-            flash('Invalid state parameter', 'error')
-            return redirect(url_for('generate'))
-        
-        # Exchange code for tokens
+            flash('Invalid state parameter - possible CSRF attack', 'error')
+            return redirect(url_for('login'))
+        if os.getenv('RENDER'):
+            redirect_uri = 'https://www.benjamintakaki.com/spotify/spotify-callback'
+        else:
+            redirect_uri = 'http://localhost:5000/spotify/spotify-callback'
         token_data = {
             'grant_type': 'authorization_code',
             'code': code,
-            'redirect_uri': SPOTIFY_REDIRECT_URI,
+            'redirect_uri': redirect_uri,
             'client_id': SPOTIFY_CLIENT_ID,
             'client_secret': SPOTIFY_CLIENT_SECRET
         }
-        
-        response = requests.post('https://accounts.spotify.com/api/token', data=token_data)
-        
+        response = requests.post('https://accounts.spotify.com/api/token', data=token_data, timeout=30)
         if response.status_code != 200:
-            flash('Failed to get Spotify tokens', 'error')
-            return redirect(url_for('generate'))
-        
+            print(f"Token exchange failed: {response.status_code} - {response.text}")
+            flash('Failed to get Spotify tokens. Please try again.', 'error')
+            return redirect(url_for('login'))
         tokens = response.json()
         access_token = tokens['access_token']
         refresh_token = tokens.get('refresh_token')
         expires_in = tokens.get('expires_in', 3600)
-        
-        # Get user info from Spotify
         headers = {'Authorization': f'Bearer {access_token}'}
-        user_response = requests.get('https://api.spotify.com/v1/me', headers=headers)
-        
+        user_response = requests.get('https://api.spotify.com/v1/me', headers=headers, timeout=30)
         if user_response.status_code != 200:
-            flash('Failed to get Spotify user info', 'error')
-            return redirect(url_for('generate'))
-        
+            print(f"User info fetch failed: {user_response.status_code} - {user_response.text}")
+            flash('Failed to get Spotify user info. Please try again.', 'error')
+            return redirect(url_for('login'))
         spotify_user = user_response.json()
         spotify_id = spotify_user['id']
-        
-        print(f"🔍 Spotify user data: {spotify_user}")  # Debug log
-        
-        # Find or create user
+        print(f"🔍 Spotify user data: {spotify_user}")
         user = User.query.filter_by(spotify_id=spotify_id).first()
-        
         if not user:
-            # Create new user
             user = User(
                 spotify_id=spotify_id,
                 spotify_username=spotify_user.get('id'),
                 display_name=spotify_user.get('display_name', spotify_user.get('id')),
                 email=spotify_user.get('email'),
-                is_premium=False  # Will be determined by is_premium_user() method
+                is_premium=False
             )
             db.session.add(user)
-            print(f"✓ Created new user with email: {user.email}, spotify_username: {user.spotify_username}")
+            print(f"✓ Created new user with email: {user.email}")
         else:
-            # Update existing user
             user.display_name = spotify_user.get('display_name', spotify_user.get('id'))
             user.email = spotify_user.get('email')
-            print(f"✓ Updated existing user with email: {user.email}, spotify_username: {user.spotify_username}")
-        
-        # Update tokens
+            print(f"✓ Updated existing user")
         user.spotify_access_token = access_token
         user.spotify_refresh_token = refresh_token
         user.spotify_token_expires = datetime.datetime.utcnow() + timedelta(seconds=expires_in)
         user.last_login = datetime.datetime.utcnow()
-        
         db.session.commit()
-        
-        # Check if user is premium AFTER saving to database
-        is_premium = user.is_premium_user()
-        print(f"🔍 Premium check result: {is_premium} for email: {user.email}, spotify_username: {user.spotify_username}")
-        
-        # Create login session
         session_token = LoginSession.create_session(
             user.id,
             ip_address=request.remote_addr,
             user_agent=request.headers.get('User-Agent', '')
         )
-        
-        # Set session variables
         session['user_id'] = user.id
         session['user_session'] = session_token
-        session['username'] = user.display_name or user.username
-        
-        # Create response with cookie
         resp = make_response(redirect(url_for('generate')))
-        resp.set_cookie('session_token', session_token, max_age=30*24*60*60)  # 30 days
-        
-        # Show different flash messages based on premium status
+        resp.set_cookie('session_token', session_token, max_age=30*24*60*60)
+        is_premium = user.is_premium_user()
         if is_premium:
             flash('🌟 Welcome back, Premium user! You have unlimited generations and file upload access.', 'success')
         else:
             flash('Successfully connected to Spotify! You have 2 daily generations.', 'success')
-        
         return resp
-        
     except Exception as e:
         print(f"Error in Spotify callback: {e}")
         import traceback
         traceback.print_exc()
-        flash('An error occurred during Spotify authorization', 'error')
-        return redirect(url_for('generate'))
+        flash('An error occurred during Spotify authorization. Please try again.', 'error')
+        return redirect(url_for('login'))
 
 # OTHER ROUTES (login, logout, profile, etc. - keep existing)
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Login route - handle both form login and Spotify OAuth"""
+    """Fixed login route"""
+    user = get_current_user()
+    if user:
+        return redirect(url_for('generate'))
     if request.method == 'POST':
-        # Handle form-based login
         username = request.form.get('username')
         password = request.form.get('password')
-        
         if username and password:
             user = User.query.filter_by(username=username).first()
-            if user and check_password_hash(user.password_hash, password):
-                # Create session
-                session_token = secrets.token_urlsafe(32)
-                login_session = LoginSession(
-                    user_id=user.id,
-                    session_token=session_token,
-                    expires_at=datetime.datetime.utcnow() + timedelta(days=30),
+            if user and user.check_password(password):
+                session_token = LoginSession.create_session(
+                    user.id,
                     ip_address=request.remote_addr,
                     user_agent=request.headers.get('User-Agent', '')
                 )
-                db.session.add(login_session)
                 user.last_login = datetime.datetime.utcnow()
                 db.session.commit()
-                
+                session['user_id'] = user.id
                 session['user_session'] = session_token
+                resp = make_response(redirect(url_for('generate')))
+                resp.set_cookie('session_token', session_token, max_age=30*24*60*60)
                 flash('Logged in successfully!', 'success')
-                return redirect(url_for('generate'))
+                return resp
             else:
                 flash('Invalid username or password', 'error')
         else:
             flash('Please enter both username and password', 'error')
-    
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
-    """Logout route"""
+    """Fixed logout route"""
+    user_id = session.get('user_id')
     if 'user_session' in session:
-        # Mark session as inactive
-        session_token = session['user_session']
-        login_session = LoginSession.query.filter_by(session_token=session_token).first()
-        if login_session:
-            login_session.is_active = False
-            db.session.commit()
-        
-        session.pop('user_session', None)
-    
-    # clear all session data
+        try:
+            session_token = session['user_session']
+            login_session = LoginSession.query.filter_by(session_token=session_token).first()
+            if login_session:
+                login_session.is_active = False
+                db.session.commit()
+        except Exception as e:
+            print(f"Error marking session inactive: {e}")
     session.clear()
-    
-    flash('You have been logged out', 'info')
-    return redirect(url_for('login'))
+    resp = make_response(redirect(url_for('login')))
+    resp.set_cookie('session_token', '', expires=0)
+    flash('You have been logged out successfully', 'info')
+    return resp
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    """Register route"""
+    """Fixed register route"""
+    user = get_current_user()
+    if user:
+        return redirect(url_for('generate'))
     if request.method == 'POST':
         email = request.form.get('email')
         username = request.form.get('username')
         password = request.form.get('password')
-        
         if not email or not username or not password:
             flash('All fields are required.', 'error')
-            return redirect(url_for('register'))
-
+            return render_template('register.html')
         if User.query.filter_by(email=email).first():
             flash('Email already registered.', 'error')
-            return redirect(url_for('register'))
-        
+            return render_template('register.html')
         if User.query.filter_by(username=username).first():
             flash('Username already taken.', 'error')
-            return redirect(url_for('register'))
-
-        # Create new user
-        password_hash = generate_password_hash(password)
-        new_user = User(
-            email=email, 
-            username=username, 
-            display_name=username,
-            password_hash=password_hash
-        )
-        
+            return render_template('register.html')
         try:
+            new_user = User(
+                email=email, 
+                username=username, 
+                display_name=username
+            )
+            new_user.set_password(password)
             db.session.add(new_user)
             db.session.commit()
-            
             flash('Registration successful! Please log in.', 'success')
             return redirect(url_for('login'))
         except Exception as e:
             db.session.rollback()
             print(f"Error creating user: {e}")
             flash('Registration failed. Please try again.', 'error')
-            return redirect(url_for('register'))
-        
+            return render_template('register.html')
     return render_template('register.html')
 
-@app.route('/profile')
-@login_required
-def profile():
-    """User profile page"""
-    user = get_current_user()
-    if not user:
-        return redirect(url_for('login'))
-    
-    # Get user statistics
-    total_generations = GenerationResultDB.query.filter_by(user_id=user.id).count()
-    generations_today = user.get_generations_today()
-    daily_limit = user.get_daily_generation_limit()
-    
-    # Get recent generations
-    recent_generations = (GenerationResultDB.query
-                         .filter_by(user_id=user.id)
-                         .order_by(GenerationResultDB.timestamp.desc())
-                         .limit(10)
-                         .all())
-    
-    profile_data = {
-        'user': user,
-        'total_generations': total_generations,
-        'generations_today': generations_today,
-        'daily_limit': daily_limit,
-        'can_generate': user.can_generate_today(),
-        'recent_generations': recent_generations,
-        'spotify_connected': bool(user.spotify_access_token),
-        'is_premium': user.is_premium_user()
-    }
-    
-    return render_template('profile.html', **profile_data)
+# Debug route to list all routes
+@app.route('/debug/routes')
+def debug_routes():
+    """Debug route to see all available routes"""
+    if not app.debug and not os.getenv('RENDER'):
+        return "Not available in production", 403
+    routes = []
+    for rule in app.url_map.iter_rules():
+        routes.append({
+            'endpoint': rule.endpoint,
+            'methods': list(rule.methods),
+            'rule': rule.rule
+        })
+    return {'routes': routes}
 
 @app.route("/generated_covers/<path:filename>")
 def serve_image(filename):

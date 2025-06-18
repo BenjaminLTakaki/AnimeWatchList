@@ -72,33 +72,30 @@ spotify_path = os.path.join(project_root, 'projects/spotify-cover-generator')
 # Import Spotify app - FIXED PATH HANDLING
 try:
     print(f"Setting up Spotify app from path: {spotify_path}")
-    
-    # Store original sys.path to restore later
+    # Store original sys.path and cwd to restore later
     original_sys_path = sys.path.copy()
-    
+    original_cwd = os.getcwd()
     # Add the spotify project directory to the path FIRST
-    # This ensures all imports within the spotify app work correctly
     if spotify_path not in sys.path:
         sys.path.insert(0, spotify_path)
-    
     print(f"Added Spotify path to sys.path: {spotify_path}")
-    print(f"Current working directory: {os.getcwd()}")
-    print(f"Spotify directory contents: {os.listdir(spotify_path) if os.path.exists(spotify_path) else 'Directory not found'}")
-    
     # Change the working directory temporarily for the import
-    old_cwd = os.getcwd()
     os.chdir(spotify_path)
-    
     try:
-        # Now import the app - this should work because we're in the right directory
-        # and the path is set correctly
+        # Now import the app
         from app import app as spotify_app
         print("✅ Spotify app imported successfully")
         has_spotify_app = True
+        # IMPORTANT: Configure the Spotify app for sub-path deployment
+        spotify_app.config['APPLICATION_ROOT'] = '/spotify'
+        spotify_app.config['PREFERRED_URL_SCHEME'] = 'https'
+        # Add context processor
+        @spotify_app.context_processor
+        def inject_spotify_vars():
+            return {'current_year': datetime.datetime.now().year}
     finally:
         # Always restore the working directory
-        os.chdir(old_cwd)
-        
+        os.chdir(original_cwd)
 except Exception as e:
     print(f"❌ Could not import Spotify app: {e}")
     print(f"Error type: {type(e).__name__}")
@@ -167,11 +164,14 @@ def skillstown_redirect():
 def animewatchlist_redirect():
     return redirect('/animewatchlist/')
 
-if has_spotify_app:
-    @main_app.route('/projects/spotify-cover-generator')
-    @main_app.route('/projects/spotify-cover-generator/')
-    def spotify_redirect():
-        return redirect('/spotify/')
+@main_app.route('/projects/spotify-cover-generator')
+@main_app.route('/projects/spotify-cover-generator/')
+def spotify_redirect():
+    """Fixed redirect to Spotify app"""
+    if has_spotify_app:
+        return redirect('/spotify/', code=302)
+    else:
+        return "Spotify Cover Generator is currently unavailable", 503
 
 # Handle static files from the main app
 @main_app.route('/skillstown/static/<path:filename>')
@@ -195,14 +195,28 @@ def animewatchlist_static(filename):
         return f"Static file {filename} not found", 404
 
 if has_spotify_app:
+    SPOTIFY_APP_STATIC_DIR = os.path.join(spotify_path, 'static')
     @main_app.route('/spotify/static/<path:filename>')
     def spotify_static(filename):
         print(f"Serving Spotify static file: {filename} from {SPOTIFY_APP_STATIC_DIR}")
-        if os.path.exists(os.path.join(SPOTIFY_APP_STATIC_DIR, filename)):
-            return send_from_directory(SPOTIFY_APP_STATIC_DIR, filename)
-        else:
-            print(f"Spotify static file not found: {filename}")
-            return f"Static file {filename} not found", 404
+        try:
+            full_path = os.path.join(SPOTIFY_APP_STATIC_DIR, filename)
+            if os.path.exists(full_path):
+                return send_from_directory(SPOTIFY_APP_STATIC_DIR, filename)
+            else:
+                print(f"Spotify static file not found: {filename}")
+                # Try fallback locations
+                fallback_paths = [
+                    os.path.join(spotify_path, 'templates', filename),
+                    os.path.join(project_root, 'static', filename)
+                ]
+                for fallback_path in fallback_paths:
+                    if os.path.exists(fallback_path):
+                        return send_from_directory(os.path.dirname(fallback_path), os.path.basename(fallback_path))
+                return f"Static file {filename} not found", 404
+        except Exception as e:
+            print(f"Error serving Spotify static file {filename}: {e}")
+            return f"Error serving static file: {e}", 500
 
 # Class to handle routing to the app
 class AppDispatcher:
@@ -210,9 +224,8 @@ class AppDispatcher:
         self.app = app
         
     def __call__(self, environ, start_response):
-        # Get the request path
         path_info = environ.get('PATH_INFO', '')
-        
+        print(f"🔍 AppDispatcher handling request: {path_info}")
         # Handle static file requests
         if path_info.startswith('/skillstown/static/'):
             environ['PATH_INFO'] = path_info
@@ -236,18 +249,22 @@ class AppDispatcher:
             environ['PATH_INFO'] = path_info[len(script_name):]
             return animewatchlist_app(environ, start_response)
         elif has_spotify_app and path_info.startswith('/spotify'):
+            print("Routing to Spotify app")
             script_name = '/spotify'
             environ['SCRIPT_NAME'] = script_name
             environ['PATH_INFO'] = path_info[len(script_name):]
-            # IMPORTANT: Set the working directory for Spotify app requests
+            # CRITICAL FIX: Set the working directory and sys.path for Spotify app requests
             old_cwd = os.getcwd()
+            old_sys_path = sys.path.copy()
             try:
                 os.chdir(spotify_path)
+                if spotify_path not in sys.path:
+                    sys.path.insert(0, spotify_path)
                 return spotify_app(environ, start_response)
             finally:
                 os.chdir(old_cwd)
-            
-        # Everything else goes to the main app
+                sys.path = old_sys_path
+        print("Routing to main app")
         return main_app(environ, start_response)
 
 # Set up the WSGI application with our custom dispatcher
