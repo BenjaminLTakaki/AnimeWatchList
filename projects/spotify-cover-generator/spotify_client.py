@@ -416,6 +416,7 @@ def update_playlist_cover_image(access_token: str, playlist_id: str, image_data_
         sp_local = spotipy.Spotify(auth=access_token)
         # The spotipy documentation for playlist_upload_cover_image states:
         # "image_b64: base64 encoded JPEG image data, maximum payload size is 256 KB"
+        print(f"Attempting to upload cover for playlist {playlist_id}. Base64 image data length: {len(image_data_base64)} bytes.")
         sp_local.playlist_upload_cover_image(playlist_id, image_data_base64)
         return True, None
     except SpotifyException as e:
@@ -473,8 +474,5 @@ if __name__ == "__main__":
             track_count = get_playlist_tracks_count(test_url)
             print(f"Track count: {track_count}")
             
-            # Test extraction (uncomment to test)
-            # result = extract_playlist_data(test_url)
-            # print(f"Extraction result: {type(result)}")
     else:
         print(" Failed to initialize Spotify client")
