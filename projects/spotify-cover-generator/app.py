@@ -1365,32 +1365,34 @@ def update_playlist_cover():
 
 # SPOTIFY AUTH ROUTES (FIXED)
 @app.route('/spotify-login')
+@app.route('/spotify_login')  # Add this alias
 def spotify_login():
-    """Fixed Spotify OAuth initiation"""
+    """Initiate Spotify OAuth flow - with both URL patterns"""
     if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
         flash('Spotify integration is not configured', 'error')
         return redirect(url_for('login'))
+    
+    # Generate state for CSRF protection
     try:
         state = SpotifyState.create_state()
     except Exception as e:
         print(f"Error creating OAuth state: {e}")
         flash('Error initiating Spotify login. Please try again.', 'error')
         return redirect(url_for('login'))
-    scope = 'playlist-read-private playlist-modify-public playlist-modify-private ugc-image-upload user-read-email user-read-private'
-    if os.getenv('RENDER'):
-        redirect_uri = 'https://www.benjamintakaki.com/spotify/spotify-callback'
-    else:
-        redirect_uri = 'http://localhost:5000/spotify/spotify-callback'
+    
+    scope = " ".join([
+        "user-read-private", "user-read-email", "playlist-read-private",
+        "playlist-modify-public", "playlist-modify-private",
+        "ugc-image-upload"
+    ])
+    
     auth_url = (
-        'https://accounts.spotify.com/authorize?'
-        f'client_id={SPOTIFY_CLIENT_ID}&'
-        f'response_type=code&'
-        f'redirect_uri={redirect_uri}&'
-        f'scope={scope}&'
-        f'state={state}'
+        f"https://accounts.spotify.com/authorize?response_type=code"
+        f"&client_id={SPOTIFY_CLIENT_ID}&scope={scope}"
+        f"&redirect_uri={SPOTIFY_REDIRECT_URI}&state={state}"
     )
-    print(f"Redirecting to Spotify OAuth with redirect_uri: {redirect_uri}")
     return redirect(auth_url)
+
 
 @app.route('/spotify-callback')
 def spotify_callback():
@@ -1530,25 +1532,66 @@ def logout():
     flash('You have been logged out successfully', 'info')
     return resp
 
+@app.route('/profile')
+@login_required
+def profile():
+    """User profile page"""
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('login'))
+    
+    # Get user statistics
+    total_generations = GenerationResultDB.query.filter_by(user_id=user.id).count()
+    generations_today = user.get_generations_today()
+    daily_limit = user.get_daily_generation_limit()
+    
+    # Get recent generations
+    recent_generations = (GenerationResultDB.query
+                         .filter_by(user_id=user.id)
+                         .order_by(GenerationResultDB.timestamp.desc())
+                         .limit(10)
+                         .all())
+    
+    profile_data = {
+        'user': user,
+        'total_generations': total_generations,
+        'generations_today': generations_today,
+        'daily_limit': daily_limit,
+        'can_generate': user.can_generate_today(),
+        'recent_generations': recent_generations,
+        'spotify_connected': bool(user.spotify_access_token),
+        'is_premium': user.is_premium_user()
+    }
+    
+    return render_template('profile.html', **profile_data)
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    """Fixed register route"""
+    """Register route"""
+    # If user is already logged in, redirect to generate
     user = get_current_user()
     if user:
         return redirect(url_for('generate'))
+    
     if request.method == 'POST':
         email = request.form.get('email')
         username = request.form.get('username')
         password = request.form.get('password')
+        
         if not email or not username or not password:
             flash('All fields are required.', 'error')
             return render_template('register.html')
+
+        # Check for existing users
         if User.query.filter_by(email=email).first():
             flash('Email already registered.', 'error')
             return render_template('register.html')
+        
         if User.query.filter_by(username=username).first():
             flash('Username already taken.', 'error')
             return render_template('register.html')
+
+        # Create new user
         try:
             new_user = User(
                 email=email, 
@@ -1556,8 +1599,10 @@ def register():
                 display_name=username
             )
             new_user.set_password(password)
+            
             db.session.add(new_user)
             db.session.commit()
+            
             flash('Registration successful! Please log in.', 'success')
             return redirect(url_for('login'))
         except Exception as e:
@@ -1565,14 +1610,13 @@ def register():
             print(f"Error creating user: {e}")
             flash('Registration failed. Please try again.', 'error')
             return render_template('register.html')
+        
     return render_template('register.html')
 
-# Debug route to list all routes
+# Add this debug route to check what routes exist
 @app.route('/debug/routes')
 def debug_routes():
     """Debug route to see all available routes"""
-    if not app.debug and not os.getenv('RENDER'):
-        return "Not available in production", 403
     routes = []
     for rule in app.url_map.iter_rules():
         routes.append({
@@ -1580,11 +1624,13 @@ def debug_routes():
             'methods': list(rule.methods),
             'rule': rule.rule
         })
-    return {'routes': routes}
+    
+    from flask import jsonify
+    return jsonify({'routes': routes})
 
-@app.route("/generated_covers/<path:filename>")
-def serve_image(filename):
-    return send_from_directory(COVERS_DIR, filename)
+# Make sure spotify_login route exists (rename from spotify-login)
+# This is now handled by the alias, so we can remove the duplicate route definition.
+
 
 if not any(rule.endpoint == 'health_check' for rule in app.url_map.iter_rules()):
     @app.route('/health')
