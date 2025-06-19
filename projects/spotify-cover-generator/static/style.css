@@ -674,3 +674,95 @@ input[type="text"]:focus, select:focus {
 .genre-percentage-bar[data-width] {
     width: attr(data-width percentage);
 }
+
+/* Enhanced Genre Percentages Styling - Add this to your style.css */
+.genre-percentages-container {
+    margin-top: 20px;
+    padding: 20px;
+    background: #333;
+    border-radius: 8px;
+}
+
+.genre-percentages-container h4 {
+    color: #1DB954;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+}
+
+.genre-percentage-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 15px;
+}
+
+.genre-percentage-label {
+    color: #fff;
+    font-weight: 500;
+    min-width: 120px;
+    flex-shrink: 0;
+    text-transform: capitalize;
+}
+
+.genre-percentage {
+    flex: 1;
+    height: 20px;
+    background-color: #555;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.genre-percentage-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #1DB954, #1ed760);
+    border-radius: 10px;
+    width: var(--width);
+    transition: width 0.8s ease-in-out;
+    position: relative;
+}
+
+.percentage-text {
+    color: #ccc;
+    font-size: 0.9em;
+    min-width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* Different colors for different positions */
+.genre-percentage-item:nth-child(1) .genre-percentage-bar {
+    background: linear-gradient(90deg, #1DB954, #1ed760);
+}
+
+.genre-percentage-item:nth-child(2) .genre-percentage-bar {
+    background: linear-gradient(90deg, #2196F3, #1976D2);
+}
+
+.genre-percentage-item:nth-child(3) .genre-percentage-bar {
+    background: linear-gradient(90deg, #FF9800, #F57C00);
+}
+
+.genre-percentage-item:nth-child(4) .genre-percentage-bar {
+    background: linear-gradient(90deg, #f44336, #d32f2f);
+}
+
+.genre-percentage-item:nth-child(5) .genre-percentage-bar {
+    background: linear-gradient(90deg, #9C27B0, #7B1FA2);
+}
+
+/* Animation on page load */
+.genre-percentage-bar {
+    animation: fillBar 1.2s ease-out 0.2s both;
+}
+
+@keyframes fillBar {
+    from {
+        width: 0%;
+        opacity: 0;
+    }
+    to {
+        width: var(--width);
+        opacity: 1;
+    }
+}

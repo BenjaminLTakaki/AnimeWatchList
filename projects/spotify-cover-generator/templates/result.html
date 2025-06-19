@@ -266,10 +266,7 @@
                     <div class="genre-percentage-item">
                         <div class="genre-percentage-label">{{ genre.name }}</div>
                         <div class="genre-percentage">
-                            <div
-                              class="genre-percentage-bar"
-                              style="--width: {{ genre.percentage }}%;">
-                            </div>
+                            <div class="genre-percentage-bar" style="--width: {{ genre.percentage }}%;"></div>
                         </div>
                         <div class="percentage-text">{{ genre.percentage }}%</div>
                     </div>
@@ -606,7 +603,18 @@
                     }, 3000);
                 }
             }
-            
+            document.addEventListener('DOMContentLoaded', function() {
+                // Animate percentage bars on page load
+                const bars = document.querySelectorAll('.genre-percentage-bar');
+                bars.forEach((bar, index) => {
+                    const width = bar.style.getPropertyValue('--width');
+                    bar.style.setProperty('--width', '0%');
+                    
+                    setTimeout(() => {
+                        bar.style.setProperty('--width', width);
+                    }, 100 + (index * 100)); // Stagger the animations
+                });
+            });
             // Original result page functionality
             const copyTitleButton = document.getElementById('copy-title');
             if (copyTitleButton) {
