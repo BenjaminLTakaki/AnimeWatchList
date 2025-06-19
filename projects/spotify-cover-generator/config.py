@@ -57,12 +57,25 @@ SD_3_5_LARGE_ENGINE = "sd3.5-large"
 # Flask configuration
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY")
 
-# Database configuration - Render provides this automatically
-SPOTIFY_DB_URL = os.getenv('DATABASE_URL') or os.getenv('SPOTIFY_DB_URL', 'postgresql://postgres:password@localhost/portfoliodb')
+# FIXED: Use single database URL for everything (Render-optimized)
+# Render provides DATABASE_URL automatically
+MAIN_DB_URL = os.getenv('DATABASE_URL')
+
+if not MAIN_DB_URL:
+    # Fallback for local development
+    MAIN_DB_URL = 'postgresql://postgres:password@localhost/portfoliodb'
+    print("⚠️ No DATABASE_URL found, using local fallback")
+else:
+    print(f"✅ Found DATABASE_URL from Render environment")
 
 # Fix for Render's DATABASE_URL format (starts with postgres:// instead of postgresql://)
-if SPOTIFY_DB_URL and SPOTIFY_DB_URL.startswith('postgres://'):
-    SPOTIFY_DB_URL = SPOTIFY_DB_URL.replace('postgres://', 'postgresql://', 1)
+if MAIN_DB_URL and MAIN_DB_URL.startswith('postgres://'):
+    MAIN_DB_URL = MAIN_DB_URL.replace('postgres://', 'postgresql://', 1)
+
+# Use the same database for everything
+SPOTIFY_DB_URL = MAIN_DB_URL
+
+print(f"🔗 Using database: {MAIN_DB_URL[:50]}...")
 
 # Default negative prompt
 DEFAULT_NEGATIVE_PROMPT = """
