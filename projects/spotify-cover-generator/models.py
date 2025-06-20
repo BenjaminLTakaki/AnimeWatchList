@@ -601,7 +601,18 @@ class PlaylistData:
     artist_ids: List[str] = field(default_factory=list)  # NEW: Add artist IDs
     
     def to_dict(self):
-        """Convert to dictionary."""
+        artist_ids_list = []
+        if isinstance(self.artist_ids, list):
+            artist_ids_list = self.artist_ids
+        elif self.artist_ids is not None:
+            try:
+                artist_ids_list = list(self.artist_ids)
+            except TypeError:
+                # Log error or handle case where self.artist_ids is not iterable
+                print(f"DEBUG: self.artist_ids in PlaylistData.to_dict() was not a list or iterable: {type(self.artist_ids)}")
+                artist_ids_list = [] 
+        # else: artist_ids_list remains [] if self.artist_ids is None
+
         return {
             "item_name": self.item_name,
             "track_names": self.track_names,
@@ -612,7 +623,7 @@ class PlaylistData:
             "spotify_url": self.spotify_url,
             "found_genres": self.found_genres,
             "style_elements": self.genre_analysis.get_style_elements(),
-            "artist_ids": self.artist_ids  # NEW: Include artist IDs in dict
+            "artist_ids": artist_ids_list # Ensure 'artist_ids' key is always present
         }
     
     @classmethod
@@ -631,7 +642,7 @@ class PlaylistData:
             genre_analysis=genre_analysis,
             spotify_url=data.get("spotify_url", ""),
             found_genres=data.get("found_genres", False),
-            artist_ids=data.get("artist_ids", [])  # NEW: Include artist IDs
+            artist_ids=data.get("artist_ids", [])  
         )
     
     @classmethod

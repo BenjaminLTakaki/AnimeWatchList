@@ -90,6 +90,7 @@ def generate_cover(url, user_mood=None, lora_input=None, output_path=None, negat
     
     # Convert playlist data to dictionary
     data = playlist_data.to_dict()
+    print(f"DEBUG: artist_ids in data for title generation: {data.get('artist_ids')}") 
     
     # Create image prompt
     base_image_prompt = create_prompt_from_data(data, user_mood)

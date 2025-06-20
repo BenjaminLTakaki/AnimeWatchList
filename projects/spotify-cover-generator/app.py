@@ -3,6 +3,7 @@ import sys
 import random
 import json
 import datetime
+from datetime import timezone # Added import
 import traceback
 import uuid 
 import time
@@ -93,6 +94,8 @@ app = Flask(__name__,
 app.secret_key = FLASK_SECRET_KEY or ''.join(random.choices(
     'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=24))
 
+app.permanent_session_lifetime = timedelta(days=7)
+
 # Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = SPOTIFY_DB_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -122,7 +125,7 @@ class User(db.Model):
     spotify_token_expires = db.Column(db.DateTime, nullable=True)
     display_name = db.Column(db.String(100), nullable=True)
     is_premium = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.datetime.now(timezone.utc))
     last_login = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     generations = db.relationship('GenerationResultDB', backref='user', lazy=True)
@@ -148,7 +151,7 @@ class User(db.Model):
         return 999 if self.is_premium_user() else 2
 
     def can_generate_today(self):
-        today = datetime.datetime.utcnow().date()
+        today = datetime.datetime.now(timezone.utc).date()
         count = GenerationResultDB.query.filter(
             GenerationResultDB.user_id == self.id,
             db.func.date(GenerationResultDB.timestamp) == today
@@ -156,7 +159,7 @@ class User(db.Model):
         return count < self.get_daily_generation_limit()
 
     def get_generations_today(self):
-        today = datetime.datetime.utcnow().date()
+        today = datetime.datetime.now(timezone.utc).date()
         return GenerationResultDB.query.filter(
             GenerationResultDB.user_id == self.id,
             db.func.date(GenerationResultDB.timestamp) == today
@@ -166,7 +169,7 @@ class User(db.Model):
         if not self.spotify_refresh_token:
             return False
         if self.spotify_token_expires and \
-           self.spotify_token_expires <= datetime.datetime.utcnow() + timedelta(minutes=5):
+           self.spotify_token_expires <= datetime.datetime.now(timezone.utc) + timedelta(minutes=5):
             return self._refresh_spotify_token()
         return True
 
@@ -181,7 +184,7 @@ class User(db.Model):
             if response.status_code == 200:
                 token_data = response.json()
                 self.spotify_access_token = token_data['access_token']
-                self.spotify_token_expires = datetime.datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
+                self.spotify_token_expires = datetime.datetime.now(timezone.utc) + timedelta(seconds=token_data['expires_in'])
                 if 'refresh_token' in token_data:
                     self.spotify_refresh_token = token_data['refresh_token']
                 db.session.commit()
@@ -209,7 +212,7 @@ class LoginSession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=False)
     session_token = db.Column(db.String(100), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.datetime.now(timezone.utc))
     expires_at = db.Column(db.DateTime, nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     ip_address = db.Column(db.String(45), nullable=True)
@@ -219,7 +222,7 @@ class LoginSession(db.Model):
     @staticmethod
     def create_session(user_id, ip_address=None, user_agent=None):
         token = secrets.token_urlsafe(32)
-        expires = datetime.datetime.utcnow() + timedelta(days=30)
+        expires = datetime.datetime.now(timezone.utc) + timedelta(days=30)
         sess = LoginSession(
             user_id=user_id, session_token=token,
             expires_at=expires, ip_address=ip_address,
@@ -232,7 +235,7 @@ class LoginSession(db.Model):
     @staticmethod
     def get_user_from_session(session_token):
         sess = LoginSession.query.filter_by(session_token=session_token, is_active=True).first()
-        if not sess or sess.expires_at <= datetime.datetime.utcnow():
+        if not sess or sess.expires_at <= datetime.datetime.now(timezone.utc):
             if sess:
                 sess.is_active = False
                 db.session.commit()
@@ -243,7 +246,7 @@ class SpotifyState(db.Model):
     __tablename__ = 'spotify_oauth_states'
     id = db.Column(db.Integer, primary_key=True)
     state = db.Column(db.String(100), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.datetime.now(timezone.utc))
     used = db.Column(db.Boolean, default=False)
     
     @staticmethod
@@ -257,7 +260,7 @@ class SpotifyState(db.Model):
     @staticmethod
     def verify_and_use_state(state):
         oauth_state = SpotifyState.query.filter_by(state=state, used=False).first()
-        if oauth_state and oauth_state.created_at > datetime.datetime.utcnow() - timedelta(minutes=10):
+        if oauth_state and oauth_state.created_at > datetime.datetime.now(timezone.utc) - timedelta(minutes=10):
             oauth_state.used = True
             db.session.commit()
             return True
@@ -270,7 +273,7 @@ class LoraModelDB(db.Model):
     source_type = db.Column(db.String(20), default='local')  # Only 'local' now
     path = db.Column(db.String(500), default='')
     file_size = db.Column(db.Integer, default=0)  # File size in bytes
-    uploaded_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    uploaded_at = db.Column(db.DateTime, default=lambda: datetime.datetime.now(timezone.utc))
     uploaded_by = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=True)
     
     def to_lora_model(self):
@@ -338,7 +341,7 @@ def get_current_user():
                 session_token=session_token, 
                 is_active=True
             ).first()
-            if login_session and login_session.expires_at > datetime.datetime.utcnow():
+            if login_session and login_session.expires_at > datetime.datetime.now(timezone.utc):
                 user = login_session.user
                 if user and user.is_active:
                     session['user_id'] = user.id
@@ -355,7 +358,7 @@ def get_current_user():
                 session_token=session_token, 
                 is_active=True
             ).first()
-            if login_session and login_session.expires_at > datetime.datetime.utcnow():
+            if login_session and login_session.expires_at > datetime.datetime.now(timezone.utc):
                 user = login_session.user
                 if user and user.is_active:
                     session['user_id'] = user.id
@@ -805,9 +808,10 @@ def get_or_create_guest_session():
     """Get or create a guest session for anonymous users"""
     if 'guest_session_id' not in session:
         session['guest_session_id'] = str(uuid.uuid4())
-        session['guest_created'] = datetime.utcnow().isoformat()
+        session['guest_created'] = datetime.datetime.now(timezone.utc).isoformat()
         session['guest_generations_today'] = 0
         session['guest_last_generation'] = None
+        session.permanent = True
     return session['guest_session_id']
 
 def get_guest_generations_today():
@@ -816,8 +820,8 @@ def get_guest_generations_today():
         return 0
     
     if 'guest_last_generation' in session and session['guest_last_generation']:
-        last_gen = datetime.fromisoformat(session['guest_last_generation'])
-        if last_gen.date() != datetime.utcnow().date():
+        last_gen = datetime.datetime.fromisoformat(session['guest_last_generation'])
+        if last_gen.date() != datetime.datetime.now(timezone.utc).date():
             session['guest_generations_today'] = 0
     
     return session.get('guest_generations_today', 0)
@@ -825,7 +829,7 @@ def get_guest_generations_today():
 def increment_guest_generations():
     """Increment guest generation count"""
     session['guest_generations_today'] = get_guest_generations_today() + 1
-    session['guest_last_generation'] = datetime.utcnow().isoformat()
+    session['guest_last_generation'] = datetime.datetime.now(timezone.utc).isoformat()
 
 def can_guest_generate():
     """Check if guest can generate (limit: 1 per day)"""
@@ -874,7 +878,7 @@ def track_guest_generation():
 def inject_template_vars():
     """Inject common variables into all templates"""
     return {
-        'current_year': datetime.datetime.now().year,
+        'current_year': datetime.datetime.now(timezone.utc).year,
         'user_info': get_current_user_or_guest()
     }
 
@@ -1466,8 +1470,8 @@ def spotify_callback():
             print(f"✓ Updated existing user")
         user.spotify_access_token = access_token
         user.spotify_refresh_token = refresh_token
-        user.spotify_token_expires = datetime.datetime.utcnow() + timedelta(seconds=expires_in)
-        user.last_login = datetime.datetime.utcnow()
+        user.spotify_token_expires = datetime.datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        user.last_login = datetime.datetime.now(timezone.utc)
         db.session.commit()
         session_token = LoginSession.create_session(
             user.id,
@@ -1509,7 +1513,7 @@ def login():
                     ip_address=request.remote_addr,
                     user_agent=request.headers.get('User-Agent', '')
                 )
-                user.last_login = datetime.datetime.utcnow()
+                user.last_login = datetime.datetime.now(timezone.utc)
                 db.session.commit()
                 session['user_id'] = user.id
                 session['user_session'] = session_token
@@ -1653,7 +1657,7 @@ if not any(rule.endpoint == 'health_check' for rule in app.url_map.iter_rules())
             
             response_data = {
                 "status": "healthy" if all_healthy else "degraded",
-                "timestamp": datetime.datetime.utcnow().isoformat(),
+                "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
                 "services": {name: {
                     "healthy": result.healthy,
                     "response_time_ms": result.response_time_ms,
@@ -1667,14 +1671,14 @@ if not any(rule.endpoint == 'health_check' for rule in app.url_map.iter_rules())
             # Fallback health check if monitoring system not available
             return jsonify({
                 "status": "healthy",
-                "timestamp": datetime.datetime.utcnow().isoformat(),
+                "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
                 "message": "Basic health check - monitoring system not available"
             }), 200
         except Exception as e:
             return jsonify({
                 "status": "error", 
                 "error": str(e),
-                "timestamp": datetime.datetime.utcnow().isoformat()
+                "timestamp": datetime.datetime.now(timezone.utc).isoformat()
             }), 500
 
 @app.route('/metrics')
@@ -1685,7 +1689,7 @@ def metrics_endpoint():
         
         metrics_data = {
             "performance": app_logger.get_performance_summary(),
-            "timestamp": datetime.datetime.utcnow().isoformat()
+            "timestamp": datetime.datetime.now(timezone.utc).isoformat()
         }
         
         return jsonify(metrics_data), 200
@@ -1694,14 +1698,14 @@ def metrics_endpoint():
         # Fallback metrics
         return jsonify({
             "status": "monitoring_unavailable",
-            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
             "message": "Monitoring system not available"
         }), 200
     except Exception as e:
         return jsonify({
             "error": "Metrics not available",
             "message": str(e),
-            "timestamp": datetime.datetime.utcnow().isoformat()
+            "timestamp": datetime.datetime.now(timezone.utc).isoformat()
         }), 500
 
 # 5. FIX monitoring_system.py initialization
