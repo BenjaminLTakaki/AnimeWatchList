@@ -11,6 +11,7 @@ from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 from functools import wraps
+import hashlib # Added import
 
 import requests
 import base64
@@ -26,7 +27,7 @@ from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-from sqlalchemy import text
+from sqlalchemy import text, func # Added func
 
 import spotify_client # Added import
 
@@ -93,8 +94,6 @@ app = Flask(__name__,
             static_folder=str(BASE_DIR / "static"))
 app.secret_key = FLASK_SECRET_KEY or ''.join(random.choices(
     'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=24))
-
-app.permanent_session_lifetime = timedelta(days=7)
 
 # Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = SPOTIFY_DB_URL
@@ -168,9 +167,12 @@ class User(db.Model):
     def refresh_spotify_token_if_needed(self):
         if not self.spotify_refresh_token:
             return False
-        if self.spotify_token_expires and \
-           self.spotify_token_expires <= datetime.datetime.now(timezone.utc) + timedelta(minutes=5):
-            return self._refresh_spotify_token()
+        if self.spotify_token_expires:
+            spotify_token_expires_ts = self.spotify_token_expires
+            if spotify_token_expires_ts.tzinfo is None:
+                spotify_token_expires_ts = spotify_token_expires_ts.replace(tzinfo=timezone.utc)
+            if spotify_token_expires_ts <= datetime.datetime.now(timezone.utc) + timedelta(minutes=5):
+                return self._refresh_spotify_token()
         return True
 
     def _refresh_spotify_token(self):
@@ -235,12 +237,23 @@ class LoginSession(db.Model):
     @staticmethod
     def get_user_from_session(session_token):
         sess = LoginSession.query.filter_by(session_token=session_token, is_active=True).first()
-        if not sess or sess.expires_at <= datetime.datetime.now(timezone.utc):
-            if sess:
-                sess.is_active = False
-                db.session.commit()
+
+        if not sess:
             return None
-        return sess.user
+
+        # Ensure expires_at is timezone-aware for comparison
+        # This assumes 'timezone' and 'datetime' are imported, 
+        # and 'db' is the SQLAlchemy instance.
+        expires_at_aware = sess.expires_at
+        if expires_at_aware.tzinfo is None:
+            expires_at_aware = expires_at_aware.replace(tzinfo=timezone.utc)
+
+        if expires_at_aware <= datetime.datetime.now(timezone.utc): # Session expired
+            sess.is_active = False
+            db.session.commit()
+            return None
+            
+        return sess.user 
 
 class SpotifyState(db.Model):
     __tablename__ = 'spotify_oauth_states'
@@ -260,10 +273,14 @@ class SpotifyState(db.Model):
     @staticmethod
     def verify_and_use_state(state):
         oauth_state = SpotifyState.query.filter_by(state=state, used=False).first()
-        if oauth_state and oauth_state.created_at > datetime.datetime.now(timezone.utc) - timedelta(minutes=10):
-            oauth_state.used = True
-            db.session.commit()
-            return True
+        if oauth_state:
+            created_at_ts = oauth_state.created_at
+            if created_at_ts.tzinfo is None:
+                created_at_ts = created_at_ts.replace(tzinfo=timezone.utc)
+            if created_at_ts > datetime.datetime.now(timezone.utc) - timedelta(minutes=10):
+                oauth_state.used = True
+                db.session.commit()
+                return True
         return False
 
 class LoraModelDB(db.Model):
@@ -304,7 +321,58 @@ class GenerationResultDB(db.Model):
     lora_url = db.Column(db.String(1000))
     user_id = db.Column(db.Integer, db.ForeignKey('spotify_users.id'), nullable=True)
 
+class GuestIPGenerationLog(db.Model):
+    __tablename__ = 'spotify_guest_ip_generation_log'
+    ip_address_hash = db.Column(db.String(64), primary_key=True) # SHA256 hash
+    last_generated_at = db.Column(db.DateTime, nullable=False)
+
+    def __repr__(self):
+        return f'<GuestIPGenerationLog {self.ip_address_hash}>'
+
 # HELPER FUNCTIONS
+def _hash_ip(ip_address):
+    if not ip_address:
+        return None
+    return hashlib.sha256(ip_address.encode('utf-8')).hexdigest()
+
+def can_guest_generate_by_ip(ip_address):
+    hashed_ip = _hash_ip(ip_address)
+    if not hashed_ip:
+        return False # Or handle error appropriately
+
+    log_entry = GuestIPGenerationLog.query.get(hashed_ip)
+    if not log_entry:
+        return True # Never generated before from this IP
+
+    # Check if last_generated_at is from today
+    # Make last_generated_at aware if it's naive
+    last_gen_at_aware = log_entry.last_generated_at
+    if last_gen_at_aware.tzinfo is None:
+        last_gen_at_aware = last_gen_at_aware.replace(tzinfo=timezone.utc)
+
+    if last_gen_at_aware.date() < datetime.datetime.now(timezone.utc).date():
+        return True # Last generation was before today
+    return False # Already generated today
+
+def record_guest_generation_by_ip(ip_address):
+    hashed_ip = _hash_ip(ip_address)
+    if not hashed_ip:
+        return # Or handle error
+
+    log_entry = GuestIPGenerationLog.query.get(hashed_ip)
+    now_utc = datetime.datetime.now(timezone.utc)
+    if log_entry:
+        log_entry.last_generated_at = now_utc
+    else:
+        log_entry = GuestIPGenerationLog(ip_address_hash=hashed_ip, last_generated_at=now_utc)
+        db.session.add(log_entry)
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error recording guest IP generation: {e}")
+        # Potentially re-raise or handle more gracefully
+
 def login_required(f):
     """Decorator to require login for routes"""
     @wraps(f)
@@ -341,10 +409,35 @@ def get_current_user():
                 session_token=session_token, 
                 is_active=True
             ).first()
-            if login_session and login_session.expires_at > datetime.datetime.now(timezone.utc):
-                user = login_session.user
-                if user and user.is_active:
-                    session['user_id'] = user.id
+            if login_session:
+                expires_at_ts = login_session.expires_at
+                if expires_at_ts.tzinfo is None:
+                    expires_at_ts = expires_at_ts.replace(tzinfo=timezone.utc)
+                if expires_at_ts > datetime.datetime.now(timezone.utc):
+                    user = login_session.user
+                    if user and user.is_active:
+                        session['user_id'] = user.id
+                        return user
+                else:
+                    session.pop('user_session', None)
+        except Exception as e:
+            print(f"Error fetching user by session token: {e}")
+            session.pop('user_session', None)
+    session_token = request.cookies.get('session_token')
+    if session_token:
+        try:
+            login_session = LoginSession.query.filter_by(
+                session_token=session_token, 
+                is_active=True
+            ).first()
+            if login_session:
+                expires_at_ts = login_session.expires_at
+                if expires_at_ts.tzinfo is None:
+                    expires_at_ts = expires_at_ts.replace(tzinfo=timezone.utc)
+                if expires_at_ts > datetime.datetime.now(timezone.utc):
+                    user = login_session.user
+                    if user and user.is_active:
+                        session['user_id'] = user.id
                     return user
             else:
                 session.pop('user_session', None)
@@ -358,10 +451,14 @@ def get_current_user():
                 session_token=session_token, 
                 is_active=True
             ).first()
-            if login_session and login_session.expires_at > datetime.datetime.now(timezone.utc):
-                user = login_session.user
-                if user and user.is_active:
-                    session['user_id'] = user.id
+            if login_session: # Check if login_session exists before accessing attributes
+                expires_at_ts = login_session.expires_at
+                if expires_at_ts.tzinfo is None:
+                    expires_at_ts = expires_at_ts.replace(tzinfo=timezone.utc)
+                if expires_at_ts > datetime.datetime.now(timezone.utc):
+                    user = login_session.user
+                    if user and user.is_active: # Check if user exists and is active
+                        session['user_id'] = user.id
                     session['user_session'] = session_token
                     return user
         except Exception as e:
@@ -803,38 +900,6 @@ def create_tables_manually():
                 print(f"❌ SQL command {i+1} failed: {e}")
                 raise
 
-# Guest session functions (unchanged)
-def get_or_create_guest_session():
-    """Get or create a guest session for anonymous users"""
-    if 'guest_session_id' not in session:
-        session['guest_session_id'] = str(uuid.uuid4())
-        session['guest_created'] = datetime.datetime.now(timezone.utc).isoformat()
-        session['guest_generations_today'] = 0
-        session['guest_last_generation'] = None
-        session.permanent = True
-    return session['guest_session_id']
-
-def get_guest_generations_today():
-    """Get number of generations for guest today"""
-    if 'guest_session_id' not in session:
-        return 0
-    
-    if 'guest_last_generation' in session and session['guest_last_generation']:
-        last_gen = datetime.datetime.fromisoformat(session['guest_last_generation'])
-        if last_gen.date() != datetime.datetime.now(timezone.utc).date():
-            session['guest_generations_today'] = 0
-    
-    return session.get('guest_generations_today', 0)
-
-def increment_guest_generations():
-    """Increment guest generation count"""
-    session['guest_generations_today'] = get_guest_generations_today() + 1
-    session['guest_last_generation'] = datetime.datetime.now(timezone.utc).isoformat()
-
-def can_guest_generate():
-    """Check if guest can generate (limit: 1 per day)"""
-    return get_guest_generations_today() < 1
-
 def get_current_user_or_guest():
     """Get current logged in user or return guest info"""
     user = get_current_user()
@@ -849,29 +914,25 @@ def get_current_user_or_guest():
             'can_generate': user.can_generate_today(),
             'can_use_loras': True,
             'can_edit_playlists': bool(user.spotify_access_token),
-            'show_upload': user.is_premium_user()  # ONLY premium users can upload files
+            'show_upload': user.is_premium_user()
         }
     else:
-        get_or_create_guest_session()
+        # Guest logic using IP address
+        # request.remote_addr should provide the IP
+        ip_address = request.remote_addr 
+        can_generate_today = can_guest_generate_by_ip(ip_address)
         return {
             'type': 'guest',
             'user': None,
             'display_name': 'Guest',
             'is_premium': False,
-            'daily_limit': 1,
-            'generations_today': get_guest_generations_today(),
-            'can_generate': can_guest_generate(),
+            'daily_limit': 1, # Guest daily limit is 1
+            'generations_today': 0 if can_generate_today else 1, # Simplified: 0 if can still gen, 1 if already gen'd
+            'can_generate': can_generate_today,
             'can_use_loras': False,
             'can_edit_playlists': False,
             'show_upload': False
         }
-
-def track_guest_generation():
-    """Track generation for guest"""
-    try:
-        increment_guest_generations()
-    except Exception as e:
-        print(f"Error tracking guest generation: {e}")
 
 # Context processor to inject common template variables
 @app.context_processor
@@ -990,7 +1051,7 @@ def generate():
             
             # Increment generation count
             if user_info['type'] == 'guest':
-                track_guest_generation()
+                record_guest_generation_by_ip(request.remote_addr) # New call
             
             img_filename = os.path.basename(result["output_path"])
             
