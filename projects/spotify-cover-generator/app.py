@@ -95,7 +95,11 @@ app = Flask(__name__,
 app.secret_key = FLASK_SECRET_KEY or ''.join(random.choices(
     'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=24))
 
-
+# Configure proxy settings
+# When deploying behind a reverse proxy (e.g., Nginx, Heroku, Render),
+# this setting is crucial for Flask and extensions like Flask-Limiter
+# to correctly identify the client's actual IP address from the
+# X-Forwarded-For header. Set to the number of trusted proxies.
 app.config['X_FORWARDED_FOR_TRUSTED_HOPS'] = 1 
 
 # Database configuration
