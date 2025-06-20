@@ -95,6 +95,9 @@ app = Flask(__name__,
 app.secret_key = FLASK_SECRET_KEY or ''.join(random.choices(
     'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=24))
 
+
+app.config['X_FORWARDED_FOR_TRUSTED_HOPS'] = 1 
+
 # Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = SPOTIFY_DB_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
