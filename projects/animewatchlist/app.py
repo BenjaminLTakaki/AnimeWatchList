@@ -3,6 +3,7 @@ import json
 import requests
 import time
 import datetime
+import traceback # Added for detailed error logging
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_login import login_required, current_user
 from dotenv import load_dotenv
@@ -384,13 +385,17 @@ def fetch():
 @login_required
 def watched():
     """Display the list of anime marked as watched."""
+    print(f"User {current_user.id} attempting to access /watched route.") # New log
     try:
+        print(f"Calling get_user_anime_list for user {current_user.id}.") # New log
         watched_list = get_user_anime_list(current_user.id)
+        print(f"Successfully retrieved watched_list for user {current_user.id}. Count: {len(watched_list)}") # New log
         return render_template("watched.html", 
                              anime_list=watched_list, 
                              get_url_for=get_url_for)
     except Exception as e:
-        print(f"Error getting watched list: {e}")
+        detailed_error = traceback.format_exc()
+        print(f"Error in /watched route for user {current_user.id}: {e}\n{detailed_error}") # Updated log
         flash("Error loading your watched list. Please try again.")
         return redirect(get_url_for("index"))
 
