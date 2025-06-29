@@ -1,17 +1,21 @@
+{% endblock %}
 {% extends "base.html" %}
 
 {% block title %}Login - Anime Tracker{% endblock %}
 
 {% block content %}
 <div class="auth-container">
-    <h2>Login to Anime Tracker</h2>
+    <div class="auth-header">
+        <h2>Welcome Back!</h2>
+        <p>Login to continue tracking your anime</p>
+    </div>
 
     <form method="POST" action="{{ get_url_for('login') }}" class="auth-form">
         {{ form.hidden_tag() }}
 
         <div class="form-group">
             {{ form.email.label(class="form-label") }}
-            {{ form.email(class="form-control") }}
+            {{ form.email(class="form-control", placeholder="Enter your email") }}
             {% if form.email.errors %}
             <div class="invalid-feedback">
                 {% for error in form.email.errors %}
@@ -23,7 +27,7 @@
 
         <div class="form-group">
             {{ form.password.label(class="form-label") }}
-            {{ form.password(class="form-control") }}
+            {{ form.password(class="form-control", placeholder="Enter your password") }}
             {% if form.password.errors %}
             <div class="invalid-feedback">
                 {% for error in form.password.errors %}
@@ -39,7 +43,7 @@
         </div>
 
         <div class="form-action">
-            {{ form.submit(class="btn btn-primary") }}
+            {{ form.submit(class="btn btn-primary btn-full") }}
         </div>
 
         <div class="auth-links">
@@ -47,4 +51,173 @@
         </div>
     </form>
 </div>
+
+<style>
+.auth-container {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    padding: 2rem;
+    max-width: 500px;
+    margin: 2rem auto;
+    width: 100%;
+}
+
+.auth-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.auth-header h2 {
+    color: #2E51A2;
+    margin-bottom: 0.5rem;
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.auth-header p {
+    color: #666;
+    margin: 0;
+    font-size: 1rem;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-label {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #333;
+    font-size: 0.9rem;
+}
+
+.form-control {
+    padding: 1rem;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    min-height: 48px;
+    background: #fafafa;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #2E51A2;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(46, 81, 162, 0.1);
+}
+
+.form-control::placeholder {
+    color: #999;
+}
+
+.form-check {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin: 0.5rem 0;
+}
+
+.form-check-input {
+    width: 18px;
+    height: 18px;
+    accent-color: #2E51A2;
+}
+
+.form-check-label {
+    font-size: 0.9rem;
+    color: #666;
+    cursor: pointer;
+}
+
+.form-action {
+    margin-top: 0.5rem;
+}
+
+.btn-full {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    min-height: 48px;
+}
+
+.invalid-feedback {
+    color: #f44336;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: #ffebee;
+    border-radius: 4px;
+    border-left: 3px solid #f44336;
+}
+
+.auth-links {
+    margin-top: 1rem;
+    text-align: center;
+    font-size: 0.9rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+}
+
+.auth-links a {
+    color: #2E51A2;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.auth-links a:hover {
+    text-decoration: underline;
+}
+
+/* Mobile optimizations */
+@media (max-width: 767px) {
+    .auth-container {
+        margin: 1rem;
+        padding: 1.5rem;
+        max-width: none;
+    }
+    
+    .auth-header h2 {
+        font-size: 1.5rem;
+    }
+    
+    .auth-form {
+        gap: 1.2rem;
+    }
+    
+    .form-control {
+        padding: 0.8rem;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    .btn-full {
+        padding: 1rem;
+        font-size: 1rem;
+    }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .form-control,
+    .btn-full {
+        min-height: 48px;
+    }
+    
+    .form-check-input {
+        width: 20px;
+        height: 20px;
+    }
+}
+</style>
 {% endblock %}

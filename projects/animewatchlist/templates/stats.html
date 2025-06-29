@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block title %}My Stats - Anime Tracker{% endblock %}
+
+{% block content %}
+<div class="stats-container">
+    <h2>My Anime Statistics</h2>
+    
+    {% if stats.total_anime > 0 %}
+    <!-- Main Statistics Grid -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.total_anime }}</div>
+            <div class="stat-label">Anime Watched</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.total_episodes }}</div>
+            <div class="stat-label">Episodes Watched</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.estimated_hours }}</div>
+            <div class="stat-label">Hours Watched</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.average_score }}</div>
+            <div class="stat-label">Average Score</div>
+        </div>
+    </div>
+    
+    <!-- Additional Stats -->
+    <div class="additional-stats">
+        <!-- Top Genres -->
+        {% if stats.top_genres %}
+        <div class="stat-section">
+            <h3>Top Genres</h3>
+            <div class="genre-list">
+                {% for genre, count in stats.top_genres %}
+                <div class="genre-stat">
+                    <span class="genre-tag">{{ genre }}</span>
+                    <span class="genre-count">{{ count }} anime</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Featured Anime -->
+        <div class="featured-section">
+            {% if stats.longest_anime %}
+            <div class="featured-anime">
+                <h4>Longest Anime Watched</h4>
+                {% if stats.longest_anime.main_picture and stats.longest_anime.main_picture.medium %}
+                <img src="{{ stats.longest_anime.main_picture.medium }}" alt="{{ stats.longest_anime.title }}">
+                {% endif %}
+                <h5>
+                    <a href="https://myanimelist.net/anime/{{ stats.longest_anime.id }}" target="_blank" class="anime-title-link">
+                        {{ stats.longest_anime.title }}
+                    </a>
+                </h5>
+                <p>{{ stats.longest_anime.episodes }} episodes</p>
+            </div>
+            {% endif %}
+            
+            {% if stats.highest_rated %}
+            <div class="featured-anime">
+                <h4>Highest Rated Anime</h4>
+                {% if stats.highest_rated.main_picture and stats.highest_rated.main_picture.medium %}
+                <img src="{{ stats.highest_rated.main_picture.medium }}" alt="{{ stats.highest_rated.title }}">
+                {% endif %}
+                <h5>
+                    <a href="https://myanimelist.net/anime/{{ stats.highest_rated.id }}" target="_blank" class="anime-title-link">
+                        {{ stats.highest_rated.title }}
+                    </a>
+                </h5>
+                <p>{{ stats.highest_rated.score }}/10</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Fun Facts -->
+    <div class="fun-facts">
+        <h3>Fun Facts</h3>
+        <div class="facts-grid">
+            <div class="fact-card">
+                <div class="fact-icon">📺</div>
+                <div class="fact-text">
+                    <strong>{{ (stats.estimated_hours / 24) | round(1) }}</strong> days spent watching anime
+                </div>
+            </div>
+            
+            <div class="fact-card">
+                <div class="fact-icon">⭐</div>
+                <div class="fact-text">
+                    You've rated <strong>{{ stats.total_anime }}</strong> anime with an average score of <strong>{{ stats.average_score }}</strong>
+                </div>
+            </div>
+            
+            {% if stats.total_episodes > 0 %}
+            <div class="fact-card">
+                <div class="fact-icon">🎬</div>
+                <div class="fact-text">
+                    Average of <strong>{{ (stats.total_episodes / stats.total_anime) | round(1) }}</strong> episodes per anime
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if stats.top_genres %}
+            <div class="fact-card">
+                <div class="fact-icon">🏷️</div>
+                <div class="fact-text">
+                    Your favorite genre is <strong>{{ stats.top_genres[0][0] }}</strong> with {{ stats.top_genres[0][1] }} anime
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+        <h3>Quick Actions</h3>
+        <div class="action-buttons">
+            <a href="{{ get_url_for('watched') }}" class="btn btn-primary">View Watched List</a>
+            <a href="{{ get_url_for('search') }}" class="btn btn-secondary">Find New Anime</a>
+            <a href="{{ get_url_for('index') }}" class="btn btn-secondary">Discover Popular</a>
+        </div>
+    </div>
+    
+    {% else %}
+    <!-- Empty State -->
+    <div class="empty-stats">
+        <h3>No statistics yet</h3>
+        <p>Start watching and rating anime to see your statistics!</p>
+        <div class="action-buttons">
+            <a href="{{ get_url_for('index') }}" class="btn btn-primary">Discover Anime</a>
+            <a href="{{ get_url_for('search') }}" class="btn btn-secondary">Search Anime</a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.stats-container h2 {
+    text-align: center;
+    color: #2E51A2;
+    margin-bottom: 2rem;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.additional-stats {
+    margin-top: 3rem;
+}
+
+.stat-section {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.stat-section h3 {
+    color: #2E51A2;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    font-size: 1.3rem;
+}
+
+.genre-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.genre-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #2E51A2;
+}
+
+.genre-count {
+    font-weight: 600;
+    color: #666;
+}
+
+.featured-section {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.featured-anime {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.featured-anime h4 {
+    color: #2E51A2;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.featured-anime img {
+    width: 120px;
+    height: 180px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.featured-anime h5 {
+    margin: 0.5rem 0;
+    font-size: 1rem;
+}
+
+.featured-anime p {
+    color: #666;
+    margin: 0;
+    font-weight: 600;
+}
+
+.fun-facts {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 2rem 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.fun-facts h3 {
+    color: #2E51A2;
+    text-align: center;
+    margin-bottom: 1.5rem;
+    font-size: 1.3rem;
+}
+
+.facts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+.fact-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #4CAF50;
+}
+
+.fact-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+}
+
+.fact-text {
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.quick-actions {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.quick-actions h3 {
+    color: #2E51A2;
+    margin-bottom: 1.5rem;
+    font-size: 1.3rem;
+}
+
+.empty-stats {
+    text-align: center;
+    background: white;
+    border-radius: 12px;
+    padding: 4rem 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.empty-stats h3 {
+    color: #2E51A2;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+}
+
+.empty-stats p {
+    color: #666;
+    margin-bottom: 2rem;
+    font-size: 1.1rem;
+}
+
+.anime-title-link {
+    color: #2E51A2;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.anime-title-link:hover {
+    color: #4266b3;
+    text-decoration: underline;
+}
+
+/* Tablet and Desktop */
+@media (min-width: 768px) {
+    .featured-section {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .facts-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .featured-anime img {
+        width: 100px;
+        height: 150px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .genre-list {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+}
+</style>
+{% endblock %}

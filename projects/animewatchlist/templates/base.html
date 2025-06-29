@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Anime Tracker{% endblock %}</title>
     <link rel="stylesheet" href="{{ get_url_for('static', filename='style.css') }}">
+    
+    <!-- Mobile optimizations -->
+    <meta name="theme-color" content="#2E51A2">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    
+    <!-- Preload critical fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head>
 <body>
     <header>
@@ -14,9 +23,9 @@
                 <li><a href="{{ get_url_for('index') }}">Home</a></li>
                 {% if current_user.is_authenticated %}
                 <li><a href="{{ get_url_for('watched') }}">Watched</a></li>
-                <li><a href="{{ get_url_for('not_watched') }}">Not Watched</a></li>
+                <li><a href="{{ get_url_for('stats') }}">Stats</a></li>
                 <li><a href="{{ get_url_for('search') }}">Search</a></li>
-                <li><a href="{{ get_url_for('fetch') }}">Fetch New Anime</a></li>
+                <li><a href="{{ get_url_for('fetch') }}">Discover</a></li>
                 <li><a href="{{ get_url_for('profile') }}">Profile</a></li>
                 <li><a href="{{ get_url_for('logout') }}">Logout</a></li>
                 {% else %}
@@ -24,10 +33,11 @@
                 <li><a href="{{ get_url_for('login') }}">Login</a></li>
                 <li><a href="{{ get_url_for('register') }}">Register</a></li>
                 {% endif %}
-                <li><a href="/">Back to Portfolio</a></li>
+                <li><a href="/">Portfolio</a></li>
             </ul>
         </nav>
     </header>
+    
     <main>
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -38,11 +48,51 @@
         </ul>
         {% endif %}
         {% endwith %}
+        
         {% block content %}{% endblock %}
     </main>
+    
     <footer>
         <p>&copy; {{ current_year }} Anime Tracker by Benjamin Takaki</p>
     </footer>
+    
     <script src="{{ get_url_for('static', filename='script.js') }}"></script>
+    
+    <!-- Mobile menu toggle script -->
+    <script>
+    // Simple mobile navigation enhancement
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add loading states for better UX
+        const links = document.querySelectorAll('nav a, .btn, .link-btn');
+        links.forEach(link => {
+            link.addEventListener('click', function() {
+                if (!this.href.includes('#') && !this.href.includes('mailto:')) {
+                    this.style.opacity = '0.7';
+                    this.style.pointerEvents = 'none';
+                    setTimeout(() => {
+                        this.style.opacity = '';
+                        this.style.pointerEvents = '';
+                    }, 3000);
+                }
+            });
+        });
+        
+        // Improve form submissions
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function() {
+                const submitBtn = this.querySelector('button[type="submit"], input[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.style.opacity = '0.7';
+                    setTimeout(() => {
+                        submitBtn.disabled = false;
+                        submitBtn.style.opacity = '';
+                    }, 5000);
+                }
+            });
+        });
+    });
+    </script>
 </body>
 </html>
