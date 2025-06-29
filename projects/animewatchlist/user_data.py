@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 import datetime
+from sqlalchemy import inspect
 
 # This will be initialized with the db imported from auth.py
 db = None
@@ -31,6 +32,15 @@ class UserAnimeList(object):
     status = None
     created_at = None
 
+def check_column_exists(table_name, column_name):
+    """Check if a column exists in the database table."""
+    try:
+        inspector = inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns(table_name)]
+        return column_name in columns
+    except:
+        return False
+
 # Functions for user-specific anime data management
 def get_anime_by_mal_id(mal_id):
     """Get anime by MyAnimeList ID or return None if not found."""
@@ -42,64 +52,70 @@ def add_anime_to_db(anime_data):
     anime = get_anime_by_mal_id(mal_id)
     
     if not anime:
-        # Parse episodes - handle various formats
-        episodes = anime_data.get("episodes")
-        if episodes is None or episodes == "N/A":
-            episodes_int = 0
-        else:
-            try:
-                episodes_int = int(episodes)
-            except (ValueError, TypeError):
+        # Basic anime data (always supported)
+        anime_kwargs = {
+            'mal_id': mal_id,
+            'title': anime_data.get("title", "Unknown Title"),
+            'episodes': str(anime_data.get("episodes", "N/A")),
+            'image_url': anime_data.get("main_picture", {}).get("medium", ""),
+            'score': str(anime_data.get("score", "N/A"))
+        }
+        
+        # Enhanced data (only if columns exist)
+        if check_column_exists('anime', 'episodes_int'):
+            episodes = anime_data.get("episodes")
+            if episodes is None or episodes == "N/A":
                 episodes_int = 0
+            else:
+                try:
+                    episodes_int = int(episodes)
+                except (ValueError, TypeError):
+                    episodes_int = 0
+            anime_kwargs['episodes_int'] = episodes_int
         
-        # Parse score
-        score = anime_data.get("score")
-        if score is None or score == "N/A":
-            score_float = 0.0
-        else:
-            try:
-                score_float = float(score)
-            except (ValueError, TypeError):
+        if check_column_exists('anime', 'score_float'):
+            score = anime_data.get("score")
+            if score is None or score == "N/A":
                 score_float = 0.0
+            else:
+                try:
+                    score_float = float(score)
+                except (ValueError, TypeError):
+                    score_float = 0.0
+            anime_kwargs['score_float'] = score_float
         
-        # Parse air date
-        aired_from = None
-        if anime_data.get("aired", {}).get("from"):
-            try:
-                # MAL API returns dates in ISO format
-                aired_from = datetime.datetime.fromisoformat(
-                    anime_data["aired"]["from"].replace("Z", "+00:00")
-                ).date()
-            except:
-                aired_from = None
+        if check_column_exists('anime', 'aired_from'):
+            aired_from = None
+            if anime_data.get("aired", {}).get("from"):
+                try:
+                    aired_from = datetime.datetime.fromisoformat(
+                        anime_data["aired"]["from"].replace("Z", "+00:00")
+                    ).date()
+                except:
+                    aired_from = None
+            anime_kwargs['aired_from'] = aired_from
         
-        # Parse genres
-        genres = []
-        if anime_data.get("genres"):
-            genres = [genre["name"] for genre in anime_data["genres"]]
-        elif anime_data.get("genre"):  # Alternative format
-            genres = anime_data["genre"]
-        genres_str = ",".join(genres) if genres else ""
+        if check_column_exists('anime', 'genres'):
+            genres = []
+            if anime_data.get("genres"):
+                genres = [genre["name"] for genre in anime_data["genres"]]
+            elif anime_data.get("genre"):
+                genres = anime_data["genre"]
+            anime_kwargs['genres'] = ",".join(genres) if genres else ""
         
-        # Parse studio
-        studio = ""
-        if anime_data.get("studios") and len(anime_data["studios"]) > 0:
-            studio = anime_data["studios"][0]["name"]
+        if check_column_exists('anime', 'studio'):
+            studio = ""
+            if anime_data.get("studios") and len(anime_data["studios"]) > 0:
+                studio = anime_data["studios"][0]["name"]
+            anime_kwargs['studio'] = studio
         
-        anime = db.Anime(
-            mal_id=mal_id,
-            title=anime_data.get("title", "Unknown Title"),
-            episodes=str(episodes),
-            episodes_int=episodes_int,
-            image_url=anime_data.get("main_picture", {}).get("medium", ""),
-            score=str(score),
-            score_float=score_float,
-            aired_from=aired_from,
-            genres=genres_str,
-            studio=studio,
-            type=anime_data.get("type", ""),
-            status=anime_data.get("status", "")
-        )
+        if check_column_exists('anime', 'type'):
+            anime_kwargs['type'] = anime_data.get("type", "")
+        
+        if check_column_exists('anime', 'status'):
+            anime_kwargs['status'] = anime_data.get("status", "")
+        
+        anime = db.Anime(**anime_kwargs)
         db.session.add(anime)
         db.session.commit()
     
@@ -112,23 +128,28 @@ def get_user_anime_list(user_id, sort_by="date_added", sort_order="desc"):
     # Join with Anime table for sorting
     query = query.join(db.Anime)
     
-    # Apply sorting
+    # Check which columns exist for sorting
+    has_episodes_int = check_column_exists('anime', 'episodes_int')
+    has_score_float = check_column_exists('anime', 'score_float')
+    has_aired_from = check_column_exists('anime', 'aired_from')
+    
+    # Apply sorting based on available columns
     if sort_by == "title":
         if sort_order == "asc":
             query = query.order_by(db.Anime.title.asc())
         else:
             query = query.order_by(db.Anime.title.desc())
-    elif sort_by == "score":
+    elif sort_by == "score" and has_score_float:
         if sort_order == "desc":
             query = query.order_by(db.Anime.score_float.desc())
         else:
             query = query.order_by(db.Anime.score_float.asc())
-    elif sort_by == "episodes":
+    elif sort_by == "episodes" and has_episodes_int:
         if sort_order == "desc":
             query = query.order_by(db.Anime.episodes_int.desc())
         else:
             query = query.order_by(db.Anime.episodes_int.asc())
-    elif sort_by == "aired_date":
+    elif sort_by == "aired_date" and has_aired_from:
         if sort_order == "desc":
             query = query.order_by(db.Anime.aired_from.desc().nulls_last())
         else:
@@ -163,33 +184,74 @@ def get_user_stats(user_id):
         }
     
     total_anime = len(user_animes)
-    total_episodes = sum(anime.anime.episodes_int for anime in user_animes)
+    
+    # Check which columns exist for stats calculation
+    has_episodes_int = check_column_exists('anime', 'episodes_int')
+    has_score_float = check_column_exists('anime', 'score_float')
+    has_genres = check_column_exists('anime', 'genres')
+    
+    # Calculate total episodes
+    if has_episodes_int:
+        total_episodes = sum(getattr(anime.anime, 'episodes_int', 0) for anime in user_animes)
+    else:
+        # Fallback: try to parse from episodes string
+        total_episodes = 0
+        for user_anime in user_animes:
+            try:
+                episodes_str = user_anime.anime.episodes
+                if episodes_str and episodes_str != "N/A":
+                    total_episodes += int(episodes_str)
+            except (ValueError, TypeError):
+                pass
+    
     estimated_hours = round(total_episodes * 0.4, 1)  # ~24 minutes per episode = 0.4 hours
     
-    # Calculate average score (excluding 0 scores)
-    scores = [anime.anime.score_float for anime in user_animes if anime.anime.score_float > 0]
+    # Calculate average score
+    if has_score_float:
+        scores = [getattr(anime.anime, 'score_float', 0) for anime in user_animes if getattr(anime.anime, 'score_float', 0) > 0]
+    else:
+        # Fallback: try to parse from score string
+        scores = []
+        for user_anime in user_animes:
+            try:
+                score_str = user_anime.anime.score
+                if score_str and score_str != "N/A":
+                    score_val = float(score_str)
+                    if score_val > 0:
+                        scores.append(score_val)
+            except (ValueError, TypeError):
+                pass
+    
     average_score = round(sum(scores) / len(scores), 2) if scores else 0
     
     # Count genres
     genre_count = {}
-    for user_anime in user_animes:
-        if user_anime.anime.genres:
-            genres = user_anime.anime.genres.split(',')
-            for genre in genres:
-                genre = genre.strip()
-                if genre:
-                    genre_count[genre] = genre_count.get(genre, 0) + 1
+    if has_genres:
+        for user_anime in user_animes:
+            genres_str = getattr(user_anime.anime, 'genres', '')
+            if genres_str:
+                genres = genres_str.split(',')
+                for genre in genres:
+                    genre = genre.strip()
+                    if genre:
+                        genre_count[genre] = genre_count.get(genre, 0) + 1
     
     # Top 5 genres
     top_genres = sorted(genre_count.items(), key=lambda x: x[1], reverse=True)[:5]
     
     # Longest anime (by episodes)
-    longest_anime = max(user_animes, key=lambda x: x.anime.episodes_int, default=None)
-    longest_anime = longest_anime.anime.to_dict() if longest_anime and longest_anime.anime.episodes_int > 0 else None
+    longest_anime = None
+    if has_episodes_int:
+        longest = max(user_animes, key=lambda x: getattr(x.anime, 'episodes_int', 0), default=None)
+        if longest and getattr(longest.anime, 'episodes_int', 0) > 0:
+            longest_anime = longest.anime.to_dict()
     
     # Highest rated anime
-    highest_rated = max(user_animes, key=lambda x: x.anime.score_float, default=None)
-    highest_rated = highest_rated.anime.to_dict() if highest_rated and highest_rated.anime.score_float > 0 else None
+    highest_rated = None
+    if has_score_float:
+        highest = max(user_animes, key=lambda x: getattr(x.anime, 'score_float', 0), default=None)
+        if highest and getattr(highest.anime, 'score_float', 0) > 0:
+            highest_rated = highest.anime.to_dict()
     
     return {
         'total_anime': total_anime,
@@ -271,40 +333,69 @@ def init_user_data(database):
     global db
     db = database
     
-    # Now define real models that use the db instance
-    class Anime(db.Model):
-        __tablename__ = 'anime'
-        id = db.Column(db.Integer, primary_key=True)
-        mal_id = db.Column(db.Integer, nullable=False)
-        title = db.Column(db.String(255), nullable=False)
-        episodes = db.Column(db.String(20), nullable=True)
-        episodes_int = db.Column(db.Integer, default=0)  # For sorting/calculations
-        image_url = db.Column(db.String(255), nullable=True)
-        score = db.Column(db.String(10), nullable=True)
-        score_float = db.Column(db.Float, default=0.0)  # For sorting/calculations
-        aired_from = db.Column(db.Date, nullable=True)  # Air date
-        genres = db.Column(db.Text, nullable=True)  # Comma-separated genres
-        studio = db.Column(db.String(255), nullable=True)
-        type = db.Column(db.String(50), nullable=True)  # TV, Movie, OVA, etc.
-        status = db.Column(db.String(50), nullable=True)  # Finished Airing, Currently Airing, etc.
-        
-        def to_dict(self):
-            return {
-                "id": self.mal_id,
-                "title": self.title,
-                "episodes": self.episodes,
-                "episodes_int": self.episodes_int,
-                "main_picture": {
-                    "medium": self.image_url
-                },
-                "score": self.score,
-                "score_float": self.score_float,
-                "aired_from": self.aired_from.isoformat() if self.aired_from else None,
-                "genres": self.genres.split(',') if self.genres else [],
-                "studio": self.studio,
-                "type": self.type,
-                "status": self.status
-            }
+    # Check which columns exist in the current database
+    has_enhanced_columns = (
+        check_column_exists('anime', 'episodes_int') and
+        check_column_exists('anime', 'score_float')
+    )
+    
+    # Define Anime model based on available columns
+    if has_enhanced_columns:
+        # Enhanced model with all new columns
+        class Anime(db.Model):
+            __tablename__ = 'anime'
+            id = db.Column(db.Integer, primary_key=True)
+            mal_id = db.Column(db.Integer, nullable=False)
+            title = db.Column(db.String(255), nullable=False)
+            episodes = db.Column(db.String(20), nullable=True)
+            episodes_int = db.Column(db.Integer, default=0)
+            image_url = db.Column(db.String(255), nullable=True)
+            score = db.Column(db.String(10), nullable=True)
+            score_float = db.Column(db.Float, default=0.0)
+            aired_from = db.Column(db.Date, nullable=True)
+            genres = db.Column(db.Text, nullable=True)
+            studio = db.Column(db.String(255), nullable=True)
+            type = db.Column(db.String(50), nullable=True)
+            status = db.Column(db.String(50), nullable=True)
+            
+            def to_dict(self):
+                return {
+                    "id": self.mal_id,
+                    "title": self.title,
+                    "episodes": self.episodes,
+                    "episodes_int": self.episodes_int,
+                    "main_picture": {
+                        "medium": self.image_url
+                    },
+                    "score": self.score,
+                    "score_float": self.score_float,
+                    "aired_from": self.aired_from.isoformat() if self.aired_from else None,
+                    "genres": self.genres.split(',') if self.genres else [],
+                    "studio": self.studio,
+                    "type": self.type,
+                    "status": self.status
+                }
+    else:
+        # Basic model (backward compatible)
+        class Anime(db.Model):
+            __tablename__ = 'anime'
+            id = db.Column(db.Integer, primary_key=True)
+            mal_id = db.Column(db.Integer, nullable=False)
+            title = db.Column(db.String(255), nullable=False)
+            episodes = db.Column(db.String(20), nullable=True)
+            image_url = db.Column(db.String(255), nullable=True)
+            score = db.Column(db.String(10), nullable=True)
+            
+            def to_dict(self):
+                return {
+                    "id": self.mal_id,
+                    "title": self.title,
+                    "episodes": self.episodes,
+                    "main_picture": {
+                        "medium": self.image_url
+                    },
+                    "score": self.score
+                }
 
     class UserAnimeList(db.Model):
         __tablename__ = 'user_anime_list'

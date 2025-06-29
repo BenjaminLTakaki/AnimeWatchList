@@ -49,7 +49,10 @@ migrate = Migrate(app, db)
 
 # Create tables explicitly
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+    except Exception as e:
+        print(f"Warning: Could not create tables: {e}")
 
 # Now that the database is initialized, we can import the User model
 from auth import User
@@ -59,7 +62,13 @@ from user_data import init_user_data, get_user_anime_list, get_status_counts, ge
 from user_data import mark_anime_for_user, change_anime_status_for_user, get_anime_status_for_user
 
 # Initialize user data models with the database from auth
-Anime, UserAnimeList = init_user_data(db)
+try:
+    Anime, UserAnimeList = init_user_data(db)
+except Exception as e:
+    print(f"Warning: Could not initialize user data models: {e}")
+    # Fallback to basic functionality
+    Anime = None
+    UserAnimeList = None
 
 # Now that user_data is initialized with the real get_status_counts,
 # let's update auth's reference to it
@@ -68,7 +77,10 @@ auth.get_status_counts = get_status_counts
 
 # Create all tables again to ensure all models are registered
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+    except Exception as e:
+        print(f"Warning: Could not create all tables: {e}")
 
 # Global anime queue to serve one anime at a time
 anime_queue = []
@@ -78,6 +90,15 @@ os.makedirs('data', exist_ok=True)
 
 # Jikan API base URL
 JIKAN_API_BASE = "https://api.jikan.moe/v4"
+
+def check_enhanced_features():
+    """Check if the database has enhanced features enabled."""
+    try:
+        inspector = inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('anime')]
+        return 'episodes_int' in columns and 'score_float' in columns
+    except:
+        return False
 
 def fetch_anime_details(anime_id):
     """Fetch detailed anime information from MAL API."""
@@ -144,8 +165,11 @@ def fetch_more_anime():
         # Get user's anime IDs to avoid duplicates
         user_anime_ids = []
         if current_user.is_authenticated:
-            watched_list = get_user_anime_list(current_user.id)
-            user_anime_ids = [a["id"] for a in watched_list]
+            try:
+                watched_list = get_user_anime_list(current_user.id)
+                user_anime_ids = [a["id"] for a in watched_list]
+            except Exception as e:
+                print(f"Warning: Could not get user anime list: {e}")
         
         queue_ids = [a["id"] for a in anime_queue]
         
@@ -229,11 +253,11 @@ def mark():
     try:
         anime_data = json.loads(anime_json)
         
-        # Fetch detailed anime information from MAL API
-        detailed_anime = fetch_anime_details(anime_data["id"])
-        if detailed_anime:
-            # Merge the detailed data
-            anime_data.update(detailed_anime)
+        # Fetch detailed anime information from MAL API if enhanced features are available
+        if check_enhanced_features():
+            detailed_anime = fetch_anime_details(anime_data["id"])
+            if detailed_anime:
+                anime_data.update(detailed_anime)
         
         # Mark the anime for the current user
         mark_anime_for_user(current_user.id, anime_data, status)
@@ -271,30 +295,47 @@ def direct_mark(anime_id, status):
     if not anime:
         # If not in queue, fetch it from the API
         try:
-            detailed_anime = fetch_anime_details(anime_id)
-            if detailed_anime:
-                anime = {
-                    "id": detailed_anime.get("mal_id"),
-                    "title": detailed_anime.get("title"),
-                    "episodes": detailed_anime.get("episodes") if detailed_anime.get("episodes") is not None else "N/A",
-                    "main_picture": {
-                        "medium": detailed_anime.get("images", {}).get("jpg", {}).get("image_url", "")
-                    },
-                    "score": detailed_anime.get("score", "N/A")
-                }
-                # Add all the detailed data
-                anime.update(detailed_anime)
+            if check_enhanced_features():
+                detailed_anime = fetch_anime_details(anime_id)
+                if detailed_anime:
+                    anime = {
+                        "id": detailed_anime.get("mal_id"),
+                        "title": detailed_anime.get("title"),
+                        "episodes": detailed_anime.get("episodes") if detailed_anime.get("episodes") is not None else "N/A",
+                        "main_picture": {
+                            "medium": detailed_anime.get("images", {}).get("jpg", {}).get("image_url", "")
+                        },
+                        "score": detailed_anime.get("score", "N/A")
+                    }
+                    anime.update(detailed_anime)
+                else:
+                    flash("Error fetching anime details")
+                    return redirect(get_url_for("index"))
             else:
-                flash("Error fetching anime details")
-                return redirect(get_url_for("index"))
+                # Basic fetch without enhanced details
+                url = f"{JIKAN_API_BASE}/anime/{anime_id}"
+                response = requests.get(url)
+                response.raise_for_status()
+                data = response.json().get("data", {})
+                
+                anime = {
+                    "id": data.get("mal_id"),
+                    "title": data.get("title"),
+                    "episodes": data.get("episodes") if data.get("episodes") is not None else "N/A",
+                    "main_picture": {
+                        "medium": data.get("images", {}).get("jpg", {}).get("image_url", "")
+                    },
+                    "score": data.get("score", "N/A")
+                }
         except Exception as e:
             flash(f"Error fetching anime details: {e}")
             return redirect(get_url_for("index"))
     else:
-        # Fetch detailed information for anime in queue
-        detailed_anime = fetch_anime_details(anime_id)
-        if detailed_anime:
-            anime.update(detailed_anime)
+        # Fetch detailed information for anime in queue if enhanced features are available
+        if check_enhanced_features():
+            detailed_anime = fetch_anime_details(anime_id)
+            if detailed_anime:
+                anime.update(detailed_anime)
     
     # Mark the anime for the current user
     mark_anime_for_user(current_user.id, anime, status)
@@ -320,43 +361,63 @@ def fetch():
 @login_required
 def watched():
     """Display the list of anime marked as watched with sorting options."""
-    sort_by = request.args.get('sort_by', 'date_added')
-    sort_order = request.args.get('sort_order', 'desc')
-    
-    valid_sorts = ['title', 'score', 'episodes', 'aired_date', 'date_added']
-    if sort_by not in valid_sorts:
+    # Only allow sorting if enhanced features are available
+    if check_enhanced_features():
+        sort_by = request.args.get('sort_by', 'date_added')
+        sort_order = request.args.get('sort_order', 'desc')
+        
+        valid_sorts = ['title', 'score', 'episodes', 'aired_date', 'date_added']
+        if sort_by not in valid_sorts:
+            sort_by = 'date_added'
+        
+        if sort_order not in ['asc', 'desc']:
+            sort_order = 'desc'
+        
+        watched_list = get_user_anime_list(current_user.id, sort_by, sort_order)
+    else:
+        # Basic functionality without sorting
         sort_by = 'date_added'
-    
-    if sort_order not in ['asc', 'desc']:
         sort_order = 'desc'
-    
-    watched_list = get_user_anime_list(current_user.id, sort_by, sort_order)
+        watched_list = get_user_anime_list(current_user.id)
     
     return render_template("watched.html", 
                          anime_list=watched_list, 
                          current_sort=sort_by,
                          current_order=sort_order,
+                         has_enhanced_features=check_enhanced_features(),
                          get_url_for=get_url_for)
 
 @app.route("/stats")
 @login_required
 def stats():
     """Display comprehensive statistics for the user."""
-    user_stats = get_user_stats(current_user.id)
-    return render_template("stats.html", stats=user_stats, get_url_for=get_url_for)
+    try:
+        user_stats = get_user_stats(current_user.id)
+        return render_template("stats.html", stats=user_stats, get_url_for=get_url_for)
+    except Exception as e:
+        print(f"Error getting user stats: {e}")
+        flash("Error loading statistics. Please try again later.")
+        return redirect(get_url_for("index"))
 
 @app.route("/remove_anime/<int:anime_id>")
 @login_required
 def remove_anime(anime_id):
     """Remove an anime from the user's watched list."""
-    success = change_anime_status_for_user(current_user.id, anime_id, 'remove')
-    
-    if success:
-        anime = Anime.query.filter_by(mal_id=anime_id).first()
-        anime_title = anime.title if anime else "the anime"
-        flash(f"Removed '{anime_title}' from your watched list!")
-    else:
-        flash("Could not remove anime. Anime not found in your list.")
+    try:
+        success = change_anime_status_for_user(current_user.id, anime_id, 'remove')
+        
+        if success:
+            if Anime:
+                anime = Anime.query.filter_by(mal_id=anime_id).first()
+                anime_title = anime.title if anime else "the anime"
+            else:
+                anime_title = "the anime"
+            flash(f"Removed '{anime_title}' from your watched list!")
+        else:
+            flash("Could not remove anime. Anime not found in your list.")
+    except Exception as e:
+        print(f"Error removing anime: {e}")
+        flash("Error removing anime. Please try again.")
     
     return redirect(request.referrer or get_url_for("watched"))
 
@@ -391,7 +452,10 @@ def search():
                 
                 # Check if the user is authenticated and get the anime status
                 if current_user.is_authenticated:
-                    anime["status"] = get_anime_status_for_user(current_user.id, anime["id"])
+                    try:
+                        anime["status"] = get_anime_status_for_user(current_user.id, anime["id"])
+                    except Exception as e:
+                        print(f"Error getting anime status: {e}")
                 
                 results.append(anime)
                 
@@ -415,13 +479,33 @@ def mark_search():
         return redirect(url_for('search', query=query))
     
     try:
-        # Fetch detailed anime information
-        detailed_anime = fetch_anime_details(anime_id)
-        if detailed_anime:
-            mark_anime_for_user(current_user.id, detailed_anime, status)
-            flash(f"Anime marked as {status}!")
+        # Fetch detailed anime information if enhanced features are available
+        if check_enhanced_features():
+            detailed_anime = fetch_anime_details(anime_id)
+            if detailed_anime:
+                mark_anime_for_user(current_user.id, detailed_anime, status)
+                flash(f"Anime marked as {status}!")
+            else:
+                flash("Error fetching anime details")
         else:
-            flash("Error fetching anime details")
+            # Basic functionality
+            url = f"{JIKAN_API_BASE}/anime/{anime_id}"
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json().get("data", {})
+            
+            anime_data = {
+                "id": data.get("mal_id"),
+                "title": data.get("title"),
+                "episodes": data.get("episodes") if data.get("episodes") is not None else "N/A",
+                "main_picture": {
+                    "medium": data.get("images", {}).get("jpg", {}).get("image_url", "")
+                },
+                "score": data.get("score", "N/A")
+            }
+            
+            mark_anime_for_user(current_user.id, anime_data, status)
+            flash(f"Anime marked as {status}!")
     except Exception as e:
         flash(f"Error marking anime: {e}")
         

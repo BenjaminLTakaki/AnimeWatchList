@@ -7,7 +7,7 @@
     <div class="profile-card">
         <div class="profile-header">
             <div class="profile-avatar">
-                <span class="avatar-icon">👤</span>
+                <span class="avatar-icon"></span>
             </div>
             <h3>Welcome, {{ current_user.username }}!</h3>
             <p class="profile-email">{{ current_user.email }}</p>
@@ -29,15 +29,15 @@
 
         <div class="profile-actions">
             <a href="{{ get_url_for('watched') }}" class="btn btn-primary">
-                <span class="btn-icon">📚</span>
+                <span class="btn-icon"></span>
                 View Watched List
             </a>
             <a href="{{ get_url_for('stats') }}" class="btn btn-secondary">
-                <span class="btn-icon">📊</span>
+                <span class="btn-icon"></span>
                 View Detailed Stats
             </a>
             <a href="{{ get_url_for('search') }}" class="btn btn-secondary">
-                <span class="btn-icon">🔍</span>
+                <span class="btn-icon"></span>
                 Search Anime
             </a>
         </div>
@@ -47,24 +47,24 @@
             <h4>Quick Stats</h4>
             <div class="achievements-grid">
                 <div class="achievement">
-                    <span class="achievement-icon">🎬</span>
+                    <span class="achievement-icon"></span>
                     <span class="achievement-text">{{ stats[0] }} anime completed</span>
                 </div>
                 {% if stats[0] >= 10 %}
                 <div class="achievement">
-                    <span class="achievement-icon">⭐</span>
+                    <span class="achievement-icon"></span>
                     <span class="achievement-text">Anime Enthusiast</span>
                 </div>
                 {% endif %}
                 {% if stats[0] >= 50 %}
                 <div class="achievement">
-                    <span class="achievement-icon">🏆</span>
+                    <span class="achievement-icon"></span>
                     <span class="achievement-text">Otaku Level Achieved</span>
                 </div>
                 {% endif %}
                 {% if stats[0] >= 100 %}
                 <div class="achievement">
-                    <span class="achievement-icon">💎</span>
+                    <span class="achievement-icon"></span>
                     <span class="achievement-text">Anime Master</span>
                 </div>
                 {% endif %}
