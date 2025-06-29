@@ -390,8 +390,9 @@ def watched():
         print(f"Calling get_user_anime_list for user {current_user.id}.") # New log
         watched_list = get_user_anime_list(current_user.id)
         print(f"Successfully retrieved watched_list for user {current_user.id}. Count: {len(watched_list)}") # New log
-        return render_template("watched.html", 
+        return render_template("list.html",  # Changed "watched.html" to "list.html"
                              anime_list=watched_list, 
+                             list_type="Watched", # Added list_type for context in the template
                              get_url_for=get_url_for)
     except Exception as e:
         detailed_error = traceback.format_exc()
