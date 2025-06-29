@@ -7,41 +7,12 @@
     <h2>My Watched Anime</h2>
     
     {% if anime_list %}
-    <!-- Sorting Controls -->
-    <div class="sort-controls">
-        <h3>Sort By</h3>
-        <form method="GET" action="{{ get_url_for('watched') }}" class="sort-form">
-            <div class="sort-options">
-                <select name="sort_by" class="sort-select" onchange="this.form.submit()">
-                    <option value="date_added" {% if current_sort == 'date_added' %}selected{% endif %}>Date Added</option>
-                    <option value="title" {% if current_sort == 'title' %}selected{% endif %}>Title (A-Z)</option>
-                    <option value="score" {% if current_sort == 'score' %}selected{% endif %}>MAL Score</option>
-                    <option value="episodes" {% if current_sort == 'episodes' %}selected{% endif %}>Episode Count</option>
-                    <option value="aired_date" {% if current_sort == 'aired_date' %}selected{% endif %}>Air Date</option>
-                </select>
-                
-                <select name="sort_order" class="sort-select" onchange="this.form.submit()">
-                    <option value="desc" {% if current_order == 'desc' %}selected{% endif %}>
-                        {% if current_sort == 'title' %}Z-A{% else %}Highest First{% endif %}
-                    </option>
-                    <option value="asc" {% if current_order == 'asc' %}selected{% endif %}>
-                        {% if current_sort == 'title' %}A-Z{% else %}Lowest First{% endif %}
-                    </option>
-                </select>
-                
-                <noscript>
-                    <button type="submit" class="btn btn-primary">Sort</button>
-                </noscript>
-            </div>
-        </form>
-    </div>
-
     <!-- Anime Count -->
     <div class="anime-count">
         <p><strong>{{ anime_list|length }}</strong> anime in your watched list</p>
     </div>
 
-    <!-- Anime Grid -->
+    <!-- Simple Anime Grid -->
     <div class="anime-list">
         {% for anime in anime_list %}
         <div class="anime-item">
@@ -60,35 +31,13 @@
                 {% if anime.score and anime.score != "N/A" and anime.score != "0" %}
                 <p><strong>Score:</strong> {{ anime.score }}/10</p>
                 {% endif %}
-                
-                {% if anime.genres and anime.genres|length > 0 %}
-                <div class="anime-genres">
-                    <strong>Genres:</strong>
-                    <div class="genre-tags">
-                        {% for genre in anime.genres[:3] %}
-                        <span class="genre-tag">{{ genre }}</span>
-                        {% endfor %}
-                        {% if anime.genres|length > 3 %}
-                        <span class="genre-tag">+{{ anime.genres|length - 3 }} more</span>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-                
-                {% if anime.studio %}
-                <p><strong>Studio:</strong> {{ anime.studio }}</p>
-                {% endif %}
-                
-                {% if anime.aired_from %}
-                <p><strong>Aired:</strong> {{ anime.aired_from }}</p>
-                {% endif %}
             </div>
 
             <!-- Remove Button -->
             <div class="status-actions">
                 <a href="{{ get_url_for('remove_anime', anime_id=anime.id) }}" 
                    class="remove-btn"
-                   onclick="return confirm('Are you sure you want to remove {{ anime.title }} from your watched list?')">
+                   onclick="return confirm('Remove {{ anime.title }} from your watched list?')">
                     Remove from List
                 </a>
             </div>
@@ -107,103 +56,4 @@
     </div>
     {% endif %}
 </div>
-
-<style>
-.watched-container {
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-.anime-count {
-    text-align: center;
-    margin-bottom: 2rem;
-    padding: 1rem;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.anime-count p {
-    margin: 0;
-    font-size: 1.1rem;
-    color: #2E51A2;
-}
-
-.anime-details {
-    flex-grow: 1;
-    margin-bottom: 1rem;
-}
-
-.anime-details p {
-    margin: 0.3rem 0;
-    font-size: 0.9rem;
-}
-
-.anime-genres {
-    margin: 0.8rem 0;
-}
-
-.genre-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-    margin-top: 0.3rem;
-}
-
-.genre-tag {
-    background: #e3f2fd;
-    color: #1565c0;
-    padding: 0.2rem 0.6rem;
-    border-radius: 12px;
-    font-size: 0.7rem;
-    font-weight: 600;
-}
-
-.empty-list {
-    text-align: center;
-    background: white;
-    border-radius: 12px;
-    padding: 3rem 2rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.empty-list h3 {
-    color: #2E51A2;
-    margin-bottom: 1rem;
-}
-
-.empty-list p {
-    color: #666;
-    margin-bottom: 2rem;
-}
-
-.anime-title-link {
-    color: #2E51A2;
-    text-decoration: none;
-    transition: color 0.2s ease;
-}
-
-.anime-title-link:hover {
-    color: #4266b3;
-    text-decoration: underline;
-}
-
-@media (max-width: 767px) {
-    .sort-options {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 1rem;
-    }
-    
-    .sort-select {
-        min-width: auto;
-        width: 100%;
-    }
-    
-    .genre-tags {
-        justify-content: center;
-    }
-}
-</style>
-
 {% endblock %}

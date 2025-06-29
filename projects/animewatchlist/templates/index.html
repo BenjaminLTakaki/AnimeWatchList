@@ -5,33 +5,28 @@
 {% block content %}
 {% if not current_user.is_authenticated %}
 <div class="welcome-message">
-    <h2>Welcome to Anime Tracker!</h2>
-    <p>Track anime you've watched, discover new series, and view your statistics.</p>
+    <h2>Welcome to Anime Tracker</h2>
+    <p>Discover new anime and track what you've watched</p>
     <div class="features-list">
         <div class="feature-item">
-            <span class="feature-icon"></span>
+            <span class="feature-icon">TV</span>
             <span>Track watched anime</span>
         </div>
         <div class="feature-item">
-            <span class="feature-icon"></span>
+            <span class="feature-icon">SEARCH</span>
             <span>Search & discover</span>
         </div>
         <div class="feature-item">
-            <span class="feature-icon"></span>
+            <span class="feature-icon">STATS</span>
             <span>View statistics</span>
         </div>
     </div>
-    <div class="auth-buttons">
+    <div class="action-buttons">
         <a href="{{ get_url_for('login') }}" class="btn btn-primary">Login</a>
         <a href="{{ get_url_for('register') }}" class="btn btn-secondary">Register</a>
     </div>
 </div>
 {% elif anime %}
-<div class="discover-section">
-    <h2>Discover Popular Anime</h2>
-    <p>Mark anime as watched to build your personal collection</p>
-</div>
-
 <div class="anime-card">
     <h2>
         <a href="https://myanimelist.net/anime/{{ anime.id }}" target="_blank" class="anime-title-link">
@@ -52,29 +47,19 @@
 
     <div class="action-buttons">
         <a href="{{ get_url_for('direct_mark', anime_id=anime.id, status='watched') }}" 
-           class="btn btn-primary">
-           ✓ Mark as Watched
+           class="btn btn-success">
+           Add to Watched
         </a>
-        <a href="{{ get_url_for('fetch') }}" class="btn btn-secondary">
-           ↻ Skip & Get Another
+        <a href="{{ get_url_for('skip') }}" 
+           class="btn btn-skip">
+           Skip This Anime
         </a>
-    </div>
-    
-    <!-- Alternative form for better compatibility -->
-    <div class="alternative-actions">
-        <p class="small-text">Having trouble? Try these direct links:</p>
-        <form action="{{ get_url_for('mark') }}" method="POST" style="display: inline;">
-            <input type="hidden" name="anime" value="{{ anime | tojson | e }}">
-            <button type="submit" name="status" value="watched" class="btn btn-primary">
-                Mark as Watched
-            </button>
-        </form>
     </div>
 </div>
 
 {% if watched_count > 0 %}
 <div class="user-stats-summary">
-    <h3>Your Progress</h3>
+    <h3>Your Collection</h3>
     <div class="stats-quick">
         <div class="stat-item">
             <span class="stat-number">{{ watched_count }}</span>
@@ -90,18 +75,17 @@
 
 {% else %}
 <div class="no-anime">
-    <h2>🎬 No more anime available</h2>
-    <p>Try fetching more anime or search for specific titles!</p>
+    <h2>No more anime available</h2>
+    <p>Try fetching more anime or search for specific titles</p>
     
     <div class="action-buttons">
-        <a href="{{ get_url_for('fetch') }}" class="btn btn-primary">🔄 Fetch More Anime</a>
-        <a href="{{ get_url_for('search') }}" class="btn btn-secondary">🔍 Search Anime</a>
+        <a href="{{ get_url_for('fetch') }}" class="btn btn-primary">Get More Anime</a>
+        <a href="{{ get_url_for('search') }}" class="btn btn-secondary">Search Anime</a>
     </div>
     
     {% if watched_count > 0 %}
-    <div class="alternative-actions">
-        <p>Or check out your collection:</p>
-        <a href="{{ get_url_for('watched') }}" class="btn btn-secondary">📚 My Watched List</a>
+    <div class="action-buttons">
+        <a href="{{ get_url_for('watched') }}" class="btn btn-secondary">View My Watched List</a>
     </div>
     {% endif %}
 </div>

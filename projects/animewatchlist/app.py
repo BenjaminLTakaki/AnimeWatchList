@@ -66,7 +66,6 @@ try:
     Anime, UserAnimeList = init_user_data(db)
 except Exception as e:
     print(f"Warning: Could not initialize user data models: {e}")
-    # Fallback to basic functionality
     Anime = None
     UserAnimeList = None
 
@@ -215,6 +214,15 @@ def get_next_anime():
         fetch_more_anime()
     return anime_queue[0] if anime_queue else None
 
+def skip_current_anime():
+    """Skip the current anime by removing it from the queue."""
+    global anime_queue
+    if anime_queue:
+        skipped_anime = anime_queue.pop(0)
+        print(f"Skipped anime: {skipped_anime.get('title', 'Unknown')}")
+        return skipped_anime
+    return None
+
 @app.route("/")
 def index():
     """Display one anime at a time along with total watched count."""
@@ -234,6 +242,21 @@ def index():
                            watched_count=watched_count,
                            get_url_for=get_url_for,
                            is_authenticated=current_user.is_authenticated)
+
+@app.route("/skip")
+def skip():
+    """Skip the current anime without marking it."""
+    skipped_anime = skip_current_anime()
+    if skipped_anime:
+        flash(f"Skipped '{skipped_anime.get('title', 'Unknown anime')}'")
+    else:
+        flash("No anime to skip")
+    
+    # If the queue is empty after skipping, fetch more
+    if not anime_queue:
+        fetch_more_anime()
+    
+    return redirect(get_url_for("index"))
 
 @app.route("/mark", methods=["POST"])
 @login_required
@@ -261,7 +284,7 @@ def mark():
         
         # Mark the anime for the current user
         mark_anime_for_user(current_user.id, anime_data, status)
-        flash(f"Successfully marked '{anime_data['title']}' as {status}!")
+        flash(f"Added '{anime_data['title']}' to your watched list!")
         
         # Remove the marked anime from the queue
         global anime_queue
@@ -339,7 +362,7 @@ def direct_mark(anime_id, status):
     
     # Mark the anime for the current user
     mark_anime_for_user(current_user.id, anime, status)
-    flash(f"Successfully marked '{anime['title']}' as {status}!")
+    flash(f"Added '{anime['title']}' to your watched list!")
     
     # Remove from queue if present
     anime_queue = [a for a in anime_queue if a["id"] != anime_id]
@@ -360,32 +383,16 @@ def fetch():
 @app.route("/watched")
 @login_required
 def watched():
-    """Display the list of anime marked as watched with sorting options."""
-    # Only allow sorting if enhanced features are available
-    if check_enhanced_features():
-        sort_by = request.args.get('sort_by', 'date_added')
-        sort_order = request.args.get('sort_order', 'desc')
-        
-        valid_sorts = ['title', 'score', 'episodes', 'aired_date', 'date_added']
-        if sort_by not in valid_sorts:
-            sort_by = 'date_added'
-        
-        if sort_order not in ['asc', 'desc']:
-            sort_order = 'desc'
-        
-        watched_list = get_user_anime_list(current_user.id, sort_by, sort_order)
-    else:
-        # Basic functionality without sorting
-        sort_by = 'date_added'
-        sort_order = 'desc'
+    """Display the list of anime marked as watched."""
+    try:
         watched_list = get_user_anime_list(current_user.id)
-    
-    return render_template("watched.html", 
-                         anime_list=watched_list, 
-                         current_sort=sort_by,
-                         current_order=sort_order,
-                         has_enhanced_features=check_enhanced_features(),
-                         get_url_for=get_url_for)
+        return render_template("watched.html", 
+                             anime_list=watched_list, 
+                             get_url_for=get_url_for)
+    except Exception as e:
+        print(f"Error getting watched list: {e}")
+        flash("Error loading your watched list. Please try again.")
+        return redirect(get_url_for("index"))
 
 @app.route("/stats")
 @login_required
@@ -484,7 +491,7 @@ def mark_search():
             detailed_anime = fetch_anime_details(anime_id)
             if detailed_anime:
                 mark_anime_for_user(current_user.id, detailed_anime, status)
-                flash(f"Anime marked as {status}!")
+                flash(f"Added anime to your watched list!")
             else:
                 flash("Error fetching anime details")
         else:
@@ -505,7 +512,7 @@ def mark_search():
             }
             
             mark_anime_for_user(current_user.id, anime_data, status)
-            flash(f"Anime marked as {status}!")
+            flash(f"Added anime to your watched list!")
     except Exception as e:
         flash(f"Error marking anime: {e}")
         
