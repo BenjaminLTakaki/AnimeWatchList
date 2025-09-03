@@ -30,6 +30,7 @@ class UserAnimeList(object):
     user_id = None
     anime_id = None
     status = None
+    user_rating = None  # NEW: 0-5 star rating, NULL means not rated
     created_at = None
 
 def check_column_exists(table_name, column_name):
@@ -122,7 +123,7 @@ def add_anime_to_db(anime_data):
     return anime
 
 def get_user_anime_list(user_id, sort_by="date_added", sort_order="desc"):
-    """Get user's watched anime list with sorting options."""
+    """Get user's watched anime list with sorting options and ratings."""
     query = db.UserAnimeList.query.filter_by(user_id=user_id, status='watched')
     
     # Join with Anime table for sorting
@@ -132,6 +133,7 @@ def get_user_anime_list(user_id, sort_by="date_added", sort_order="desc"):
     has_episodes_int = check_column_exists('anime', 'episodes_int')
     has_score_float = check_column_exists('anime', 'score_float')
     has_aired_from = check_column_exists('anime', 'aired_from')
+    has_user_rating = check_column_exists('user_anime_list', 'user_rating')
     
     # Apply sorting based on available columns
     if sort_by == "title":
@@ -154,6 +156,11 @@ def get_user_anime_list(user_id, sort_by="date_added", sort_order="desc"):
             query = query.order_by(db.Anime.aired_from.desc().nulls_last())
         else:
             query = query.order_by(db.Anime.aired_from.asc().nulls_last())
+    elif sort_by == "user_rating" and has_user_rating:
+        if sort_order == "desc":
+            query = query.order_by(db.UserAnimeList.user_rating.desc().nulls_last())
+        else:
+            query = query.order_by(db.UserAnimeList.user_rating.asc().nulls_last())
     else:  # Default: date_added
         if sort_order == "desc":
             query = query.order_by(db.UserAnimeList.created_at.desc())
@@ -161,7 +168,18 @@ def get_user_anime_list(user_id, sort_by="date_added", sort_order="desc"):
             query = query.order_by(db.UserAnimeList.created_at.asc())
     
     user_animes = query.all()
-    return [user_anime.anime.to_dict() for user_anime in user_animes]
+    anime_list = []
+    
+    for user_anime in user_animes:
+        anime_dict = user_anime.anime.to_dict()
+        # Add user rating to the anime dict
+        if has_user_rating:
+            anime_dict['user_rating'] = user_anime.user_rating
+        else:
+            anime_dict['user_rating'] = None
+        anime_list.append(anime_dict)
+    
+    return anime_list
 
 def get_status_counts(user_id):
     """Return count for watched anime only."""
@@ -169,7 +187,7 @@ def get_status_counts(user_id):
     return watched_count, 0  # Return 0 for not_watched since we're removing that feature
 
 def get_user_stats(user_id):
-    """Get comprehensive statistics for user's watched anime."""
+    """Get comprehensive statistics for user's watched anime including rating stats."""
     user_animes = db.UserAnimeList.query.filter_by(user_id=user_id, status='watched').join(db.Anime).all()
     
     if not user_animes:
@@ -178,9 +196,13 @@ def get_user_stats(user_id):
             'total_episodes': 0,
             'estimated_hours': 0,
             'average_score': 0,
+            'average_user_rating': 0,
+            'total_rated': 0,
+            'rating_distribution': {},
             'top_genres': [],
             'longest_anime': None,
-            'highest_rated': None
+            'highest_rated': None,
+            'highest_user_rated': None
         }
     
     total_anime = len(user_animes)
@@ -189,6 +211,7 @@ def get_user_stats(user_id):
     has_episodes_int = check_column_exists('anime', 'episodes_int')
     has_score_float = check_column_exists('anime', 'score_float')
     has_genres = check_column_exists('anime', 'genres')
+    has_user_rating = check_column_exists('user_anime_list', 'user_rating')
     
     # Calculate total episodes
     if has_episodes_int:
@@ -206,7 +229,7 @@ def get_user_stats(user_id):
     
     estimated_hours = round(total_episodes * 0.4, 1)  # ~24 minutes per episode = 0.4 hours
     
-    # Calculate average score
+    # Calculate average MAL score
     if has_score_float:
         scores = [getattr(anime.anime, 'score_float', 0) for anime in user_animes if getattr(anime.anime, 'score_float', 0) > 0]
     else:
@@ -223,6 +246,31 @@ def get_user_stats(user_id):
                 pass
     
     average_score = round(sum(scores) / len(scores), 2) if scores else 0
+    
+    # Calculate user rating statistics
+    average_user_rating = 0
+    total_rated = 0
+    rating_distribution = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+    highest_user_rated = None
+    
+    if has_user_rating:
+        user_ratings = []
+        for user_anime in user_animes:
+            rating = getattr(user_anime, 'user_rating', None)
+            if rating is not None:
+                user_ratings.append(rating)
+                rating_distribution[rating] = rating_distribution.get(rating, 0) + 1
+                total_rated += 1
+        
+        if user_ratings:
+            average_user_rating = round(sum(user_ratings) / len(user_ratings), 2)
+            
+            # Find highest user rated anime
+            highest_rated_entry = max(user_animes, key=lambda x: getattr(x, 'user_rating', -1), default=None)
+            if highest_rated_entry and getattr(highest_rated_entry, 'user_rating', None) is not None:
+                highest_user_rated_dict = highest_rated_entry.anime.to_dict()
+                highest_user_rated_dict['user_rating'] = highest_rated_entry.user_rating
+                highest_user_rated = highest_user_rated_dict
     
     # Count genres
     genre_count = {}
@@ -244,27 +292,37 @@ def get_user_stats(user_id):
     if has_episodes_int:
         longest = max(user_animes, key=lambda x: getattr(x.anime, 'episodes_int', 0), default=None)
         if longest and getattr(longest.anime, 'episodes_int', 0) > 0:
-            longest_anime = longest.anime.to_dict()
+            longest_anime_dict = longest.anime.to_dict()
+            if has_user_rating:
+                longest_anime_dict['user_rating'] = getattr(longest, 'user_rating', None)
+            longest_anime = longest_anime_dict
     
-    # Highest rated anime
+    # Highest rated anime (MAL score)
     highest_rated = None
     if has_score_float:
         highest = max(user_animes, key=lambda x: getattr(x.anime, 'score_float', 0), default=None)
         if highest and getattr(highest.anime, 'score_float', 0) > 0:
-            highest_rated = highest.anime.to_dict()
+            highest_rated_dict = highest.anime.to_dict()
+            if has_user_rating:
+                highest_rated_dict['user_rating'] = getattr(highest, 'user_rating', None)
+            highest_rated = highest_rated_dict
     
     return {
         'total_anime': total_anime,
         'total_episodes': total_episodes,
         'estimated_hours': estimated_hours,
         'average_score': average_score,
+        'average_user_rating': average_user_rating,
+        'total_rated': total_rated,
+        'rating_distribution': rating_distribution,
         'top_genres': top_genres,
         'longest_anime': longest_anime,
-        'highest_rated': highest_rated
+        'highest_rated': highest_rated,
+        'highest_user_rated': highest_user_rated
     }
 
-def mark_anime_for_user(user_id, anime_data, status):
-    """Mark anime as watched for a specific user. Ignore not_watched status."""
+def mark_anime_for_user(user_id, anime_data, status, user_rating=None):
+    """Mark anime as watched for a specific user with optional rating."""
     if status != 'watched':
         return  # Only process watched anime
     
@@ -277,19 +335,61 @@ def mark_anime_for_user(user_id, anime_data, status):
         anime_id=anime.id
     ).first()
     
+    has_user_rating = check_column_exists('user_anime_list', 'user_rating')
+    
     if user_anime:
         # Update existing status
         user_anime.status = status
+        if has_user_rating and user_rating is not None:
+            user_anime.user_rating = user_rating
     else:
         # Create new record
-        user_anime = db.UserAnimeList(
-            user_id=user_id,
-            anime_id=anime.id,
-            status=status
-        )
+        user_anime_kwargs = {
+            'user_id': user_id,
+            'anime_id': anime.id,
+            'status': status
+        }
+        if has_user_rating and user_rating is not None:
+            user_anime_kwargs['user_rating'] = user_rating
+            
+        user_anime = db.UserAnimeList(**user_anime_kwargs)
         db.session.add(user_anime)
     
     db.session.commit()
+
+def update_anime_rating_for_user(user_id, mal_id, user_rating):
+    """Update the user's rating for a specific anime."""
+    has_user_rating = check_column_exists('user_anime_list', 'user_rating')
+    if not has_user_rating:
+        return False
+    
+    anime = get_anime_by_mal_id(mal_id)
+    if not anime:
+        return False
+    
+    user_anime = db.UserAnimeList.query.filter_by(
+        user_id=user_id,
+        anime_id=anime.id
+    ).first()
+    
+    if user_anime:
+        # Validate rating (0-5 or None for not rated)
+        if user_rating is None or (isinstance(user_rating, int) and 0 <= user_rating <= 5):
+            user_anime.user_rating = user_rating
+            db.session.commit()
+            return True
+    
+    return False
+
+def rate_and_mark_anime_for_user(user_id, anime_data, user_rating):
+    """Rate an anime and automatically mark it as watched."""
+    # Validate rating
+    if not (isinstance(user_rating, int) and 0 <= user_rating <= 5):
+        return False
+    
+    # This will mark as watched and set the rating
+    mark_anime_for_user(user_id, anime_data, 'watched', user_rating)
+    return True
 
 def change_anime_status_for_user(user_id, mal_id, new_status):
     """Change an anime's status. Only support removing from watched list."""
@@ -307,7 +407,7 @@ def change_anime_status_for_user(user_id, mal_id, new_status):
     ).first()
     
     if user_anime:
-        # Remove from list
+        # Remove from list (this will also remove the rating)
         db.session.delete(user_anime)
         db.session.commit()
         return True
@@ -328,6 +428,23 @@ def get_anime_status_for_user(user_id, mal_id):
     
     return user_anime.status if user_anime else None
 
+def get_anime_rating_for_user(user_id, mal_id):
+    """Get the user's rating for a specific anime."""
+    has_user_rating = check_column_exists('user_anime_list', 'user_rating')
+    if not has_user_rating:
+        return None
+        
+    anime = get_anime_by_mal_id(mal_id)
+    if not anime:
+        return None
+    
+    user_anime = db.UserAnimeList.query.filter_by(
+        user_id=user_id,
+        anime_id=anime.id
+    ).first()
+    
+    return getattr(user_anime, 'user_rating', None) if user_anime else None
+
 def init_user_data(database):
     """Initialize models with the database from auth.py"""
     global db
@@ -338,6 +455,8 @@ def init_user_data(database):
         check_column_exists('anime', 'episodes_int') and
         check_column_exists('anime', 'score_float')
     )
+    
+    has_user_rating = check_column_exists('user_anime_list', 'user_rating')
     
     # Define Anime model based on available columns
     if has_enhanced_columns:
@@ -397,21 +516,43 @@ def init_user_data(database):
                     "score": self.score
                 }
 
-    class UserAnimeList(db.Model):
-        __tablename__ = 'user_anime_list'
-        id = db.Column(db.Integer, primary_key=True)
-        user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-        anime_id = db.Column(db.Integer, db.ForeignKey('anime.id'), nullable=False)
-        status = db.Column(db.String(20), nullable=False)  # Only 'watched' now
-        created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-        
-        # Define relationship
-        anime = db.relationship('Anime', backref='user_lists')
-        user = db.relationship('User', backref='anime_lists')
-        
-        __table_args__ = (
-            db.UniqueConstraint('user_id', 'anime_id', name='user_anime_unique'),
-        )
+    # Define UserAnimeList model based on available columns
+    if has_user_rating:
+        # Model with rating support
+        class UserAnimeList(db.Model):
+            __tablename__ = 'user_anime_list'
+            id = db.Column(db.Integer, primary_key=True)
+            user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+            anime_id = db.Column(db.Integer, db.ForeignKey('anime.id'), nullable=False)
+            status = db.Column(db.String(20), nullable=False)  # Only 'watched' now
+            user_rating = db.Column(db.Integer, nullable=True)  # 0-5 stars, NULL = not rated
+            created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+            
+            # Define relationship
+            anime = db.relationship('Anime', backref='user_lists')
+            user = db.relationship('User', backref='anime_lists')
+            
+            __table_args__ = (
+                db.UniqueConstraint('user_id', 'anime_id', name='user_anime_unique'),
+                db.CheckConstraint('user_rating >= 0 AND user_rating <= 5', name='valid_rating'),
+            )
+    else:
+        # Basic model without rating
+        class UserAnimeList(db.Model):
+            __tablename__ = 'user_anime_list'
+            id = db.Column(db.Integer, primary_key=True)
+            user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+            anime_id = db.Column(db.Integer, db.ForeignKey('anime.id'), nullable=False)
+            status = db.Column(db.String(20), nullable=False)  # Only 'watched' now
+            created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+            
+            # Define relationship
+            anime = db.relationship('Anime', backref='user_lists')
+            user = db.relationship('User', backref='anime_lists')
+            
+            __table_args__ = (
+                db.UniqueConstraint('user_id', 'anime_id', name='user_anime_unique'),
+            )
     
     # Replace the placeholder classes with the real db models
     db.Anime = Anime

@@ -385,6 +385,323 @@ document.addEventListener("DOMContentLoaded", function () {
     
     handleOfflineMode();
 
+    // Star Rating Component JavaScript
+
+    class StarRating {
+        constructor(container, options = {}) {
+            this.container = container;
+            this.options = {
+                maxRating: 5,
+                currentRating: 0,
+                interactive: true,
+                showText: true,
+                size: 'normal', // 'small', 'normal', 'large'
+                onRate: null,
+                ...options
+            };
+            
+            this.currentRating = this.options.currentRating;
+            this.hoverRating = 0;
+            
+            this.init();
+        }
+        
+        init() {
+            this.render();
+            if (this.options.interactive) {
+                this.bindEvents();
+            }
+        }
+        
+        render() {
+            const ratingClass = this.options.interactive ? 'interactive' : 'readonly';
+            const sizeClass = this.options.size !== 'normal' ? this.options.size : '';
+            
+            this.container.innerHTML = `
+                <div class="star-rating ${ratingClass} ${sizeClass}" data-rating="${this.currentRating}">
+                    ${this.renderStars()}
+                </div>
+                ${this.options.showText ? this.renderText() : ''}
+            `;
+            
+            this.starsContainer = this.container.querySelector('.star-rating');
+            this.stars = this.container.querySelectorAll('.star');
+            this.textElement = this.container.querySelector('.rating-text');
+            
+            this.updateStars(this.currentRating);
+        }
+        
+        renderStars() {
+            let starsHtml = '';
+            for (let i = 1; i <= this.options.maxRating; i++) {
+                starsHtml += `
+                    <span class="star" data-rating="${i}" role="button" tabindex="0" 
+                        aria-label="Rate ${i} star${i !== 1 ? 's' : ''}" 
+                        title="${i} star${i !== 1 ? 's' : ''}">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                        </svg>
+                    </span>
+                `;
+            }
+            return starsHtml;
+        }
+        
+        renderText() {
+            const ratingText = this.getRatingText(this.currentRating);
+            const hasRating = this.currentRating > 0;
+            return `<span class="rating-text ${hasRating ? 'has-rating' : ''}">${ratingText}</span>`;
+        }
+        
+        getRatingText(rating) {
+            if (rating === 0 || rating === null || rating === undefined) {
+                return 'Not rated';
+            }
+            return `${rating}/5 stars`;
+        }
+        
+        bindEvents() {
+            if (!this.options.interactive) return;
+            
+            this.stars.forEach((star, index) => {
+                const rating = index + 1;
+                
+                // Mouse events
+                star.addEventListener('mouseenter', () => this.handleHover(rating));
+                star.addEventListener('click', () => this.handleClick(rating));
+                
+                // Keyboard events
+                star.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        this.handleClick(rating);
+                    }
+                });
+            });
+            
+            this.starsContainer.addEventListener('mouseleave', () => this.handleMouseLeave());
+        }
+        
+        handleHover(rating) {
+            this.hoverRating = rating;
+            this.updateStars(rating);
+            if (this.textElement) {
+                this.textElement.textContent = this.getRatingText(rating);
+                this.textElement.className = 'rating-text has-rating';
+            }
+        }
+        
+        handleMouseLeave() {
+            this.hoverRating = 0;
+            this.updateStars(this.currentRating);
+            if (this.textElement) {
+                this.textElement.textContent = this.getRatingText(this.currentRating);
+                this.textElement.className = `rating-text ${this.currentRating > 0 ? 'has-rating' : ''}`;
+            }
+        }
+        
+        handleClick(rating) {
+            // Allow clicking the same rating to set it to 0 (remove rating)
+            const newRating = this.currentRating === rating ? 0 : rating;
+            this.setRating(newRating);
+            
+            if (this.options.onRate) {
+                this.options.onRate(newRating);
+            }
+        }
+        
+        updateStars(rating) {
+            this.stars.forEach((star, index) => {
+                const starRating = index + 1;
+                if (starRating <= rating) {
+                    star.classList.add('filled');
+                } else {
+                    star.classList.remove('filled');
+                }
+            });
+        }
+        
+        setRating(rating, animate = true) {
+            this.currentRating = rating;
+            this.starsContainer.setAttribute('data-rating', rating);
+            
+            if (animate) {
+                this.starsContainer.classList.add('animate');
+                setTimeout(() => {
+                    this.starsContainer.classList.remove('animate');
+                }, 300);
+            }
+            
+            this.updateStars(rating);
+            if (this.textElement) {
+                this.textElement.textContent = this.getRatingText(rating);
+                this.textElement.className = `rating-text ${rating > 0 ? 'has-rating' : ''}`;
+            }
+        }
+        
+        getRating() {
+            return this.currentRating;
+        }
+        
+        destroy() {
+            if (this.starsContainer) {
+                this.starsContainer.removeEventListener('mouseleave', this.handleMouseLeave);
+            }
+            if (this.stars) {
+                this.stars.forEach(star => {
+                    star.removeEventListener('mouseenter', this.handleHover);
+                    star.removeEventListener('click', this.handleClick);
+                    star.removeEventListener('keydown', this.handleKeydown);
+                });
+            }
+        }
+    }
+
+    // Utility functions for anime rating
+    function initializeRatingSystem() {
+        console.log('Initializing rating system...');
+        
+        // Initialize all existing rating displays (readonly)
+        document.querySelectorAll('.rating-display-container').forEach(container => {
+            const rating = parseInt(container.dataset.rating) || 0;
+            new StarRating(container, {
+                currentRating: rating,
+                interactive: false,
+                showText: true,
+                size: 'small'
+            });
+        });
+        
+        // Initialize interactive rating forms
+        document.querySelectorAll('.rating-form-container').forEach(container => {
+            const animeId = container.dataset.animeId;
+            const currentRating = parseInt(container.dataset.currentRating) || 0;
+            
+            new StarRating(container, {
+                currentRating: currentRating,
+                interactive: true,
+                showText: true,
+                onRate: (rating) => handleAnimeRating(animeId, rating, container)
+            });
+        });
+    }
+
+    async function handleAnimeRating(animeId, rating, container) {
+        try {
+            // Show loading state
+            container.style.opacity = '0.7';
+            
+            const formData = new FormData();
+            formData.append('anime_id', animeId);
+            formData.append('rating', rating);
+            
+            const response = await fetch('/animewatchlist/rate_anime', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    showToast(`Rating ${rating > 0 ? `${rating}/5 stars` : 'removed'}!`, 'success');
+                    
+                    // Update any readonly displays for this anime
+                    document.querySelectorAll(`[data-anime-id="${animeId}"] .rating-display-container`).forEach(display => {
+                        const starRating = display.starRatingInstance;
+                        if (starRating) {
+                            starRating.setRating(rating);
+                        }
+                    });
+                    
+                    // If rating > 0, mark as watched automatically
+                    if (rating > 0 && result.marked_as_watched) {
+                        showToast('Anime added to watched list!', 'success');
+                        // Optionally redirect or update UI
+                        setTimeout(() => {
+                            if (window.location.pathname.includes('/animewatchlist') && !window.location.pathname.includes('/watched')) {
+                                // We're on discovery page, get next anime
+                                window.location.reload();
+                            }
+                        }, 1500);
+                    }
+                } else {
+                    throw new Error(result.message || 'Failed to save rating');
+                }
+            } else {
+                throw new Error('Network error');
+            }
+            
+        } catch (error) {
+            console.error('Rating error:', error);
+            showToast('Failed to save rating. Please try again.', 'error');
+            
+            // Reset rating on error
+            const starRating = container.starRatingInstance;
+            if (starRating) {
+                starRating.setRating(starRating.options.currentRating || 0, false);
+            }
+        } finally {
+            container.style.opacity = '';
+        }
+    }
+
+    function createRatingForm(animeId, currentRating = 0) {
+        return `
+            <div class="rating-form">
+                <h4>Rate this anime</h4>
+                <div class="rating-form-container" data-anime-id="${animeId}" data-current-rating="${currentRating}">
+                    <!-- Star rating will be initialized here -->
+                </div>
+            </div>
+        `;
+    }
+
+    function createRatingDisplay(rating, animeId = null) {
+        const dataAttr = animeId ? `data-anime-id="${animeId}"` : '';
+        return `
+            <div class="rating-display" ${dataAttr}>
+                <span class="user-rating-label">My Rating:</span>
+                <div class="rating-display-container" data-rating="${rating || 0}">
+                    <!-- Star rating will be initialized here -->
+                </div>
+            </div>
+        `;
+    }
+
+    // Enhanced toast function specifically for ratings
+    function showRatingToast(rating, action = 'rated') {
+        let message;
+        if (rating === 0) {
+            message = 'Rating removed';
+        } else {
+            message = `${action === 'rated' ? 'Rated' : 'Rating updated to'} ${rating}/5 stars`;
+        }
+        
+        showToast(message, 'success', 2000);
+    }
+
+    // Initialize rating system when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Wait a bit for the page to fully load
+        setTimeout(() => {
+            initializeRatingSystem();
+        }, 100);
+    });
+
+    // Re-initialize ratings when content is dynamically loaded
+    function reinitializeRatings() {
+        setTimeout(() => {
+            initializeRatingSystem();
+        }, 100);
+    }
+
+    // Export for global use
+    window.StarRating = StarRating;
+    window.initializeRatingSystem = initializeRatingSystem;
+    window.reinitializeRatings = reinitializeRatings;
+    window.createRatingForm = createRatingForm;
+    window.createRatingDisplay = createRatingDisplay;
+    window.handleAnimeRating = handleAnimeRating;
     // ===== PERFORMANCE MONITORING =====
     
     // Basic performance monitoring

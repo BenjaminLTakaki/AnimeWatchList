@@ -4,7 +4,7 @@ import requests
 import time
 import datetime
 import traceback # Added for detailed error logging
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_login import login_required, current_user
 from dotenv import load_dotenv
 from sqlalchemy import inspect
@@ -60,7 +60,8 @@ from auth import User
 
 # Import and initialize user data AFTER db is initialized
 from user_data import init_user_data, get_user_anime_list, get_status_counts, get_user_stats
-from user_data import mark_anime_for_user, change_anime_status_for_user, get_anime_status_for_user
+from user_data import (mark_anime_for_user, change_anime_status_for_user, get_anime_status_for_user,
+                       update_anime_rating_for_user, rate_and_mark_anime_for_user, get_anime_rating_for_user)
 
 # Initialize user data models with the database from auth
 try:
@@ -97,6 +98,15 @@ def check_enhanced_features():
         inspector = inspect(db.engine)
         columns = [col['name'] for col in inspector.get_columns('anime')]
         return 'episodes_int' in columns and 'score_float' in columns
+    except:
+        return False
+
+def check_rating_feature():
+    """Check if the database has rating feature enabled."""
+    try:
+        inspector = inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('user_anime_list')]
+        return 'user_rating' in columns
     except:
         return False
 
@@ -226,14 +236,17 @@ def skip_current_anime():
 
 @app.route("/")
 def index():
-    """Display one anime at a time along with total watched count."""
+    """Display one anime at a time along with total watched count and rating option."""
     current_anime = get_next_anime()
     
     watched_count = 0
+    current_rating = None
     
     if current_user.is_authenticated:
         try:
             watched_count, _ = get_status_counts(current_user.id)
+            if current_anime and check_rating_feature():
+                current_rating = get_anime_rating_for_user(current_user.id, current_anime['id'])
         except Exception as e:
             print(f"Error getting status counts: {e}")
             flash("There was an issue accessing your anime lists.")
@@ -241,6 +254,8 @@ def index():
     return render_template("index.html", 
                            anime=current_anime,
                            watched_count=watched_count,
+                           current_rating=current_rating,
+                           has_rating_feature=check_rating_feature(),
                            get_url_for=get_url_for,
                            is_authenticated=current_user.is_authenticated)
 
@@ -303,6 +318,110 @@ def mark():
         return redirect(get_url_for("index"))
     
     return redirect(get_url_for("index"))
+
+@app.route("/rate_anime", methods=["POST"])
+@login_required
+def rate_anime():
+    """Rate an anime and optionally mark it as watched."""
+    if not check_rating_feature():
+        return jsonify({"success": False, "message": "Rating feature not available"})
+    
+    try:
+        anime_id = request.form.get("anime_id")
+        rating = request.form.get("rating")
+        
+        if not anime_id:
+            return jsonify({"success": False, "message": "Anime ID required"})
+        
+        # Validate rating
+        try:
+            rating = int(rating) if rating is not None else None
+            if rating is not None and not (0 <= rating <= 5):
+                return jsonify({"success": False, "message": "Rating must be between 0 and 5"})
+        except ValueError:
+            return jsonify({"success": False, "message": "Invalid rating format"})
+        
+        anime_id = int(anime_id)
+        marked_as_watched = False
+        
+        # Check if anime is already in user's list
+        current_status = get_anime_status_for_user(current_user.id, anime_id)
+        
+        if current_status == 'watched':
+            # Update existing rating
+            success = update_anime_rating_for_user(current_user.id, anime_id, rating)
+            if not success:
+                return jsonify({"success": False, "message": "Failed to update rating"})
+        else:
+            # If rating > 0, mark as watched automatically
+            if rating and rating > 0:
+                # Fetch anime data to mark as watched
+                anime_data = None
+                
+                # First check if it's in our queue
+                global anime_queue
+                anime_data = next((a for a in anime_queue if a["id"] == anime_id), None)
+                
+                if not anime_data:
+                    # Fetch from API
+                    if check_enhanced_features():
+                        detailed_anime = fetch_anime_details(anime_id)
+                        if detailed_anime:
+                            anime_data = {
+                                "id": detailed_anime.get("mal_id"),
+                                "title": detailed_anime.get("title"),
+                                "episodes": detailed_anime.get("episodes") if detailed_anime.get("episodes") is not None else "N/A",
+                                "main_picture": {
+                                    "medium": detailed_anime.get("images", {}).get("jpg", {}).get("image_url", "")
+                                },
+                                "score": detailed_anime.get("score", "N/A")
+                            }
+                            anime_data.update(detailed_anime)
+                    else:
+                        # Basic fetch
+                        url = f"{JIKAN_API_BASE}/anime/{anime_id}"
+                        response = requests.get(url)
+                        response.raise_for_status()
+                        data = response.json().get("data", {})
+                        
+                        anime_data = {
+                            "id": data.get("mal_id"),
+                            "title": data.get("title"),
+                            "episodes": data.get("episodes") if data.get("episodes") is not None else "N/A",
+                            "main_picture": {
+                                "medium": data.get("images", {}).get("jpg", {}).get("image_url", "")
+                            },
+                            "score": data.get("score", "N/A")
+                        }
+                
+                if anime_data:
+                    mark_anime_for_user(current_user.id, anime_data, 'watched', rating)
+                    marked_as_watched = True
+                    
+                    # Remove from queue if it was there
+                    anime_queue = [a for a in anime_queue if a["id"] != anime_id]
+                else:
+                    return jsonify({"success": False, "message": "Could not fetch anime data"})
+            else:
+                # Just update rating without marking as watched (for rating 0 or None)
+                # But anime needs to exist in watched list to have a rating
+                if rating == 0:
+                    success = update_anime_rating_for_user(current_user.id, anime_id, None)
+                    if not success:
+                        return jsonify({"success": False, "message": "Anime not in your watched list"})
+                else:
+                    return jsonify({"success": False, "message": "Anime must be watched to rate it"})
+        
+        return jsonify({
+            "success": True, 
+            "message": "Rating saved successfully",
+            "marked_as_watched": marked_as_watched
+        })
+        
+    except Exception as e:
+        print(f"Error in rate_anime: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "message": "Internal server error"})
 
 @app.route("/direct_mark/<int:anime_id>/<status>")
 @login_required
@@ -384,29 +503,40 @@ def fetch():
 @app.route("/watched")
 @login_required
 def watched():
-    """Display the list of anime marked as watched."""
-    print(f"User {current_user.id} attempting to access /watched route.") # New log
+    """Display the list of anime marked as watched with ratings."""
+    print(f"User {current_user.id} attempting to access /watched route.")
     try:
-        print(f"Calling get_user_anime_list for user {current_user.id}.") # New log
-        watched_list = get_user_anime_list(current_user.id)
-        print(f"Successfully retrieved watched_list for user {current_user.id}. Count: {len(watched_list)}") # New log
-        return render_template("list.html",  # Changed "watched.html" to "list.html"
+        # Get sorting parameters
+        sort_by = request.args.get('sort_by', 'date_added')
+        sort_order = request.args.get('sort_order', 'desc')
+        
+        print(f"Calling get_user_anime_list for user {current_user.id} with sorting: {sort_by} {sort_order}")
+        watched_list = get_user_anime_list(current_user.id, sort_by, sort_order)
+        print(f"Successfully retrieved watched_list for user {current_user.id}. Count: {len(watched_list)}")
+        
+        return render_template("list.html",
                              anime_list=watched_list, 
-                             list_type="Watched", # Added list_type for context in the template
+                             list_type="Watched",
+                             has_rating_feature=check_rating_feature(),
+                             sort_by=sort_by,
+                             sort_order=sort_order,
                              get_url_for=get_url_for)
     except Exception as e:
         detailed_error = traceback.format_exc()
-        print(f"Error in /watched route for user {current_user.id}: {e}\n{detailed_error}") # Updated log
+        print(f"Error in /watched route for user {current_user.id}: {e}\n{detailed_error}")
         flash("Error loading your watched list. Please try again.")
         return redirect(get_url_for("index"))
 
 @app.route("/stats")
 @login_required
 def stats():
-    """Display comprehensive statistics for the user."""
+    """Display comprehensive statistics for the user including rating stats."""
     try:
         user_stats = get_user_stats(current_user.id)
-        return render_template("stats.html", stats=user_stats, get_url_for=get_url_for)
+        return render_template("stats.html", 
+                             stats=user_stats, 
+                             has_rating_feature=check_rating_feature(),
+                             get_url_for=get_url_for)
     except Exception as e:
         print(f"Error getting user stats: {e}")
         flash("Error loading statistics. Please try again later.")
@@ -436,7 +566,7 @@ def remove_anime(anime_id):
 
 @app.route("/search", methods=["GET", "POST"])
 def search():
-    """Search for anime by title."""
+    """Search for anime by title with rating display."""
     results = []
     query = request.args.get("query", "") or request.form.get("query", "")
     
@@ -460,15 +590,18 @@ def search():
                         "medium": item.get("images", {}).get("jpg", {}).get("image_url", "")
                     },
                     "score": item.get("score", "N/A"),
-                    "status": None
+                    "status": None,
+                    "user_rating": None
                 }
                 
-                # Check if the user is authenticated and get the anime status
+                # Check if the user is authenticated and get the anime status and rating
                 if current_user.is_authenticated:
                     try:
                         anime["status"] = get_anime_status_for_user(current_user.id, anime["id"])
+                        if check_rating_feature():
+                            anime["user_rating"] = get_anime_rating_for_user(current_user.id, anime["id"])
                     except Exception as e:
-                        print(f"Error getting anime status: {e}")
+                        print(f"Error getting anime status/rating: {e}")
                 
                 results.append(anime)
                 
@@ -477,7 +610,11 @@ def search():
         except Exception as e:
             flash(f"Error searching for anime: {e}")
     
-    return render_template("search.html", results=results, query=query, get_url_for=get_url_for)
+    return render_template("search.html", 
+                         results=results, 
+                         query=query, 
+                         has_rating_feature=check_rating_feature(),
+                         get_url_for=get_url_for)
 
 @app.route("/mark_search", methods=["POST"])
 @login_required

@@ -7,15 +7,38 @@
     <h2>My Watched Anime</h2>
     
     {% if anime_list %}
-    <!-- Anime Count -->
-    <div class="anime-count">
-        <p><strong>{{ anime_list|length }}</strong> anime in your watched list</p>
+    <!-- Anime Count and Sorting -->
+    <div class="list-controls">
+        <div class="anime-count">
+            <p><strong>{{ anime_list|length }}</strong> anime in your watched list</p>
+        </div>
+        
+        <!-- Sort Controls -->
+        <div class="sort-controls">
+            <form method="GET" class="sort-form">
+                <label for="sort_by">Sort by:</label>
+                <select name="sort_by" id="sort_by" class="sort-select" onchange="this.form.submit()">
+                    <option value="date_added" {{ 'selected' if sort_by == 'date_added' else '' }}>Date Added</option>
+                    <option value="title" {{ 'selected' if sort_by == 'title' else '' }}>Title</option>
+                    <option value="score" {{ 'selected' if sort_by == 'score' else '' }}>MAL Score</option>
+                    <option value="episodes" {{ 'selected' if sort_by == 'episodes' else '' }}>Episodes</option>
+                    {% if has_rating_feature %}
+                    <option value="user_rating" {{ 'selected' if sort_by == 'user_rating' else '' }}>My Rating</option>
+                    {% endif %}
+                </select>
+                
+                <select name="sort_order" class="sort-select" onchange="this.form.submit()">
+                    <option value="desc" {{ 'selected' if sort_order == 'desc' else '' }}>High to Low</option>
+                    <option value="asc" {{ 'selected' if sort_order == 'asc' else '' }}>Low to High</option>
+                </select>
+            </form>
+        </div>
     </div>
 
     <!-- Simple Anime Grid -->
     <div class="anime-list">
         {% for anime in anime_list %}
-        <div class="anime-item">
+        <div class="anime-item" data-anime-id="{{ anime.id }}">
             <h3>
                 <a href="https://myanimelist.net/anime/{{ anime.id }}" target="_blank" class="anime-title-link">
                     {{ anime.title }}
@@ -28,8 +51,33 @@
             
             <div class="anime-details">
                 <p><strong>Episodes:</strong> {{ anime.episodes }}</p>
-                {% if anime.score and anime.score != "N/A" and anime.score != "0" %}
-                <p><strong>Score:</strong> {{ anime.score }}/10</p>
+                
+                <!-- Rating Row with MAL Score and User Rating -->
+                <div class="rating-row">
+                    {% if anime.score and anime.score != "N/A" and anime.score != "0" %}
+                    <div class="mal-score">
+                        <span>MAL: {{ anime.score }}/10</span>
+                    </div>
+                    {% endif %}
+                    
+                    {% if has_rating_feature %}
+                    <div class="user-rating">
+                        <span class="user-rating-label">My Rating:</span>
+                        <div class="rating-display-container" data-rating="{{ anime.user_rating or 0 }}" data-anime-id="{{ anime.id }}">
+                            <!-- Star rating will be initialized here -->
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% if has_rating_feature %}
+                <!-- Interactive Rating Form -->
+                <div class="rating-form compact">
+                    <h4>Update Rating</h4>
+                    <div class="rating-form-container" data-anime-id="{{ anime.id }}" data-current-rating="{{ anime.user_rating or 0 }}">
+                        <!-- Interactive star rating will be initialized here -->
+                    </div>
+                </div>
                 {% endif %}
             </div>
 
@@ -37,7 +85,7 @@
             <div class="status-actions">
                 <a href="{{ get_url_for('remove_anime', anime_id=anime.id) }}" 
                    class="remove-btn"
-                   onclick="return confirm('Remove {{ anime.title }} from your watched list?')">
+                   onclick="return confirm('Remove {{ anime.title }} from your watched list? This will also remove your rating.')">
                     Remove from List
                 </a>
             </div>
@@ -56,4 +104,249 @@
     </div>
     {% endif %}
 </div>
+
+<style>
+.list-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.anime-count {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 1px solid var(--border-color);
+}
+
+.anime-count p {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.sort-controls {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 1px solid var(--border-color);
+}
+
+.sort-form {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.sort-form label {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.sort-select {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    background: white;
+    color: var(--text-primary);
+}
+
+.sort-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(46, 81, 162, 0.1);
+}
+
+/* Rating row styles */
+.rating-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0.5rem 0;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    border-top: 1px solid #eee;
+}
+
+.mal-score {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.user-rating {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.user-rating-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Compact rating form for list view */
+.rating-form.compact {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    border-left: 3px solid var(--primary-color);
+}
+
+.rating-form.compact h4 {
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.rating-form.compact .rating-form-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Anime item updates */
+.anime-item {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.anime-item:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.anime-details {
+    flex-grow: 1;
+    margin-bottom: 1rem;
+}
+
+.anime-details p {
+    margin: 0.3rem 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.status-actions {
+    margin-top: auto;
+}
+
+.status-actions .remove-btn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+    display: block;
+    padding: 0.8rem;
+    background: var(--danger-color);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.status-actions .remove-btn:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+}
+
+/* Mobile optimizations */
+@media (max-width: 767px) {
+    .list-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .anime-count,
+    .sort-controls {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .sort-form {
+        justify-content: center;
+        gap: 0.8rem;
+    }
+    
+    .sort-select {
+        min-width: 120px;
+    }
+    
+    .rating-row {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 0.8rem !important;
+    }
+    
+    .user-rating {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .rating-form.compact {
+        padding: 0.8rem;
+        margin: 0.8rem 0;
+    }
+    
+    .anime-item {
+        padding: 1rem;
+    }
+    
+    .anime-item img {
+        height: 200px;
+    }
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .list-controls {
+        justify-content: space-around;
+    }
+    
+    .anime-list {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .remove-btn {
+        min-height: 48px;
+        font-size: 1rem;
+    }
+    
+    .sort-select {
+        min-height: 44px;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    .anime-item:hover {
+        transform: none;
+        box-shadow: var(--shadow);
+    }
+}
+</style>
 {% endblock %}
