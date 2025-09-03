@@ -172,11 +172,8 @@ def get_user_anime_list(user_id, sort_by="date_added", sort_order="desc"):
     
     for user_anime in user_animes:
         anime_dict = user_anime.anime.to_dict()
-        # Add user rating to the anime dict
-        if has_user_rating:
-            anime_dict['user_rating'] = user_anime.user_rating
-        else:
-            anime_dict['user_rating'] = None
+        # Safely get the user rating using getattr
+        anime_dict['user_rating'] = getattr(user_anime, 'user_rating', None)
         anime_list.append(anime_dict)
     
     return anime_list
@@ -516,43 +513,24 @@ def init_user_data(database):
                     "score": self.score
                 }
 
-    # Define UserAnimeList model based on available columns
-    if has_user_rating:
-        # Model with rating support
-        class UserAnimeList(db.Model):
-            __tablename__ = 'user_anime_list'
-            id = db.Column(db.Integer, primary_key=True)
-            user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-            anime_id = db.Column(db.Integer, db.ForeignKey('anime.id'), nullable=False)
-            status = db.Column(db.String(20), nullable=False)  # Only 'watched' now
-            user_rating = db.Column(db.Integer, nullable=True)  # 0-5 stars, NULL = not rated
-            created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-            
-            # Define relationship
-            anime = db.relationship('Anime', backref='user_lists')
-            user = db.relationship('User', backref='anime_lists')
-            
-            __table_args__ = (
-                db.UniqueConstraint('user_id', 'anime_id', name='user_anime_unique'),
-                db.CheckConstraint('user_rating >= 0 AND user_rating <= 5', name='valid_rating'),
-            )
-    else:
-        # Basic model without rating
-        class UserAnimeList(db.Model):
-            __tablename__ = 'user_anime_list'
-            id = db.Column(db.Integer, primary_key=True)
-            user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-            anime_id = db.Column(db.Integer, db.ForeignKey('anime.id'), nullable=False)
-            status = db.Column(db.String(20), nullable=False)  # Only 'watched' now
-            created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-            
-            # Define relationship
-            anime = db.relationship('Anime', backref='user_lists')
-            user = db.relationship('User', backref='anime_lists')
-            
-            __table_args__ = (
-                db.UniqueConstraint('user_id', 'anime_id', name='user_anime_unique'),
-            )
+    # Define UserAnimeList model statically with user_rating
+    class UserAnimeList(db.Model):
+        __tablename__ = 'user_anime_list'
+        id = db.Column(db.Integer, primary_key=True)
+        user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+        anime_id = db.Column(db.Integer, db.ForeignKey('anime.id'), nullable=False)
+        status = db.Column(db.String(20), nullable=False)  # Only 'watched' now
+        user_rating = db.Column(db.Integer, nullable=True)  # 0-5 stars, NULL = not rated
+        created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+        
+        # Define relationship
+        anime = db.relationship('Anime', backref='user_lists')
+        user = db.relationship('User', backref='anime_lists')
+        
+        __table_args__ = (
+            db.UniqueConstraint('user_id', 'anime_id', name='user_anime_unique'),
+            db.CheckConstraint('user_rating >= 0 AND user_rating <= 5', name='valid_rating'),
+        )
     
     # Replace the placeholder classes with the real db models
     db.Anime = Anime
