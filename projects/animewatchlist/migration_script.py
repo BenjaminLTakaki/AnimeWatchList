@@ -1,5 +1,6 @@
 """
 Database Migration Script for Adding Rating System to AnimeWatchList
+Fixed for SQLAlchemy 2.0+ compatibility
 
 This script adds the user_rating column to the user_anime_list table.
 Run this after deploying the updated code.
@@ -22,9 +23,11 @@ def add_rating_column():
         with app.app_context():
             print("Starting rating system migration...")
             
-            # Test database connection
+            # Test database connection (SQLAlchemy 2.0 compatible)
             try:
-                result = db.engine.execute(text("SELECT 1 as test"))
+                with db.engine.connect() as connection:
+                    result = connection.execute(text("SELECT 1 as test"))
+                    test_row = result.fetchone()
                 print("✅ Database connection successful")
             except Exception as e:
                 print(f"❌ Database connection failed: {e}")
@@ -40,7 +43,11 @@ def add_rating_column():
                 try:
                     # Add user_rating column (nullable, 0-5 integer, NULL means not rated)
                     query = "ALTER TABLE user_anime_list ADD COLUMN user_rating INTEGER CHECK (user_rating >= 0 AND user_rating <= 5);"
-                    db.engine.execute(text(query))
+                    
+                    with db.engine.connect() as connection:
+                        connection.execute(text(query))
+                        connection.commit()
+                    
                     print("✅ Added user_rating column")
                 except Exception as e:
                     print(f"⚠️  Failed to add user_rating column: {e}")
@@ -48,8 +55,12 @@ def add_rating_column():
             else:
                 print("✅ user_rating column already exists")
             
-            # Commit all changes
-            db.session.commit()
+            # Commit all changes (if using session)
+            try:
+                db.session.commit()
+            except:
+                pass  # In case there's no active session
+            
             print("\n🎉 Rating system migration completed successfully!")
             
             # Show final table structure
@@ -82,8 +93,11 @@ def verify_rating_migration():
                 try:
                     # This should work
                     test_query = "SELECT COUNT(*) FROM user_anime_list WHERE user_rating IS NULL OR (user_rating >= 0 AND user_rating <= 5)"
-                    result = db.engine.execute(text(test_query))
-                    count = result.scalar()
+                    
+                    with db.engine.connect() as connection:
+                        result = connection.execute(text(test_query))
+                        count = result.scalar()
+                    
                     print(f"✅ Rating constraint working, found {count} valid records")
                 except Exception as e:
                     print(f"⚠️  Rating constraint check failed: {e}")
