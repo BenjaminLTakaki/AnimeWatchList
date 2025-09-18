@@ -3,18 +3,21 @@ import json
 import requests
 import time
 import datetime
-import traceback # Added for detailed error logging
+import traceback
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_login import login_required, current_user
 from dotenv import load_dotenv
 from sqlalchemy import inspect
 from flask_migrate import Migrate
 
+# Import the MAL API functions
+from anime_series_grouper import get_anime_details, get_top_anime, search_anime, get_mal_headers
+
 # Load environment variables
 load_dotenv()
 
-# Jikan API base URL
-JIKAN_API_BASE = "https://api.jikan.moe/v4"
+# MAL API base URL (replacing Jikan)
+MAL_API_BASE = "https://api.myanimelist.net/v2"
 
 def create_app(config=None):
     """Create and configure the Flask application."""
@@ -121,25 +124,13 @@ def create_app(config=None):
             return False
 
     def fetch_anime_details(anime_id):
-        """Fetch detailed anime information from MAL API."""
-        try:
-            url = f"{JIKAN_API_BASE}/anime/{anime_id}/full"
-            response = requests.get(url)
-            
-            if response.status_code == 429:
-                time.sleep(2)
-                response = requests.get(url)
-            
-            response.raise_for_status()
-            return response.json().get("data", {})
-        except Exception as e:
-            print(f"Error fetching anime details for ID {anime_id}: {e}")
-            return None
+        """Fetch detailed anime information from MAL API - UPDATED FOR MAL API."""
+        return get_anime_details(anime_id)
 
     def fetch_more_anime():
-        """Fetch a batch of most popular anime from the Jikan API with persistent page tracking."""
+        """Fetch a batch of popular anime from MAL API - UPDATED FOR MAL API."""
         nonlocal anime_queue
-        print("Fetching popular anime...")
+        print("Fetching popular anime from MAL API...")
         
         PAGE_TRACKER_FILE = os.path.join('data', "page_tracker.json")
         
@@ -147,32 +138,25 @@ def create_app(config=None):
         try:
             if os.path.exists(PAGE_TRACKER_FILE):
                 with open(PAGE_TRACKER_FILE, 'r') as f:
-                    current_page = json.load(f).get('current_page', 1)
+                    current_page = json.load(f).get('current_page', 0)
             else:
-                current_page = 1
+                current_page = 0
         except Exception:
-            current_page = 1
+            current_page = 0
         
-        print(f"Current page: {current_page}")
+        print(f"Current offset: {current_page}")
         
-        # Set up the request to get popular anime
-        url = f"{JIKAN_API_BASE}/top/anime"
-        params = {
-            "page": current_page,
-            "limit": 20
-        }
+        # MAL API ranking types to cycle through
+        ranking_types = ['all', 'airing', 'tv', 'movie', 'bypopularity']
+        ranking_type = ranking_types[current_page % len(ranking_types)]
         
         try:
-            print(f"Requesting page {current_page} of top anime")
-            response = requests.get(url, params=params)
+            print(f"Requesting {ranking_type} anime")
             
-            if response.status_code == 429:
-                print("Rate limited, waiting 2 seconds...")
-                time.sleep(2)
-                response = requests.get(url, params=params)
-            
-            response.raise_for_status()
-            data = response.json()
+            # Use the helper function to get top anime WITH OFFSET
+            offset = (current_page // len(ranking_types)) * 20
+            top_anime_list = get_top_anime(ranking_type=ranking_type, limit=20, offset=offset)
+
             
             # Increment the page for next time
             current_page += 1
@@ -196,21 +180,21 @@ def create_app(config=None):
             # Track how many new anime we add
             added_count = 0
             
-            # Process each anime entry
-            for item in data.get("data", []):
+            # Process each anime entry from MAL API
+            for item in top_anime_list:
                 anime_id = item.get("mal_id")
                 
                 # Skip if already in our lists or queue
                 if anime_id in user_anime_ids or anime_id in queue_ids:
                     continue
                 
-                # Format the anime data with basic info
+                # Format the anime data to match the expected structure
                 anime = {
                     "id": anime_id,
                     "title": item.get("title", "Unknown Title"),
                     "episodes": item.get("episodes") if item.get("episodes") is not None else "N/A",
                     "main_picture": {
-                        "medium": item.get("images", {}).get("jpg", {}).get("image_url", "")
+                        "medium": item.get("main_picture", {}).get("medium", "")
                     },
                     "score": item.get("score", "N/A")
                 }
@@ -374,35 +358,7 @@ def create_app(config=None):
                     
                     if not anime_data:
                         # Fetch from API
-                        if check_enhanced_features():
-                            detailed_anime = fetch_anime_details(anime_id)
-                            if detailed_anime:
-                                anime_data = {
-                                    "id": detailed_anime.get("mal_id"),
-                                    "title": detailed_anime.get("title"),
-                                    "episodes": detailed_anime.get("episodes") if detailed_anime.get("episodes") is not None else "N/A",
-                                    "main_picture": {
-                                        "medium": detailed_anime.get("images", {}).get("jpg", {}).get("image_url", "")
-                                    },
-                                    "score": detailed_anime.get("score", "N/A")
-                                }
-                                anime_data.update(detailed_anime)
-                        else:
-                            # Basic fetch
-                            url = f"{JIKAN_API_BASE}/anime/{anime_id}"
-                            response = requests.get(url)
-                            response.raise_for_status()
-                            data = response.json().get("data", {})
-                            
-                            anime_data = {
-                                "id": data.get("mal_id"),
-                                "title": data.get("title"),
-                                "episodes": data.get("episodes") if data.get("episodes") is not None else "N/A",
-                                "main_picture": {
-                                    "medium": data.get("images", {}).get("jpg", {}).get("image_url", "")
-                                },
-                                "score": data.get("score", "N/A")
-                            }
+                        anime_data = fetch_anime_details(anime_id)
                     
                     if anime_data:
                         mark_anime_for_user(current_user.id, anime_data, 'watched', rating)
@@ -448,38 +404,10 @@ def create_app(config=None):
         if not anime:
             # If not in queue, fetch it from the API
             try:
-                if check_enhanced_features():
-                    detailed_anime = fetch_anime_details(anime_id)
-                    if detailed_anime:
-                        anime = {
-                            "id": detailed_anime.get("mal_id"),
-                            "title": detailed_anime.get("title"),
-                            "episodes": detailed_anime.get("episodes") if detailed_anime.get("episodes") is not None else "N/A",
-                            "main_picture": {
-                                "medium": detailed_anime.get("images", {}).get("jpg", {}).get("image_url", "")
-                            },
-                            "score": detailed_anime.get("score", "N/A")
-                        }
-                        anime.update(detailed_anime)
-                    else:
-                        flash("Error fetching anime details")
-                        return redirect(get_url_for("index"))
-                else:
-                    # Basic fetch without enhanced details
-                    url = f"{JIKAN_API_BASE}/anime/{anime_id}"
-                    response = requests.get(url)
-                    response.raise_for_status()
-                    data = response.json().get("data", {})
-                    
-                    anime = {
-                        "id": data.get("mal_id"),
-                        "title": data.get("title"),
-                        "episodes": data.get("episodes") if data.get("episodes") is not None else "N/A",
-                        "main_picture": {
-                            "medium": data.get("images", {}).get("jpg", {}).get("image_url", "")
-                        },
-                        "score": data.get("score", "N/A")
-                    }
+                anime = fetch_anime_details(anime_id)
+                if not anime:
+                    flash("Error fetching anime details")
+                    return redirect(get_url_for("index"))
             except Exception as e:
                 flash(f"Error fetching anime details: {e}")
                 return redirect(get_url_for("index"))
@@ -601,7 +529,7 @@ def create_app(config=None):
 
     @app.route("/search", methods=["GET", "POST"])
     def search():
-        """Search for anime by title with rating display."""
+        """Search for anime by title with rating display - UPDATED FOR MAL API."""
         results = []
         query = request.args.get("query", "") or request.form.get("query", "")
         
@@ -610,19 +538,16 @@ def create_app(config=None):
         
         if query:
             try:
-                url = f"{JIKAN_API_BASE}/anime"
-                params = {"q": query, "limit": 20}
-                response = requests.get(url, params=params)
-                response.raise_for_status()
-                data = response.json()
+                # Use MAL API search instead of Jikan
+                search_results = search_anime(query, limit=20)
                 
-                for item in data.get("data", []):
+                for item in search_results:
                     anime = {
                         "id": item.get("mal_id"),
                         "title": item.get("title"),
                         "episodes": item.get("episodes") if item.get("episodes") is not None else "N/A",
                         "main_picture": {
-                            "medium": item.get("images", {}).get("jpg", {}).get("image_url", "")
+                            "medium": item.get("main_picture", {}).get("medium", "")
                         },
                         "score": item.get("score", "N/A"),
                         "status": None,
@@ -664,33 +589,12 @@ def create_app(config=None):
             return redirect(url_for('search', query=query))
         
         try:
-            # Fetch detailed anime information if enhanced features are available
-            if check_enhanced_features():
-                detailed_anime = fetch_anime_details(anime_id)
-                if detailed_anime:
-                    mark_anime_for_user(current_user.id, detailed_anime, status)
-                    flash(f"Added anime to your watched list!")
-                else:
-                    flash("Error fetching anime details")
-            else:
-                # Basic functionality
-                url = f"{JIKAN_API_BASE}/anime/{anime_id}"
-                response = requests.get(url)
-                response.raise_for_status()
-                data = response.json().get("data", {})
-                
-                anime_data = {
-                    "id": data.get("mal_id"),
-                    "title": data.get("title"),
-                    "episodes": data.get("episodes") if data.get("episodes") is not None else "N/A",
-                    "main_picture": {
-                        "medium": data.get("images", {}).get("jpg", {}).get("image_url", "")
-                    },
-                    "score": data.get("score", "N/A")
-                }
-                
+            anime_data = fetch_anime_details(anime_id)
+            if anime_data:
                 mark_anime_for_user(current_user.id, anime_data, status)
                 flash(f"Added anime to your watched list!")
+            else:
+                flash("Error fetching anime details")
         except Exception as e:
             flash(f"Error marking anime: {e}")
             
