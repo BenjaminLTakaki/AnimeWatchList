@@ -63,6 +63,9 @@ from user_data import init_user_data, get_user_anime_list, get_status_counts, ge
 from user_data import (mark_anime_for_user, change_anime_status_for_user, get_anime_status_for_user,
                        update_anime_rating_for_user, rate_and_mark_anime_for_user, get_anime_rating_for_user)
 
+# Import the recommendation engine
+from recommendation_engine import get_recommendations
+
 # Initialize user data models with the database from auth
 try:
     Anime, UserAnimeList = init_user_data(db)
@@ -525,6 +528,31 @@ def watched():
         detailed_error = traceback.format_exc()
         print(f"Error in /watched route for user {current_user.id}: {e}\n{detailed_error}")
         flash("Error loading your watched list. Please try again.")
+        return redirect(get_url_for("index"))
+
+@app.route("/recommendations")
+@login_required
+def recommendations():
+    """Display personalized anime recommendations."""
+    try:
+        # Get user's watched list, which includes ratings
+        # The recommendation engine needs the 'mal_id' and 'user_rating' keys
+        watched_list = get_user_anime_list(current_user.id)
+
+        if not watched_list:
+            flash("You need to watch and rate some anime before we can provide recommendations.", "info")
+            return render_template("recommendations.html", recommendations=[])
+
+        # Generate recommendations
+        # Using test_mode=True to limit API calls during testing.
+        # For production, this should be False.
+        recs = get_recommendations(watched_list, test_mode=True)
+
+        return render_template("recommendations.html", recommendations=recs, get_url_for=get_url_for)
+    except Exception as e:
+        print(f"Error generating recommendations: {e}")
+        traceback.print_exc()
+        flash("Sorry, there was an error generating recommendations. Please try again later.", "danger")
         return redirect(get_url_for("index"))
 
 @app.route("/stats")

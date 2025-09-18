@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Your Recommendations{% endblock %}
+
+{% block content %}
+<div class="recommendations-page">
+    <h1>Your Personalized Anime Recommendations</h1>
+    <p>Based on your watched list and ratings, here are some series you might enjoy.</p>
+
+    {% if recommendations %}
+        <div class="recommendations-list">
+            {% for rec in recommendations %}
+                <div class="recommendation-card">
+                    {% if rec['anime']['images']['jpg']['image_url'] %}
+                    <div class="rec-image">
+                        <img src="{{ rec['anime']['images']['jpg']['image_url'] }}" alt="{{ rec['anime']['title'] }}">
+                    </div>
+                    {% endif %}
+                    <div class="rec-content">
+                        <h3 class="rec-title">
+                            <a href="{{ rec['anime']['url'] }}" target="_blank">
+                                {{ rec['anime']['title'] }}
+                            </a>
+                        </h3>
+                        <p class="rec-score">Match Score: <strong>{{ "%.0f"|format(rec.score * 100) }}%</strong></p>
+                        <p class="rec-explanation">
+                            <strong>Why you might like it:</strong> {{ rec.explanation }}
+                        </p>
+                        {% if rec.series_info and rec.series_info.total_seasons > 1 %}
+                            <p class="series-info">
+                                This is the start of a series with {{ rec.series_info.total_seasons }} parts.
+                            </p>
+                        {% endif %}
+                        <div class="rec-actions">
+                            <a href="{{ get_url_for('direct_mark', anime_id=rec['anime']['mal_id'], status='watched') }}" class="btn btn-primary">Add to Watched</a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="no-recommendations">
+            <h2>We couldn't find any recommendations for you right now.</h2>
+            <p>Try watching and rating more anime to improve your recommendations. Or try again later.</p>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.recommendations-page h1 {
+    text-align: center;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+.recommendations-page > p {
+    text-align: center;
+    color: var(--text-secondary);
+    margin-bottom: 2.5rem;
+    font-size: 1.1rem;
+}
+.recommendations-list {
+    display: grid;
+    gap: 1.5rem;
+}
+.recommendation-card {
+    display: flex;
+    gap: 1.5rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    padding: 1.5rem;
+    border-left: 5px solid var(--primary-color);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.recommendation-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.08);
+}
+.rec-image {
+    flex-shrink: 0;
+}
+.rec-image img {
+    width: 120px;
+    height: 180px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+.rec-content {
+    flex-grow: 1;
+}
+.rec-title {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+}
+.rec-title a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 1.3rem;
+}
+.rec-title a:hover {
+    text-decoration: underline;
+}
+.rec-score {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+.rec-explanation {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+}
+.series-info {
+    font-style: italic;
+    color: #007bff;
+    background-color: #e7f3ff;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    display: inline-block;
+    font-size: 0.9rem;
+}
+.rec-actions {
+    margin-top: 1.5rem;
+}
+.no-recommendations {
+    text-align: center;
+    padding: 3rem;
+    background: white;
+    border-radius: 12px;
+}
+
+@media (max-width: 767px) {
+    .recommendation-card {
+        flex-direction: column;
+    }
+    .rec-image {
+        text-align: center;
+    }
+    .rec-image img {
+        width: 150px;
+        height: auto;
+    }
+}
+</style>
+{% endblock %}

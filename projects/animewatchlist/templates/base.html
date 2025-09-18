@@ -229,6 +229,7 @@
                 <ul>
                     <li><a href="{{ get_url_for('index') }}">Home</a></li>
                     {% if current_user.is_authenticated %}
+                    <li><a href="{{ get_url_for('recommendations') }}">Recommendations</a></li>
                     <li><a href="{{ get_url_for('watched') }}">My List</a></li>
                     <li><a href="{{ get_url_for('stats') }}">Stats</a></li>
                     <li><a href="{{ get_url_for('search') }}">Search</a></li>
