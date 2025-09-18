@@ -1,54 +1,7 @@
-import requests
-import time
 import re
 from collections import deque
+from .mal_api_client import get_anime_details
 
-# Jikan API base URL
-JIKAN_API_BASE = "https://api.jikan.moe/v4"
-
-# In-memory cache to store API responses
-RELATIONS_CACHE = {}
-ANIME_DETAILS_CACHE = {}
-
-def get_anime_details(mal_id):
-    """Fetches full anime details from the Jikan API with caching."""
-    if mal_id in ANIME_DETAILS_CACHE:
-        return ANIME_DETAILS_CACHE[mal_id]
-
-    print(f"Fetching details for {mal_id} from API.")
-    try:
-        url = f"{JIKAN_API_BASE}/anime/{mal_id}"
-        response = requests.get(url)
-        if response.status_code == 429:
-            time.sleep(2)
-            response = requests.get(url)
-        response.raise_for_status()
-        data = response.json().get("data")
-        ANIME_DETAILS_CACHE[mal_id] = data
-        return data
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching anime details for ID {mal_id}: {e}")
-        return None
-
-def get_anime_relations(mal_id):
-    """Fetches anime relations from the Jikan API with caching."""
-    if mal_id in RELATIONS_CACHE:
-        return RELATIONS_CACHE[mal_id]
-
-    print(f"Fetching relations for {mal_id} from API.")
-    try:
-        url = f"{JIKAN_API_BASE}/anime/{mal_id}/relations"
-        response = requests.get(url)
-        if response.status_code == 429:
-            time.sleep(2)
-            response = requests.get(url)
-        response.raise_for_status()
-        data = response.json().get("data", [])
-        RELATIONS_CACHE[mal_id] = data
-        return data
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching anime relations for ID {mal_id}: {e}")
-        return []
 
 def normalize_title(title):
     """Normalizes an anime title for similarity comparison."""
@@ -118,17 +71,7 @@ def group_anime_series(anime_list):
             current_series[current_id] = current_details
             processed_ids.add(current_id)
 
-            # 1. Group by official relations
-            relations = get_anime_relations(current_id)
-            for relation_group in relations:
-                # We only care about sequels, prequels, and main stories
-                if relation_group['relation'] in ['Sequel', 'Prequel', 'Parent story', 'Main story']:
-                    for entry in relation_group['entry']:
-                        if entry['type'] == 'anime' and entry['mal_id'] not in visited_in_group:
-                            queue.append(entry['mal_id'])
-                            visited_in_group.add(entry['mal_id'])
-
-        # 2. Group by title similarity (for anime in the initial list)
+        # Group by title similarity (for anime in the initial list)
         base_title = normalized_titles.get(mal_id)
         if base_title:
             for other_id, other_title in normalized_titles.items():
