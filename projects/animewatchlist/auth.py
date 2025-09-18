@@ -59,11 +59,6 @@ auth_routes = {}
 def init_auth(app, get_url_for_func, get_status_counts_func):
     """
     Initialize authentication system with the main app.
-    
-    Args:
-        app: Flask application instance
-        get_url_for_func: Function to generate URLs (imported from main app)
-        get_status_counts_func: Function to get status counts (imported from user_data)
     """
     # Configure database - ONLY use environment variables
     database_uri = os.environ.get('DATABASE_URL')
@@ -79,10 +74,24 @@ def init_auth(app, get_url_for_func, get_status_counts_func):
     if database_uri and database_uri.startswith('postgres://'):
         database_uri = database_uri.replace('postgres://', 'postgresql://', 1)
     
-    print(f"Using database URI: {database_uri}")  # Log the full URI for debugging
+    print(f"Using database URI: {database_uri}")
     
     app.config['SQLALCHEMY_DATABASE_URI'] = database_uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    
+    # **NEW: Database connection pool configuration for production**
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,           # Verify connections before use
+        'pool_recycle': 300,             # Recycle connections every 5 minutes
+        'pool_timeout': 20,              # Connection timeout
+        'max_overflow': 0,               # No overflow connections
+        'pool_size': 2,                  # Smaller pool for Render's limits
+        'connect_args': {
+            'sslmode': 'require',        # Ensure SSL connections
+            'connect_timeout': 10,       # Connection timeout
+            'application_name': 'animewatchlist'
+        }
+    }
     
     # Initialize database with app
     db.init_app(app)
@@ -94,33 +103,42 @@ def init_auth(app, get_url_for_func, get_status_counts_func):
     # Initialize LoginManager
     login_manager = LoginManager()
     login_manager.init_app(app)
-    login_manager.login_view = 'login'  # Endpoint name for the login view
+    login_manager.login_view = 'login'
     login_manager.login_message_category = 'info'
     
     @login_manager.user_loader
     def load_user(user_id):
-        return User.query.get(int(user_id))
+        try:
+            return User.query.get(int(user_id))
+        except Exception as e:
+            print(f"Error loading user {user_id}: {e}")
+            return None
 
-    # Create database tables
+    # Create database tables with error handling
     with app.app_context():
         try:
             db.create_all()
             print("Database tables created successfully!")
         except Exception as e:
             print(f"Error creating database tables: {e}")
+            # Try to reconnect once
+            try:
+                db.engine.dispose()
+                db.create_all()
+                print("Database reconnected and tables created successfully!")
+            except Exception as e2:
+                print(f"Second attempt failed: {e2}")
     
-    # Register routes
-    # Views will now use current_app.config to get their specific get_url_for and get_status_counts
-
-    app.add_url_rule('/register', endpoint='register', view_func=register, methods=['GET', 'POST'])
-    app.add_url_rule('/login', endpoint='login', view_func=login, methods=['GET', 'POST'])
-    app.add_url_rule('/logout', endpoint='logout', view_func=logout, methods=['GET', 'POST'])
-    app.add_url_rule('/profile', endpoint='profile', view_func=profile, methods=['GET', 'POST'])
-
-
-    # Store auth route functions in a global dict for access from outside
-    # This part might also need rethinking if multiple apps have different auth views for same names.
-    # For now, assuming endpoint names like 'register', 'login' are consistent in what they point to functionally.
+    # Register routes with error handling
+    try:
+        app.add_url_rule('/register', endpoint='register', view_func=register, methods=['GET', 'POST'])
+        app.add_url_rule('/login', endpoint='login', view_func=login, methods=['GET', 'POST'])
+        app.add_url_rule('/logout', endpoint='logout', view_func=logout, methods=['GET', 'POST'])
+        app.add_url_rule('/profile', endpoint='profile', view_func=profile, methods=['GET', 'POST'])
+    except Exception as e:
+        print(f"Error registering auth routes: {e}")
+    
+    # Global auth routes dict
     global auth_routes
     auth_routes = {
         'register': register,

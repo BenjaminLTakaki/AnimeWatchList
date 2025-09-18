@@ -212,7 +212,7 @@ def get_user_stats(user_id):
     
     # Calculate total episodes
     if has_episodes_int:
-        total_episodes = sum(getattr(anime.anime, 'episodes_int', 0) for anime in user_animes)
+        total_episodes = sum(getattr(anime.anime, 'episodes_int', 0) or 0 for anime in user_animes)
     else:
         # Fallback: try to parse from episodes string
         total_episodes = 0
@@ -226,9 +226,13 @@ def get_user_stats(user_id):
     
     estimated_hours = round(total_episodes * 0.4, 1)  # ~24 minutes per episode = 0.4 hours
     
-    # Calculate average MAL score
+    # Calculate average MAL score - FIX: Handle None values properly
     if has_score_float:
-        scores = [getattr(anime.anime, 'score_float', 0) for anime in user_animes if getattr(anime.anime, 'score_float', 0) > 0]
+        scores = []
+        for anime in user_animes:
+            score_val = getattr(anime.anime, 'score_float', None)
+            if score_val is not None and score_val > 0:
+                scores.append(score_val)
     else:
         # Fallback: try to parse from score string
         scores = []
@@ -262,11 +266,18 @@ def get_user_stats(user_id):
         if user_ratings:
             average_user_rating = round(sum(user_ratings) / len(user_ratings), 2)
             
-            # Find highest user rated anime
-            highest_rated_entry = max(user_animes, key=lambda x: getattr(x, 'user_rating', -1), default=None)
-            if highest_rated_entry and getattr(highest_rated_entry, 'user_rating', None) is not None:
+            # Find highest user rated anime - FIX: Handle None values
+            highest_rated_entry = None
+            max_rating = -1
+            for user_anime in user_animes:
+                rating = getattr(user_anime, 'user_rating', None)
+                if rating is not None and rating > max_rating:
+                    max_rating = rating
+                    highest_rated_entry = user_anime
+            
+            if highest_rated_entry and max_rating > 0:
                 highest_user_rated_dict = highest_rated_entry.anime.to_dict()
-                highest_user_rated_dict['user_rating'] = highest_rated_entry.user_rating
+                highest_user_rated_dict['user_rating'] = max_rating
                 highest_user_rated = highest_user_rated_dict
     
     # Count genres
@@ -284,24 +295,38 @@ def get_user_stats(user_id):
     # Top 5 genres
     top_genres = sorted(genre_count.items(), key=lambda x: x[1], reverse=True)[:5]
     
-    # Longest anime (by episodes)
+    # Longest anime (by episodes) - FIX: Handle None values
     longest_anime = None
     if has_episodes_int:
-        longest = max(user_animes, key=lambda x: getattr(x.anime, 'episodes_int', 0), default=None)
-        if longest and getattr(longest.anime, 'episodes_int', 0) > 0:
-            longest_anime_dict = longest.anime.to_dict()
+        max_episodes = 0
+        longest_entry = None
+        for user_anime in user_animes:
+            episodes = getattr(user_anime.anime, 'episodes_int', None) or 0
+            if episodes > max_episodes:
+                max_episodes = episodes
+                longest_entry = user_anime
+        
+        if longest_entry and max_episodes > 0:
+            longest_anime_dict = longest_entry.anime.to_dict()
             if has_user_rating:
-                longest_anime_dict['user_rating'] = getattr(longest, 'user_rating', None)
+                longest_anime_dict['user_rating'] = getattr(longest_entry, 'user_rating', None)
             longest_anime = longest_anime_dict
     
-    # Highest rated anime (MAL score)
+    # Highest rated anime (MAL score) - FIX: Handle None values
     highest_rated = None
     if has_score_float:
-        highest = max(user_animes, key=lambda x: getattr(x.anime, 'score_float', 0), default=None)
-        if highest and getattr(highest.anime, 'score_float', 0) > 0:
-            highest_rated_dict = highest.anime.to_dict()
+        max_score = 0
+        highest_entry = None
+        for user_anime in user_animes:
+            score = getattr(user_anime.anime, 'score_float', None) or 0
+            if score > max_score:
+                max_score = score
+                highest_entry = user_anime
+        
+        if highest_entry and max_score > 0:
+            highest_rated_dict = highest_entry.anime.to_dict()
             if has_user_rating:
-                highest_rated_dict['user_rating'] = getattr(highest, 'user_rating', None)
+                highest_rated_dict['user_rating'] = getattr(highest_entry, 'user_rating', None)
             highest_rated = highest_rated_dict
     
     return {

@@ -173,7 +173,7 @@ def spotify_redirect():
     else:
         return "Spotify Cover Generator is currently unavailable", 503
 
-# Handle static files from the main app
+# Handle static files from the main app - FIXED STATIC FILE HANDLING
 @main_app.route('/skillstown/static/<path:filename>')
 def skillstown_static(filename):
     print(f"Serving SkillsTown static file: {filename} from {SKILLSTOWN_APP_STATIC_DIR}")
@@ -195,7 +195,6 @@ def animewatchlist_static(filename):
         return f"Static file {filename} not found", 404
 
 if has_spotify_app:
-    SPOTIFY_APP_STATIC_DIR = os.path.join(spotify_path, 'static')
     @main_app.route('/spotify/static/<path:filename>')
     def spotify_static(filename):
         print(f"Serving Spotify static file: {filename} from {SPOTIFY_APP_STATIC_DIR}")
@@ -218,7 +217,7 @@ if has_spotify_app:
             print(f"Error serving Spotify static file {filename}: {e}")
             return f"Error serving static file: {e}", 500
 
-# Class to handle routing to the app
+# Class to handle routing to the app - OPTIMIZED WITH ERROR HANDLING
 class AppDispatcher:
     def __init__(self, app):
         self.app = app
@@ -226,6 +225,13 @@ class AppDispatcher:
     def __call__(self, environ, start_response):
         path_info = environ.get('PATH_INFO', '')
         print(f"🔍 AppDispatcher handling request: {path_info}")
+        
+        # Clean up double paths (fix for /animewatchlist/animewatchlist/static/)
+        if '/animewatchlist/animewatchlist/' in path_info:
+            path_info = path_info.replace('/animewatchlist/animewatchlist/', '/animewatchlist/')
+            environ['PATH_INFO'] = path_info
+            print(f"Fixed double path to: {path_info}")
+        
         # Handle static file requests
         if path_info.startswith('/skillstown/static/'):
             environ['PATH_INFO'] = path_info
@@ -237,38 +243,83 @@ class AppDispatcher:
             environ['PATH_INFO'] = path_info
             return main_app(environ, start_response)
             
-        # Route requests to the appropriate app
-        if path_info.startswith('/skillstown'):
-            script_name = '/skillstown'
-            environ['SCRIPT_NAME'] = script_name
-            environ['PATH_INFO'] = path_info[len(script_name):]
-            return skillstown_app(environ, start_response)
-        elif path_info.startswith('/animewatchlist'):
-            script_name = '/animewatchlist'
-            environ['SCRIPT_NAME'] = script_name
-            environ['PATH_INFO'] = path_info[len(script_name):]
-            return animewatchlist_app(environ, start_response)
-        elif has_spotify_app and path_info.startswith('/spotify'):
-            print("Routing to Spotify app")
-            script_name = '/spotify'
-            environ['SCRIPT_NAME'] = script_name
-            environ['PATH_INFO'] = path_info[len(script_name):]
-            # CRITICAL FIX: Set the working directory and sys.path for Spotify app requests
-            old_cwd = os.getcwd()
-            old_sys_path = sys.path.copy()
-            try:
-                os.chdir(spotify_path)
-                if spotify_path not in sys.path:
-                    sys.path.insert(0, spotify_path)
-                return spotify_app(environ, start_response)
-            finally:
-                os.chdir(old_cwd)
-                sys.path = old_sys_path
-        print("Routing to main app")
-        return main_app(environ, start_response)
+        # Route requests to the appropriate app with error handling
+        try:
+            if path_info.startswith('/skillstown'):
+                script_name = '/skillstown'
+                environ['SCRIPT_NAME'] = script_name
+                environ['PATH_INFO'] = path_info[len(script_name):]
+                return skillstown_app(environ, start_response)
+            elif path_info.startswith('/animewatchlist'):
+                script_name = '/animewatchlist'
+                environ['SCRIPT_NAME'] = script_name
+                environ['PATH_INFO'] = path_info[len(script_name):]
+                return animewatchlist_app(environ, start_response)
+            elif has_spotify_app and path_info.startswith('/spotify'):
+                print("Routing to Spotify app")
+                script_name = '/spotify'
+                environ['SCRIPT_NAME'] = script_name
+                environ['PATH_INFO'] = path_info[len(script_name):]
+                # CRITICAL FIX: Set the working directory and sys.path for Spotify app requests
+                old_cwd = os.getcwd()
+                old_sys_path = sys.path.copy()
+                try:
+                    os.chdir(spotify_path)
+                    if spotify_path not in sys.path:
+                        sys.path.insert(0, spotify_path)
+                    return spotify_app(environ, start_response)
+                finally:
+                    os.chdir(old_cwd)
+                    sys.path = old_sys_path
+            
+            print("Routing to main app")
+            return main_app(environ, start_response)
+            
+        except Exception as e:
+            print(f"Error in AppDispatcher routing: {e}")
+            # Return a 500 error response
+            status = '500 Internal Server Error'
+            headers = [('Content-Type', 'text/html')]
+            start_response(status, headers)
+            error_message = f"""
+            <html>
+            <head><title>Application Error</title></head>
+            <body>
+            <h1>Application Error</h1>
+            <p>There was an error processing your request: {str(e)}</p>
+            <p><a href="/">Return to Home</a></p>
+            </body>
+            </html>
+            """.encode('utf-8')
+            return [error_message]
 
 # Set up the WSGI application with our custom dispatcher
 application = AppDispatcher(main_app)
+
+# Health check endpoint for monitoring
+@main_app.route('/health')
+def health_check():
+    """Simple health check endpoint for monitoring"""
+    try:
+        # Basic database connectivity test for AnimeWatchList
+        if has_animewatchlist_app:
+            with animewatchlist_app.app_context():
+                # Simple query to test database
+                from projects.animewatchlist.auth import User
+                user_count = User.query.count()
+                return {
+                    'status': 'healthy',
+                    'users': user_count,
+                    'apps': {
+                        'skillstown': skillstown_error is None,
+                        'animewatchlist': True,
+                        'spotify': has_spotify_app
+                    }
+                }
+        else:
+            return {'status': 'partial', 'message': 'Some apps unavailable'}
+    except Exception as e:
+        return {'status': 'unhealthy', 'error': str(e)}, 500
 
 if __name__ == "__main__":
     from werkzeug.serving import run_simple
