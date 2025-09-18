@@ -472,7 +472,7 @@ def create_app(config=None):
         try:
             # Get user's watched list, which includes ratings
             # The recommendation engine needs the 'mal_id' and 'user_rating' keys
-            watched_list = get_user_anime_list(current_user.id)
+            watched_list = get_user_anime_list(current_user.id, fetch_details=True)
 
             if not watched_list:
                 flash("You need to watch and rate some anime before we can provide recommendations.", "info")

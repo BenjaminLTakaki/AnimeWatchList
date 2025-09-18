@@ -210,7 +210,7 @@ def get_recommendations(user_watched_list, test_mode=True):
         candidates.extend(seasonal_candidates)
         
         # Get top anime for quality
-        top_candidates = fetch_candidate_anime(pages=pages_to_fetch, use_seasonal=False, offset=pages_to_fetch-1)
+        top_candidates = fetch_candidate_anime(pages=pages_to_fetch, use_seasonal=False)
         candidates.extend(top_candidates)
         
         # Remove duplicates

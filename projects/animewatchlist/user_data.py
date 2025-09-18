@@ -174,7 +174,8 @@ def get_user_anime_list(user_id, sort_by="date_added", sort_order="desc", fetch_
         anime_list = []
         for user_anime in user_animes:
             anime_list.append({
-                'mal_id': user_anime.anime.mal_id,
+                'id': user_anime.anime.mal_id,  # Changed from 'mal_id' to 'id' for template compatibility
+                'mal_id': user_anime.anime.mal_id,  # Keep mal_id for API compatibility
                 'title': user_anime.anime.title,
                 'episodes': user_anime.anime.episodes,
                 'image_url': user_anime.anime.image_url,
