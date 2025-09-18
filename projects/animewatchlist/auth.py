@@ -56,22 +56,18 @@ class LoginForm(FlaskForm):
 # Global store for auth route functions (remains for now, but consider app-specific storage if needed)
 auth_routes = {}
 
-def init_auth(app, get_url_for_func, get_status_counts_func):
+def init_auth(app, get_url_for_func, get_status_counts_func, is_production=False):
     """
     Initialize authentication system with the main app.
     """
-    # Configure database - ONLY use environment variables
     database_uri = os.environ.get('DATABASE_URL')
     
-    # If DATABASE_URL is not set, log an error
     if not database_uri:
         print("ERROR: DATABASE_URL environment variable is not set!")
         print("Please set the DATABASE_URL environment variable with your PostgreSQL connection string.")
-        # Fallback to a development database for local use only
         database_uri = 'sqlite:///test.db'
     
-    # Fix for Render PostgreSQL URLs
-    if database_uri and database_uri.startswith('postgres://'):
+    if database_uri.startswith('postgres://'):
         database_uri = database_uri.replace('postgres://', 'postgresql://', 1)
     
     print(f"Using database URI: {database_uri}")
@@ -79,19 +75,19 @@ def init_auth(app, get_url_for_func, get_status_counts_func):
     app.config['SQLALCHEMY_DATABASE_URI'] = database_uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
-    # **NEW: Database connection pool configuration for production**
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_pre_ping': True,           # Verify connections before use
-        'pool_recycle': 300,             # Recycle connections every 5 minutes
-        'pool_timeout': 20,              # Connection timeout
-        'max_overflow': 0,               # No overflow connections
-        'pool_size': 2,                  # Smaller pool for Render's limits
-        'connect_args': {
-            'sslmode': 'require',        # Ensure SSL connections
-            'connect_timeout': 10,       # Connection timeout
-            'application_name': 'animewatchlist'
+    if is_production:
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_pre_ping': True,
+            'pool_recycle': 300,
+            'pool_timeout': 20,
+            'max_overflow': 0,
+            'pool_size': 2,
+            'connect_args': {
+                'sslmode': 'require',
+                'connect_timeout': 10,
+                'application_name': 'animewatchlist'
+            }
         }
-    }
     
     # Initialize database with app
     db.init_app(app)

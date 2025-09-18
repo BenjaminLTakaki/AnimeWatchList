@@ -1,6 +1,5 @@
 import re
 from collections import deque
-from .mal_api_client import get_anime_details
 
 
 def normalize_title(title):

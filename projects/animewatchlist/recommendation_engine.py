@@ -1,47 +1,71 @@
 import time
+import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from .mal_api_client import get_top_anime, get_anime_details
-from anime_series_grouper import group_anime_series, create_series_mapping
+from anime_series_grouper import get_anime_details, group_anime_series, create_series_mapping
 from cold_start_recommender import generate_recommendations as generate_cold_start_recs
 
-MAX_WORKERS = 10  # Increased workers due to caching and higher API limits
-REQUEST_DELAY = 0  # No longer needed with MAL API and caching
+JIKAN_API_BASE = "https://api.jikan.moe/v4"
+MAX_WORKERS = 3  # Limit concurrent API calls
+REQUEST_DELAY = 0.5  # Delay between requests
 
-def fetch_candidate_anime(pages=1):
+def fetch_candidate_anime(pages=1):  # Reduced default pages
     """
-    Fetches top anime from MAL API to serve as recommendation candidates.
+    Fetches top anime from Jikan to serve as recommendation candidates.
+    Optimized for production with rate limiting.
     """
-    print(f"Fetching {pages} page(s) of top anime from MAL API...")
     candidates = []
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        future_to_page = {executor.submit(get_top_anime, page): page for page in range(1, pages + 1)}
-        for future in as_completed(future_to_page):
-            page = future_to_page[future]
-            try:
-                data = future.result()
-                if data:
-                    candidates.extend(data)
-                print(f"Successfully fetched page {page} of top anime.")
-            except Exception as exc:
-                print(f"Page {page} generated an exception: {exc}")
+    for page in range(1, pages + 1):
+        print(f"Fetching page {page} of top anime for candidates...")
+        try:
+            url = f"{JIKAN_API_BASE}/top/anime"
+            params = {"page": page, "limit": 25}
+            response = requests.get(url, params=params, timeout=10)
+
+            if response.status_code == 429:
+                print("Rate limited, waiting 3 seconds...")
+                time.sleep(3)
+                response = requests.get(url, params=params, timeout=10)
+
+            response.raise_for_status()
+            data = response.json().get("data", [])
+            candidates.extend(data)
+
+            # Rate limiting between requests
+            if page < pages:
+                time.sleep(REQUEST_DELAY)
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching candidate anime page {page}: {e}")
+            break
+
     return candidates
 
 def fetch_anime_details_batch(anime_ids, max_workers=MAX_WORKERS):
     """
-    Fetch multiple anime details concurrently using the new MAL client.
-    The client handles caching, so we can increase concurrency.
+    Fetch multiple anime details concurrently with rate limiting.
     """
     results = {}
+
+    def fetch_single(anime_id):
+        try:
+            time.sleep(REQUEST_DELAY)  # Rate limiting
+            details = get_anime_details(anime_id)
+            return anime_id, details
+        except Exception as e:
+            print(f"Error fetching details for {anime_id}: {e}")
+            return anime_id, None
+
+    # Use ThreadPoolExecutor for concurrent requests
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_id = {executor.submit(get_anime_details, anime_id): anime_id for anime_id in anime_ids}
+        # Submit all requests
+        future_to_id = {executor.submit(fetch_single, anime_id): anime_id for anime_id in anime_ids}
+
+        # Process completed requests
         for future in as_completed(future_to_id):
-            anime_id = future_to_id[future]
-            try:
-                details = future.result()
-                if details:
-                    results[anime_id] = details
-            except Exception as e:
-                print(f"Error fetching details for anime ID {anime_id}: {e}")
+            anime_id, details = future.result()
+            if details:
+                results[anime_id] = details
+
     return results
 
 def get_recommendations(user_watched_list, test_mode=True):
