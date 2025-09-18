@@ -24,6 +24,18 @@ def get_anime_details(mal_id):
     Returns a dictionary with anime details or None if failed.
     """
     try:
+        # Ensure mal_id is valid
+        if not mal_id or mal_id == 'None':
+            print(f"Invalid mal_id provided: {mal_id}")
+            return None
+            
+        # Convert to int to ensure it's valid
+        try:
+            mal_id = int(mal_id)
+        except (ValueError, TypeError):
+            print(f"Could not convert mal_id to int: {mal_id}")
+            return None
+        
         # MAL API endpoint for anime details with comprehensive fields
         fields = [
             'id', 'title', 'main_picture', 'alternative_titles',
@@ -39,6 +51,7 @@ def get_anime_details(mal_id):
         params = {'fields': ','.join(fields)}
         headers = get_mal_headers()
         
+        print(f"Fetching anime {mal_id} from MAL API...")
         response = requests.get(url, params=params, headers=headers, timeout=10)
         
         # Handle rate limiting (MAL API uses different status codes)
@@ -47,15 +60,31 @@ def get_anime_details(mal_id):
             time.sleep(1)
             response = requests.get(url, params=params, headers=headers, timeout=10)
         
+        # Handle not found
+        if response.status_code == 404:
+            print(f"Anime {mal_id} not found on MAL")
+            return None
+            
         response.raise_for_status()
         data = response.json()
         
         if not data:
+            print(f"Empty response for anime {mal_id}")
+            return None
+        
+        # Debug: Print the raw data structure
+        print(f"MAL API response for {mal_id}: {data.keys()}")
+        
+        # Ensure we have the required ID field
+        anime_id = data.get('id')
+        if not anime_id:
+            print(f"No 'id' field in MAL response for {mal_id}: {data}")
             return None
         
         # Convert MAL API response to standardized format (similar to Jikan structure)
-        return {
-            'mal_id': data.get('id'),
+        result = {
+            'mal_id': anime_id,  # Use the ID from the response
+            'id': anime_id,      # Also include as 'id' for compatibility
             'title': data.get('title', 'Unknown Title'),
             'episodes': data.get('num_episodes'),
             'score': data.get('mean'),
@@ -66,7 +95,10 @@ def get_anime_details(mal_id):
                     'large_image_url': data.get('main_picture', {}).get('large', '')
                 }
             },
-            'url': f"https://myanimelist.net/anime/{data.get('id')}",
+            'main_picture': {
+                'medium': data.get('main_picture', {}).get('medium', '')
+            },
+            'url': f"https://myanimelist.net/anime/{anime_id}",
             'genres': data.get('genres', []),
             'studios': data.get('studios', []),
             'aired': {
@@ -92,6 +124,14 @@ def get_anime_details(mal_id):
             'recommendations': data.get('recommendations', []),
             'statistics': data.get('statistics', {})
         }
+        
+        # Final validation
+        if not result['mal_id']:
+            print(f"ERROR: mal_id is still None after processing for {mal_id}")
+            return None
+            
+        print(f"Successfully fetched anime: {result['title']} (ID: {result['mal_id']})")
+        return result
         
     except requests.exceptions.RequestException as e:
         print(f"Network error fetching anime {mal_id}: {e}")

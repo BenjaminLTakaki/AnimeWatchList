@@ -379,6 +379,124 @@ def mark_anime_for_user(user_id, anime_data, status, user_rating=None):
     
     db.session.commit()
 
+def add_anime_to_db(anime_data):
+    """Add anime to database if it doesn't exist and return the Anime object."""
+    # Validate mal_id first
+    mal_id = anime_data.get("id") or anime_data.get("mal_id")
+    
+    if not mal_id:
+        print(f"ERROR: No mal_id found in anime_data: {anime_data}")
+        raise ValueError("No mal_id provided in anime_data")
+    
+    # Ensure mal_id is an integer
+    try:
+        mal_id = int(mal_id)
+    except (ValueError, TypeError):
+        print(f"ERROR: Invalid mal_id format: {mal_id}")
+        raise ValueError(f"Invalid mal_id format: {mal_id}")
+    
+    print(f"Looking for anime with mal_id: {mal_id}")
+    anime = get_anime_by_mal_id(mal_id)
+    
+    if not anime:
+        print(f"Adding new anime to database: {anime_data.get('title', 'Unknown')} (ID: {mal_id})")
+        
+        # Basic anime data (always supported)
+        anime_kwargs = {
+            'mal_id': mal_id,  # Use the validated mal_id
+            'title': anime_data.get("title", "Unknown Title"),
+            'episodes': str(anime_data.get("episodes", "N/A")),
+            'image_url': anime_data.get("main_picture", {}).get("medium", "") or anime_data.get("images", {}).get("jpg", {}).get("image_url", ""),
+            'score': str(anime_data.get("score", "N/A"))
+        }
+        
+        # Enhanced data (only if columns exist)
+        if check_column_exists('anime', 'episodes_int'):
+            episodes = anime_data.get("episodes") or anime_data.get("num_episodes")
+            if episodes is None or episodes == "N/A":
+                episodes_int = 0
+            else:
+                try:
+                    episodes_int = int(episodes)
+                except (ValueError, TypeError):
+                    episodes_int = 0
+            anime_kwargs['episodes_int'] = episodes_int
+        
+        if check_column_exists('anime', 'score_float'):
+            score = anime_data.get("score") or anime_data.get("mean")
+            if score is None or score == "N/A":
+                score_float = 0.0
+            else:
+                try:
+                    score_float = float(score)
+                except (ValueError, TypeError):
+                    score_float = 0.0
+            anime_kwargs['score_float'] = score_float
+        
+        if check_column_exists('anime', 'aired_from'):
+            aired_from = None
+            if anime_data.get("aired", {}).get("from"):
+                try:
+                    aired_from = datetime.datetime.fromisoformat(
+                        anime_data["aired"]["from"].replace("Z", "+00:00")
+                    ).date()
+                except:
+                    aired_from = None
+            elif anime_data.get("start_date"):
+                try:
+                    aired_from = datetime.datetime.strptime(anime_data["start_date"], "%Y-%m-%d").date()
+                except:
+                    aired_from = None
+            anime_kwargs['aired_from'] = aired_from
+        
+        if check_column_exists('anime', 'genres'):
+            genres = []
+            if anime_data.get("genres"):
+                # Handle MAL API format
+                if isinstance(anime_data["genres"], list):
+                    for genre in anime_data["genres"]:
+                        if isinstance(genre, dict):
+                            genres.append(genre.get("name", ""))
+                        else:
+                            genres.append(str(genre))
+            anime_kwargs['genres'] = ",".join(filter(None, genres))
+        
+        if check_column_exists('anime', 'studio'):
+            studio = ""
+            if anime_data.get("studios") and len(anime_data["studios"]) > 0:
+                studio_data = anime_data["studios"][0]
+                if isinstance(studio_data, dict):
+                    studio = studio_data.get("name", "")
+                else:
+                    studio = str(studio_data)
+            anime_kwargs['studio'] = studio
+        
+        if check_column_exists('anime', 'type'):
+            anime_kwargs['type'] = anime_data.get("type") or anime_data.get("media_type", "")
+        
+        if check_column_exists('anime', 'status'):
+            anime_kwargs['status'] = anime_data.get("status", "")
+        
+        # Final validation before creating
+        if not anime_kwargs.get('mal_id'):
+            raise ValueError("mal_id is required but missing")
+        
+        print(f"Creating anime with data: {anime_kwargs}")
+        anime = db.Anime(**anime_kwargs)
+        
+        try:
+            db.session.add(anime)
+            db.session.commit()
+            print(f"Successfully added anime: {anime.title} (ID: {anime.mal_id})")
+        except Exception as e:
+            print(f"Database error adding anime: {e}")
+            db.session.rollback()
+            raise
+    else:
+        print(f"Found existing anime: {anime.title} (ID: {anime.mal_id})")
+    
+    return anime
+
 def update_anime_rating_for_user(user_id, mal_id, user_rating):
     """Update the user's rating for a specific anime."""
     has_user_rating = check_column_exists('user_anime_list', 'user_rating')
