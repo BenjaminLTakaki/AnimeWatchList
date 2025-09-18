@@ -51,12 +51,23 @@ sys.path.insert(0, animewatchlist_path)
 
 # Import the AnimeWatchList app with error handling
 try:
-    from projects.animewatchlist.app import app as animewatchlist_app, db as animewatchlist_db
+    # Import the factory function
+    from projects.animewatchlist.app import create_app as create_animewatchlist_app
+    
+    # Use the main app's config to create the animewatchlist app
+    # The create_app function will use environment variables for configuration
+    animewatchlist_app, animewatchlist_db = create_animewatchlist_app({
+        'SQLALCHEMY_DATABASE_URI': os.environ.get('DATABASE_URL'),
+        'SECRET_KEY': os.environ.get('FLASK_SECRET_KEY'),
+    })
+    
     Migrate(animewatchlist_app, animewatchlist_db)
-    print("AnimeWatchList app imported successfully")
+    print("AnimeWatchList app created successfully using factory")
     has_animewatchlist_app = True
 except Exception as e:
-    print(f"Could not import AnimeWatchList app: {e}")
+    print(f"Could not create AnimeWatchList app from factory: {e}")
+    import traceback
+    print(f"Full traceback: {traceback.format_exc()}")
     print("Creating a stub AnimeWatchList app")
     animewatchlist_app = Flask("animewatchlist_stub")
     
@@ -64,7 +75,7 @@ except Exception as e:
     def animewatchlist_index():
         return "AnimeWatchList is currently unavailable. Database connection issues. Please check your PostgreSQL setup."
     
-    has_animewatchlist_app = True
+    has_animewatchlist_app = False
 
 # Spotify Cover Generator app setup
 spotify_path = os.path.join(project_root, 'projects/spotify-cover-generator')
