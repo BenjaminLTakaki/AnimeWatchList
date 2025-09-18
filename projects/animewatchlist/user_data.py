@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 import datetime
 from sqlalchemy import inspect
+from recommendation_engine import fetch_anime_details_batch
 
 # This will be initialized with the db imported from auth.py
 db = None
@@ -122,7 +123,7 @@ def add_anime_to_db(anime_data):
     
     return anime
 
-def get_user_anime_list(user_id, sort_by="date_added", sort_order="desc"):
+def get_user_anime_list(user_id, sort_by="date_added", sort_order="desc", fetch_details=False):
     """Get user's watched anime list with sorting options and ratings."""
     query = db.UserAnimeList.query.filter_by(user_id=user_id, status='watched')
     
@@ -168,15 +169,40 @@ def get_user_anime_list(user_id, sort_by="date_added", sort_order="desc"):
             query = query.order_by(db.UserAnimeList.created_at.asc())
     
     user_animes = query.all()
-    anime_list = []
     
-    for user_anime in user_animes:
-        anime_dict = user_anime.anime.to_dict()
-        # Safely get the user rating using getattr
-        anime_dict['user_rating'] = getattr(user_anime, 'user_rating', None)
-        anime_list.append(anime_dict)
-    
-    return anime_list
+    if not fetch_details:
+        anime_list = []
+        for user_anime in user_animes:
+            anime_list.append({
+                'mal_id': user_anime.anime.mal_id,
+                'title': user_anime.anime.title,
+                'episodes': user_anime.anime.episodes,
+                'image_url': user_anime.anime.image_url,
+                'score': user_anime.anime.score,
+                'user_rating': user_anime.user_rating if hasattr(user_anime, 'user_rating') else None,
+                'date_added': user_anime.created_at
+            })
+        return anime_list
+
+    # Fetch full details for all anime in the list
+    anime_ids = [ua.anime.mal_id for ua in user_animes]
+    detailed_anime_data = fetch_anime_details_batch(anime_ids)
+
+    # Create a mapping for user ratings
+    user_ratings = {ua.anime.mal_id: ua.user_rating for ua in user_animes}
+
+    # Combine detailed data with user-specific data
+    detailed_anime_list = []
+    for mal_id, details in detailed_anime_data.items():
+        if details:
+            details['user_rating'] = user_ratings.get(mal_id)
+            detailed_anime_list.append(details)
+            
+    # Sort the detailed list if needed (example by title)
+    if sort_by == "title":
+        detailed_anime_list.sort(key=lambda x: x.get('title', ''))
+
+    return detailed_anime_list
 
 def get_status_counts(user_id):
     """Return count for watched anime only."""
