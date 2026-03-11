@@ -152,62 +152,72 @@ body::after {
 /* Theme Toggle Switch */
 .theme-toggle {
     position: relative;
-    width: 60px;
-    height: 32px;
+    width: 56px;
+    height: 30px;
     background: var(--background-card);
-    border: 2px solid var(--border-color);
-    border-radius: 20px;
+    border: 1.5px solid var(--border-color);
+    border-radius: 15px;
     cursor: pointer;
-    transition: all 0.3s ease;
-    overflow: hidden;
-    box-shadow: var(--shadow-light);
+    padding: 0;
+    transition: border-color 0.3s ease, background 0.3s ease;
+    flex-shrink: 0;
 }
 
 .theme-toggle:hover {
     border-color: var(--accent-primary);
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
 }
 
-.theme-toggle-slider {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 24px;
-    height: 24px;
-    background: var(--accent-gradient);
-    border-radius: 50%;
-    transition: transform 0.3s ease;
+.theme-toggle-track {
+    position: relative;
     display: flex;
     align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.theme-toggle.light .theme-toggle-slider {
-    transform: translateX(28px);
+    justify-content: space-between;
+    width: 100%;
+    height: 100%;
+    padding: 0 6px;
 }
 
 .theme-icon {
     width: 14px;
     height: 14px;
-    fill: white;
-    transition: opacity 0.3s ease;
+    fill: none;
+    stroke: var(--text-secondary);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    position: relative;
+    z-index: 1;
+    transition: stroke 0.3s ease;
 }
 
-.theme-icon.sun {
-    opacity: 0;
+.moon-icon {
+    fill: var(--text-secondary);
+    stroke: none;
 }
 
-.theme-icon.moon {
-    opacity: 1;
+.theme-toggle-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 22px;
+    height: 22px;
+    background: var(--accent-gradient);
+    border-radius: 50%;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
-.theme-toggle.light .theme-icon.sun {
-    opacity: 1;
+.theme-toggle.light .theme-toggle-thumb {
+    transform: translateX(26px);
 }
 
-.theme-toggle.light .theme-icon.moon {
-    opacity: 0;
+.theme-toggle.light .moon-icon {
+    fill: transparent;
+    stroke: transparent;
+}
+
+.theme-toggle.light .sun-icon {
+    stroke: var(--accent-primary);
 }
 
 ::selection {
@@ -663,6 +673,11 @@ section > p {
     height: 100%;
     object-fit: cover;
     transition: transform 0.5s ease;
+    display: block;
+}
+
+.project-image svg {
+    object-fit: contain;
 }
 
 .project-card:hover .project-image img,
@@ -725,7 +740,7 @@ section > p {
     padding: 0.75rem 1.5rem;
 }
 
-/* GitHub Section with Carousel */
+/* GitHub Section */
 .github-section {
     margin-top: 5rem;
     padding-top: 3rem;
@@ -753,38 +768,90 @@ section > p {
     border-radius: 2px;
 }
 
-/* Carousel Container */
-.carousel-container {
+/* Scroll container */
+.github-scroll-container {
     position: relative;
-    max-width: 1200px;
+    max-width: 100%;
     margin: 2rem auto;
-    overflow: hidden;
-    padding: 0 20px;
 }
 
-.carousel-wrapper {
+.github-scroll-wrapper {
     display: flex;
-    transition: transform 0.4s ease-in-out;
-    gap: 2rem;
-    width: max-content;
+    gap: 1.25rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.5rem 0 1.5rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent-primary) transparent;
 }
 
-/* Fixed Repo Cards - Equal Heights */
+.github-scroll-wrapper::-webkit-scrollbar {
+    height: 6px;
+}
+
+.github-scroll-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.github-scroll-wrapper::-webkit-scrollbar-thumb {
+    background: var(--accent-primary);
+    border-radius: 3px;
+    opacity: 0.6;
+}
+
+/* Scroll shadow indicators */
+.github-scroll-container.shadow-left::before,
+.github-scroll-container.shadow-right::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 40px;
+    pointer-events: none;
+    z-index: 2;
+    transition: opacity 0.3s ease;
+}
+
+.github-scroll-container {
+    position: relative;
+}
+
+.github-scroll-container.shadow-left::before {
+    left: 0;
+    background: linear-gradient(to right, var(--background-dark), transparent);
+}
+
+.github-scroll-container.shadow-right::after {
+    right: 0;
+    background: linear-gradient(to left, var(--background-dark), transparent);
+}
+
+[data-theme="light"] .github-scroll-container.shadow-left::before {
+    background: linear-gradient(to right, var(--background-dark), transparent);
+}
+
+[data-theme="light"] .github-scroll-container.shadow-right::after {
+    background: linear-gradient(to left, var(--background-dark), transparent);
+}
+
+/* Repo Cards */
 .repo-card {
     background: var(--background-card);
     border-radius: 16px;
-    padding: 2rem;
+    padding: 1.75rem;
     border: 1px solid var(--border-color);
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
     
-    /* Consistent sizing */
-    width: 320px;
-    height: 280px;
-    flex-shrink: 0;
+    min-width: 280px;
+    max-width: 320px;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
+    scroll-snap-align: start;
     
     box-shadow: var(--shadow-light);
 }
@@ -883,64 +950,7 @@ section > p {
     margin-top: auto;
 }
 
-/* Carousel Navigation - FIXED */
-.carousel-nav {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
-    margin-top: 2rem;
-}
 
-.carousel-btn {
-    background: var(--background-card);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
-    box-shadow: var(--shadow-light);
-}
-
-.carousel-btn:hover:not(:disabled) {
-    background: var(--accent-primary);
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-medium);
-}
-
-.carousel-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.carousel-indicators {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.carousel-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--border-color);
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.carousel-dot.active {
-    background: var(--accent-primary);
-    transform: scale(1.2);
-}
-
-.carousel-dot:hover {
-    background: var(--accent-secondary);
-}
 
 /* Loading state */
 .loading {
@@ -968,29 +978,22 @@ section > p {
     font-style: italic;
 }
 
-/* Responsive Design for Carousel */
-@media screen and (max-width: 1024px) {
-    .repo-card {
-        width: 280px;
-        height: 260px;
-    }
-}
-
+/* Responsive Design for Repo Cards */
 @media screen and (max-width: 768px) {
-    .carousel-wrapper {
+    .github-scroll-wrapper {
         gap: 1rem;
     }
-    
+
     .repo-card {
-        width: 260px;
-        height: 240px;
+        min-width: 250px;
+        max-width: 280px;
         padding: 1.5rem;
     }
-    
+
     .repo-card h4 {
         font-size: 1.1rem;
     }
-    
+
     .repo-card p {
         font-size: 0.85rem;
         height: 3.8em;
@@ -998,24 +1001,10 @@ section > p {
 }
 
 @media screen and (max-width: 480px) {
-    .carousel-container {
-        padding: 0 10px;
-    }
-    
     .repo-card {
-        width: 240px;
-        height: 220px;
+        min-width: 230px;
+        max-width: 260px;
         padding: 1.25rem;
-    }
-    
-    .carousel-nav {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-    
-    .carousel-btn {
-        width: 40px;
-        height: 40px;
     }
 }
 /* Contact Section Styles - ADD TO YOUR styles.css */

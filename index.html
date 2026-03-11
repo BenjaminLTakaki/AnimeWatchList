@@ -47,12 +47,12 @@
                         <li><a href="#contact">Contact</a></li>
                     </ul>
                 </nav>
-                <div class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
-                    <div class="theme-toggle-slider">
-                        <svg class="theme-icon moon" viewBox="0 0 24 24">
+                <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" type="button">
+                    <span class="theme-toggle-track">
+                        <svg class="theme-icon moon-icon" viewBox="0 0 24 24" width="16" height="16">
                             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
                         </svg>
-                        <svg class="theme-icon sun" viewBox="0 0 24 24">
+                        <svg class="theme-icon sun-icon" viewBox="0 0 24 24" width="16" height="16">
                             <circle cx="12" cy="12" r="5"/>
                             <line x1="12" y1="1" x2="12" y2="3"/>
                             <line x1="12" y1="21" x2="12" y2="23"/>
@@ -63,8 +63,9 @@
                             <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
                             <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
                         </svg>
-                    </div>
-                </div>
+                        <span class="theme-toggle-thumb"></span>
+                    </span>
+                </button>
                 <button class="nav-toggle" aria-label="Toggle navigation">
                     <span class="hamburger"></span>
                 </button>
@@ -121,7 +122,28 @@
                 <!-- Course Recommendation Project -->
                 <div class="project-card">
                     <div class="project-image">
-                        <img src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&h=400&fit=crop" alt="SkillsTown Course Recommender Preview" onerror="this.src='https://via.placeholder.com/600x400/1a1a1a/3b82f6?text=SkillsTown+Course+Recommender'">
+                        <svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="grad-skills" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.15" />
+                                    <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:0.08" />
+                                </linearGradient>
+                            </defs>
+                            <rect width="600" height="400" fill="url(#grad-skills)" />
+                            <!-- Document icon -->
+                            <rect x="230" y="80" width="140" height="180" rx="8" fill="none" stroke="#3b82f6" stroke-width="3" opacity="0.7" />
+                            <line x1="260" y1="120" x2="340" y2="120" stroke="#3b82f6" stroke-width="2" opacity="0.5" />
+                            <line x1="260" y1="145" x2="330" y2="145" stroke="#3b82f6" stroke-width="2" opacity="0.5" />
+                            <line x1="260" y1="170" x2="320" y2="170" stroke="#3b82f6" stroke-width="2" opacity="0.5" />
+                            <line x1="260" y1="195" x2="310" y2="195" stroke="#06b6d4" stroke-width="2" opacity="0.5" />
+                            <!-- Arrow -->
+                            <path d="M300 280 L300 310 M288 300 L300 312 L312 300" fill="none" stroke="#06b6d4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6" />
+                            <!-- Lightbulb / recommendation -->
+                            <circle cx="300" cy="345" r="16" fill="none" stroke="#06b6d4" stroke-width="2" opacity="0.5" />
+                            <line x1="300" y1="335" x2="300" y2="342" stroke="#06b6d4" stroke-width="2" opacity="0.5" />
+                            <line x1="293" y1="338" x2="300" y2="345" stroke="#06b6d4" stroke-width="2" opacity="0.5" />
+                            <line x1="307" y1="338" x2="300" y2="345" stroke="#06b6d4" stroke-width="2" opacity="0.5" />
+                        </svg>
                     </div>
                     <div class="project-details">
                         <h3>SkillsTown Course Recommender</h3>
@@ -143,7 +165,27 @@
                 <!-- AnimeWatchList Project -->
                 <div class="project-card">
                     <div class="project-image">
-                        <img src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=600&h=400&fit=crop" alt="AnimeWatchList Preview" onerror="this.src='https://via.placeholder.com/600x400/1a1a1a/06b6d4?text=AnimeWatchList'">
+                        <svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="grad-anime" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:0.15" />
+                                    <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0.08" />
+                                </linearGradient>
+                            </defs>
+                            <rect width="600" height="400" fill="url(#grad-anime)" />
+                            <!-- Play button / screen -->
+                            <rect x="210" y="100" width="180" height="120" rx="10" fill="none" stroke="#06b6d4" stroke-width="3" opacity="0.6" />
+                            <polygon points="280,140 280,180 310,160" fill="#06b6d4" opacity="0.5" />
+                            <!-- List lines below screen -->
+                            <rect x="220" y="245" width="12" height="12" rx="2" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0.5" />
+                            <line x1="245" y1="251" x2="370" y2="251" stroke="#3b82f6" stroke-width="2" opacity="0.4" />
+                            <rect x="220" y="270" width="12" height="12" rx="2" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0.5" />
+                            <line x1="245" y1="276" x2="350" y2="276" stroke="#3b82f6" stroke-width="2" opacity="0.4" />
+                            <rect x="220" y="295" width="12" height="12" rx="2" fill="none" stroke="#06b6d4" stroke-width="2" opacity="0.5" />
+                            <line x1="245" y1="301" x2="340" y2="301" stroke="#06b6d4" stroke-width="2" opacity="0.4" />
+                            <!-- Checkmark in first box -->
+                            <polyline points="223,251 226,254 233,247" fill="none" stroke="#06b6d4" stroke-width="1.5" opacity="0.7" />
+                        </svg>
                     </div>
                     <div class="project-details">
                         <h3>AnimeWatchList</h3>
@@ -165,7 +207,31 @@
                 <!-- Spotify Cover Generator Project -->
                 <div class="project-card">
                     <div class="project-image">
-                        <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&h=400&fit=crop" alt="Spotify Cover Generator Preview" onerror="this.src='https://via.placeholder.com/600x400/1a1a1a/3b82f6?text=Spotify+Cover+Generator'">
+                        <svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="grad-spotify" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.12" />
+                                    <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:0.12" />
+                                </linearGradient>
+                            </defs>
+                            <rect width="600" height="400" fill="url(#grad-spotify)" />
+                            <!-- Album art frame -->
+                            <rect x="220" y="80" width="160" height="160" rx="12" fill="none" stroke="#3b82f6" stroke-width="3" opacity="0.6" />
+                            <!-- Abstract art inside frame -->
+                            <circle cx="270" cy="140" r="25" fill="none" stroke="#06b6d4" stroke-width="2" opacity="0.4" />
+                            <circle cx="330" cy="160" r="18" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0.35" />
+                            <path d="M260 180 Q300 130 340 180" fill="none" stroke="#06b6d4" stroke-width="2" opacity="0.3" />
+                            <!-- Music notes -->
+                            <circle cx="250" cy="280" r="8" fill="none" stroke="#06b6d4" stroke-width="2" opacity="0.5" />
+                            <line x1="258" y1="280" x2="258" y2="258" stroke="#06b6d4" stroke-width="2" opacity="0.5" />
+                            <path d="M258 258 Q268 255 268 262" fill="none" stroke="#06b6d4" stroke-width="2" opacity="0.5" />
+                            <!-- Sound waves -->
+                            <path d="M320 268 Q325 260 320 252" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" opacity="0.4" />
+                            <path d="M330 272 Q338 260 330 248" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" opacity="0.35" />
+                            <path d="M340 276 Q350 260 340 244" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" opacity="0.3" />
+                            <!-- Sparkle / AI -->
+                            <path d="M360 300 L363 290 L366 300 L376 303 L366 306 L363 316 L360 306 L350 303 Z" fill="#06b6d4" opacity="0.3" />
+                        </svg>
                     </div>
                     <div class="project-details">
                         <h3>Spotify Cover Generator</h3>
@@ -184,21 +250,12 @@
                     </div>
                 </div>
 
-                <!-- GitHub Repositories Section - Carousel -->
+                <!-- GitHub Repositories Section -->
                 <div id="github-projects" class="github-section">
                     <h3 class="github-heading">From My GitHub</h3>
-                    <div class="carousel-container">
-                        <div id="github-repos" class="carousel-wrapper">
+                    <div class="github-scroll-container">
+                        <div id="github-repos" class="github-scroll-wrapper">
                             <div class="loading">Loading GitHub repositories...</div>
-                        </div>
-                        <div class="carousel-nav">
-                            <button class="carousel-btn" id="prevBtn" disabled>
-                                <i class="fas fa-chevron-left"></i>
-                            </button>
-                            <div class="carousel-indicators" id="indicators"></div>
-                            <button class="carousel-btn" id="nextBtn">
-                                <i class="fas fa-chevron-right"></i>
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -210,7 +267,7 @@
     <section id="contact" class="contact">
         <div class="container">
             <h2>Contact Me</h2>
-            <p>If you'd like to get in touch, feel free to send me a message!</p>
+            <p>If you would like to get in touch, feel free to send me a message.</p>
             <form id="contact-form" class="contact-form">
                 <input type="text" name="name" placeholder="Your Name" required aria-label="Your Name" />
                 <input type="email" name="email" placeholder="Your Email" required aria-label="Your Email" />
@@ -231,7 +288,7 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2024 Benjamin Takaki. All rights reserved.</p>
+            <p>&copy; 2026 Benjamin Takaki. All rights reserved.</p>
         </div>
     </footer>
 

@@ -1,8 +1,3 @@
-// Carousel variables
-let currentIndex = 0;
-let repos = [];
-let reposPerView = 3;
-
 // Run when DOM is loaded
 document.addEventListener('DOMContentLoaded', function () {
     // Initialize theme
@@ -44,14 +39,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     window.addEventListener('scroll', () => {
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
         
         if (scrollTop > 100) {
-            header.style.background = getComputedStyle(document.documentElement).getPropertyValue('--background-dark') === '#fafbfc' 
+            header.style.background = isLight 
                 ? 'rgba(250, 251, 252, 0.95)' 
                 : 'rgba(10, 10, 10, 0.95)';
             header.style.boxShadow = '0 2px 20px rgba(0, 0, 0, 0.1)';
         } else {
-            header.style.background = getComputedStyle(document.documentElement).getPropertyValue('--background-dark') === '#fafbfc' 
+            header.style.background = isLight 
                 ? 'rgba(250, 251, 252, 0.9)' 
                 : 'rgba(10, 10, 10, 0.9)';
             header.style.boxShadow = 'none';
@@ -156,8 +152,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 5000);
     }
 
-    // Initialize carousel controls
-    initializeCarousel();
+    // Initialize scroll shadows for GitHub section
+    initializeScrollShadows();
     
     // Fetch GitHub Repositories
     fetchGitHubRepos();
@@ -268,102 +264,32 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
     }
 });
 
-// FIXED CAROUSEL FUNCTIONS
-// Carousel variables are already defined at the top of the script.
-
-// Initialize carousel controls
-function initializeCarousel() {
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-
-    if (prevBtn && nextBtn) {
-        prevBtn.addEventListener('click', () => moveToPrev());
-        nextBtn.addEventListener('click', () => moveToNext());
-    }
-
-    // Update repos per view based on screen size
-    updateReposPerView();
-    window.addEventListener('resize', updateReposPerView);
-}
-
-function updateReposPerView() {
-    const width = window.innerWidth;
-    if (width < 480) {
-        reposPerView = 1;
-    } else if (width < 768) {
-        reposPerView = 1;
-    } else if (width < 1024) {
-        reposPerView = 2;
-    } else {
-        reposPerView = 3;
-    }
-    
-    if (repos.length > 0) {
-        updateCarousel();
-    }
-}
-
-function moveToPrev() {
-    if (currentIndex > 0) {
-        currentIndex--;
-        updateCarousel();
-    }
-}
-
-function moveToNext() {
-    const maxIndex = Math.max(0, repos.length - reposPerView);
-    if (currentIndex < maxIndex) {
-        currentIndex++;
-        updateCarousel();
-    }
-}
-
-function moveToIndex(index) {
-    const maxIndex = Math.max(0, repos.length - reposPerView);
-    currentIndex = Math.min(index, maxIndex);
-    updateCarousel();
-}
-
-function updateCarousel() {
-    const wrapper = document.querySelector('.carousel-wrapper');
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-    
+// Scroll shadow indicators for GitHub section
+function initializeScrollShadows() {
+    const wrapper = document.querySelector('.github-scroll-wrapper');
     if (!wrapper) return;
 
-    // Calculate translateX based on card width and gap
-    const cardWidth = 320; // Fixed width from CSS
-    const gap = 32; // 2rem gap from CSS
-    const translateX = -(currentIndex * (cardWidth + gap));
-    
-    wrapper.style.transform = `translateX(${translateX}px)`;
+    const container = wrapper.parentElement;
 
-    // Update button states
-    if (prevBtn) {
-        prevBtn.disabled = currentIndex === 0;
+    function updateShadows() {
+        const scrollLeft = wrapper.scrollLeft;
+        const maxScroll = wrapper.scrollWidth - wrapper.clientWidth;
+
+        if (maxScroll <= 0) {
+            container.classList.remove('shadow-left', 'shadow-right');
+            return;
+        }
+
+        container.classList.toggle('shadow-left', scrollLeft > 8);
+        container.classList.toggle('shadow-right', scrollLeft < maxScroll - 8);
     }
-    if (nextBtn) {
-        const maxIndex = Math.max(0, repos.length - reposPerView);
-        nextBtn.disabled = currentIndex >= maxIndex;
-    }
 
-    // Update indicators
-    updateIndicators();
-}
-
-function updateIndicators() {
-    const indicatorsContainer = document.getElementById('indicators');
-    if (!indicatorsContainer) return;
-
-    const maxIndex = Math.max(0, repos.length - reposPerView);
-    indicatorsContainer.innerHTML = '';
-
-    for (let i = 0; i <= maxIndex; i++) {
-        const dot = document.createElement('div');
-        dot.className = `carousel-dot ${i === currentIndex ? 'active' : ''}`;
-        dot.addEventListener('click', () => moveToIndex(i));
-        indicatorsContainer.appendChild(dot);
-    }
+    wrapper.addEventListener('scroll', updateShadows, { passive: true });
+    // Run once after repos load
+    const observer = new MutationObserver(() => {
+        requestAnimationFrame(updateShadows);
+    });
+    observer.observe(wrapper, { childList: true });
 }
 
 // GitHub Repositories Fetch Function 
@@ -408,17 +334,15 @@ async function fetchGitHubRepos() {
                 return new Date(b.updated_at) - new Date(a.updated_at);
             });
 
-        repos = filteredRepos;
-
-        console.log(`Found ${repos.length} repositories to display`); // Debug log
+        const repos = filteredRepos;
 
         if (repos.length === 0) {
             reposContainer.innerHTML = '<p class="no-repos">No GitHub projects to display.</p>';
             return;
         }
 
-        // Create repo cards with consistent structure
-        repos.forEach((repo, index) => {
+        // Create repo cards
+        repos.forEach((repo) => {
             const card = document.createElement('div');
             card.className = 'repo-card';
 
@@ -426,7 +350,7 @@ async function fetchGitHubRepos() {
             const langColor = getLanguageColor(repo.language);
 
             // Handle description - provide fallback if none exists
-            let description = repo.description || `A ${repo.language || 'code'} project with ${repo.size > 1000 ? 'substantial' : 'focused'} implementation.`;
+            let description = repo.description || `A ${repo.language || 'code'} project.`;
             
             // Truncate description if too long
             if (description.length > 120) {
@@ -457,10 +381,6 @@ async function fetchGitHubRepos() {
 
             reposContainer.appendChild(card);
         });
-
-        // Initialize carousel after repos are loaded
-        currentIndex = 0;
-        updateCarousel();
 
         // Add intersection observer for repo cards
         const observer = new IntersectionObserver((entries) => {
