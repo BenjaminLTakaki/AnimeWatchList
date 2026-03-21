@@ -64,8 +64,8 @@ def get_url_for(*args, **kwargs):
     url = url_for(*args, **kwargs)
     return url
 
-# Import models after db is defined
-from models import Company, Student, Category, ContentPage, Course, CourseContentPage, UserProfile, SkillsTownCourse, CourseDetail, CourseQuiz, CourseQuizAttempt, UserCourse, UserLearningProgress, db
+# Import models via package path to avoid colliding with other project modules named `models`.
+from skillstown.models import Company, Student, Category, ContentPage, Course, CourseContentPage, UserProfile, SkillsTownCourse, CourseDetail, CourseQuiz, CourseQuizAttempt, UserCourse, UserLearningProgress, db
 
 def get_quiz_api_headers():
     return {
