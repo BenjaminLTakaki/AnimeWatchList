@@ -5,7 +5,7 @@ import re
 import math
 from functools import lru_cache
 import json
-from .extensions import db
+from extensions import db
 import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
