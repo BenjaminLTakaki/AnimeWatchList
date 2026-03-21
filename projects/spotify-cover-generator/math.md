@@ -1,4 +1,3 @@
-Here’s the same breakdown, formatted in Markdown:
 
 ---
 
@@ -79,7 +78,7 @@ with weights $w=\{5,4,3,2,1\}$, then apply thresholds:
 
 ### 6. Simple Counts for Depth & Context
 
-“Emotional depth” and “cultural context” use only integer counts and set-membership—no further arithmetic.
+“Emotional depth” and “cultural context” use only integer counts and set-membership no further arithmetic.
 
 ---
 

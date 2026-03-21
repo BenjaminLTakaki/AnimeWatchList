@@ -228,6 +228,7 @@ def generate_cover(url, user_mood=None, lora_input=None, output_path=None, negat
         return {"error": f"Failed to extract playlist data: {str(e)}"}
     
     # Convert playlist data to dictionary
+<<<<<<< HEAD
     try:
         data = playlist_data.to_dict()
     except Exception as e:
@@ -240,6 +241,13 @@ def generate_cover(url, user_mood=None, lora_input=None, output_path=None, negat
             "style_elements": [],
             "spotify_url": url
         }
+=======
+    data = playlist_data.to_dict()
+    print(f"DEBUG: artist_ids in data for title generation: {data.get('artist_ids')}") 
+    
+    # Create image prompt
+    base_image_prompt = create_prompt_from_data(data, user_mood)
+>>>>>>> animewatchlist-fixed
     
     # Generate title
     try:

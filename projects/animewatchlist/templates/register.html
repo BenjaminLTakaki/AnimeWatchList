@@ -4,14 +4,17 @@
 
 {% block content %}
 <div class="auth-container">
-    <h2>Create an Account</h2>
+    <div class="auth-header">
+        <h2>Join Anime Tracker</h2>
+        <p>Create your account to start tracking anime</p>
+    </div>
     
-    <form method="POST" action="{{ get_url_for('register') }}" class="auth-form">
+    <form method="POST" action="{{ get_url_for('register') }}" class="auth-form" novalidate>
         {{ form.hidden_tag() }}
         
         <div class="form-group">
             {{ form.username.label(class="form-label") }}
-            {{ form.username(class="form-control") }}
+            {{ form.username(class="form-control", placeholder="Choose a username") }}
             {% if form.username.errors %}
                 <div class="invalid-feedback">
                     {% for error in form.username.errors %}
@@ -19,11 +22,12 @@
                     {% endfor %}
                 </div>
             {% endif %}
+            <div class="form-hint">4-25 characters, letters and numbers only</div>
         </div>
         
         <div class="form-group">
             {{ form.email.label(class="form-label") }}
-            {{ form.email(class="form-control") }}
+            {{ form.email(class="form-control", placeholder="Enter your email address") }}
             {% if form.email.errors %}
                 <div class="invalid-feedback">
                     {% for error in form.email.errors %}
@@ -35,7 +39,7 @@
         
         <div class="form-group">
             {{ form.password.label(class="form-label") }}
-            {{ form.password(class="form-control") }}
+            {{ form.password(class="form-control", placeholder="Create a strong password") }}
             {% if form.password.errors %}
                 <div class="invalid-feedback">
                     {% for error in form.password.errors %}
@@ -43,11 +47,12 @@
                     {% endfor %}
                 </div>
             {% endif %}
+            <div class="form-hint">Minimum 6 characters</div>
         </div>
         
         <div class="form-group">
             {{ form.confirm_password.label(class="form-label") }}
-            {{ form.confirm_password(class="form-control") }}
+            {{ form.confirm_password(class="form-control", placeholder="Confirm your password") }}
             {% if form.confirm_password.errors %}
                 <div class="invalid-feedback">
                     {% for error in form.confirm_password.errors %}
@@ -58,7 +63,7 @@
         </div>
         
         <div class="form-action">
-            {{ form.submit(class="btn btn-primary") }}
+            {{ form.submit(class="btn btn-primary btn-full") }}
         </div>
         
         <div class="auth-links">
@@ -66,4 +71,272 @@
         </div>
     </form>
 </div>
+
+<style>
+.auth-container {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    padding: 2rem;
+    max-width: 500px;
+    margin: 2rem auto;
+    width: 100%;
+}
+
+.auth-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.auth-header h2 {
+    color: #2E51A2;
+    margin-bottom: 0.5rem;
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.auth-header p {
+    color: #666;
+    margin: 0;
+    font-size: 1rem;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-label {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #333;
+    font-size: 0.9rem;
+}
+
+.form-control {
+    padding: 1rem;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    min-height: 48px;
+    background: #fafafa;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #2E51A2;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(46, 81, 162, 0.1);
+}
+
+.form-control::placeholder {
+    color: #999;
+}
+
+.form-hint {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 0.3rem;
+    padding-left: 0.5rem;
+}
+
+.form-action {
+    margin-top: 0.5rem;
+}
+
+.btn-full {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    min-height: 48px;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-full::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-full:hover::before {
+    left: 100%;
+}
+
+.invalid-feedback {
+    color: #f44336;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: #ffebee;
+    border-radius: 4px;
+    border-left: 3px solid #f44336;
+}
+
+.auth-links {
+    margin-top: 1rem;
+    text-align: center;
+    font-size: 0.9rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+}
+
+.auth-links a {
+    color: #2E51A2;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.auth-links a:hover {
+    text-decoration: underline;
+}
+
+/* Form validation styling */
+.form-control:valid {
+    border-color: #4CAF50;
+}
+
+.form-control:invalid {
+    border-color: #f44336;
+}
+
+/* Progressive enhancement for password matching */
+.password-match {
+    border-color: #4CAF50 !important;
+}
+
+.password-mismatch {
+    border-color: #f44336 !important;
+}
+
+/* Mobile optimizations */
+@media (max-width: 767px) {
+    .auth-container {
+        margin: 1rem;
+        padding: 1.5rem;
+        max-width: none;
+    }
+    
+    .auth-header h2 {
+        font-size: 1.5rem;
+    }
+    
+    .auth-form {
+        gap: 1.2rem;
+    }
+    
+    .form-control {
+        padding: 0.8rem;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    .btn-full {
+        padding: 1rem;
+        font-size: 1rem;
+    }
+    
+    .form-hint {
+        font-size: 0.75rem;
+    }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .form-control,
+    .btn-full {
+        min-height: 48px;
+    }
+    
+    .form-control {
+        padding: 1rem;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .form-control {
+        border-width: 3px;
+    }
+    
+    .form-control:focus {
+        box-shadow: 0 0 0 3px #000;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .form-control,
+    .btn-full,
+    .btn-full::before {
+        transition: none;
+    }
+}
+</style>
+
+<script>
+// Progressive enhancement for better UX
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('.auth-form');
+    const password = document.querySelector('input[name="password"]');
+    const confirmPassword = document.querySelector('input[name="confirm_password"]');
+    const submitBtn = document.querySelector('.btn-full');
+    
+    // Real-time password matching validation
+    if (password && confirmPassword) {
+        function checkPasswordMatch() {
+            if (confirmPassword.value && password.value) {
+                if (password.value === confirmPassword.value) {
+                    confirmPassword.classList.add('password-match');
+                    confirmPassword.classList.remove('password-mismatch');
+                } else {
+                    confirmPassword.classList.add('password-mismatch');
+                    confirmPassword.classList.remove('password-match');
+                }
+            } else {
+                confirmPassword.classList.remove('password-match', 'password-mismatch');
+            }
+        }
+        
+        password.addEventListener('input', checkPasswordMatch);
+        confirmPassword.addEventListener('input', checkPasswordMatch);
+    }
+    
+    // Form submission handling
+    if (form && submitBtn) {
+        form.addEventListener('submit', function() {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating Account...';
+            
+            // Re-enable after 10 seconds in case of errors
+            setTimeout(() => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Sign Up';
+            }, 10000);
+        });
+    }
+    
+    // Auto-focus first input with error
+    const firstError = document.querySelector('.invalid-feedback');
+    if (firstError) {
+        const errorInput = firstError.closest('.form-group').querySelector('.form-control');
+        if (errorInput) {
+            errorInput.focus();
+        }
+    }
+});
+</script>
 {% endblock %}

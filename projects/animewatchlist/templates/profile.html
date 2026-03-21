@@ -6,6 +6,9 @@
 <div class="profile-container">
     <div class="profile-card">
         <div class="profile-header">
+            <div class="profile-avatar">
+                <span class="avatar-icon"></span>
+            </div>
             <h3>Welcome, {{ current_user.username }}!</h3>
             <p class="profile-email">{{ current_user.email }}</p>
             {% if current_user.date_joined %}
@@ -16,23 +19,355 @@
         <div class="profile-stats">
             <div class="stat-card">
                 <div class="stat-number">{{ stats[0] if stats and stats|length >= 2 else 0 }}</div>
-                <div class="stat-label">Watched</div>
+                <div class="stat-label">Anime Watched</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number">{{ stats[1] if stats and stats|length >= 2 else 0 }}</div>
-                <div class="stat-label">Not Watched</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">{{ (stats[0] + stats[1]) if stats and stats|length >= 2 else 0 }}</div>
-                <div class="stat-label">Total</div>
+                <div class="stat-number">{{ (stats[0] * 24) | round(1) if stats and stats|length >= 2 else 0 }}</div>
+                <div class="stat-label">Episodes (Est.)</div>
             </div>
         </div>
 
         <div class="profile-actions">
-            <a href="{{ get_url_for('watched') }}" class="btn btn-primary">View Watched</a>
-            <a href="{{ get_url_for('not_watched') }}" class="btn btn-secondary">View Not Watched</a>
-            <a href="{{ get_url_for('search') }}" class="btn btn-secondary">Search Anime</a>
+            <a href="{{ get_url_for('watched') }}" class="btn btn-primary">
+                <span class="btn-icon"></span>
+                View Watched List
+            </a>
+            <a href="{{ get_url_for('stats') }}" class="btn btn-secondary">
+                <span class="btn-icon"></span>
+                View Detailed Stats
+            </a>
+            <a href="{{ get_url_for('search') }}" class="btn btn-secondary">
+                <span class="btn-icon"></span>
+                Search Anime
+            </a>
+        </div>
+
+        {% if stats and stats[0] > 0 %}
+        <div class="quick-achievements">
+            <h4>Quick Stats</h4>
+            <div class="achievements-grid">
+                <div class="achievement">
+                    <span class="achievement-icon"></span>
+                    <span class="achievement-text">{{ stats[0] }} anime completed</span>
+                </div>
+                {% if stats[0] >= 10 %}
+                <div class="achievement">
+                    <span class="achievement-icon"></span>
+                    <span class="achievement-text">Anime Enthusiast</span>
+                </div>
+                {% endif %}
+                {% if stats[0] >= 50 %}
+                <div class="achievement">
+                    <span class="achievement-icon"></span>
+                    <span class="achievement-text">Otaku Level Achieved</span>
+                </div>
+                {% endif %}
+                {% if stats[0] >= 100 %}
+                <div class="achievement">
+                    <span class="achievement-icon"></span>
+                    <span class="achievement-text">Anime Master</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="account-actions">
+            <h4>Account</h4>
+            <div class="account-buttons">
+                <a href="{{ get_url_for('logout') }}" class="btn-logout">
+                    <span class="btn-icon">🚪</span>
+                    Logout
+                </a>
+            </div>
         </div>
     </div>
 </div>
+
+<style>
+.profile-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.profile-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    padding: 2rem;
+    text-align: center;
+}
+
+.profile-header {
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid #eee;
+}
+
+.profile-avatar {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #2E51A2, #4266b3);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem auto;
+    box-shadow: 0 4px 12px rgba(46, 81, 162, 0.3);
+}
+
+.avatar-icon {
+    font-size: 2rem;
+    color: white;
+}
+
+.profile-header h3 {
+    font-size: 1.8rem;
+    color: #2E51A2;
+    margin: 0 0 0.5rem 0;
+    font-weight: 700;
+}
+
+.profile-email {
+    color: #666;
+    margin: 0.3rem 0;
+    font-size: 1rem;
+}
+
+.profile-date {
+    color: #888;
+    margin: 0.3rem 0;
+    font-size: 0.9rem;
+}
+
+.profile-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border-left: 4px solid #2E51A2;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #2E51A2;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #666;
+    font-weight: 600;
+}
+
+.profile-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.profile-actions .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    width: 100%;
+}
+
+.btn-icon {
+    font-size: 1.2rem;
+}
+
+.quick-achievements {
+    margin-bottom: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #eee;
+}
+
+.quick-achievements h4 {
+    color: #2E51A2;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+}
+
+.achievements-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.achievement {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #4CAF50;
+}
+
+.achievement-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.achievement-text {
+    font-weight: 600;
+    color: #333;
+}
+
+.account-actions {
+    padding-top: 2rem;
+    border-top: 1px solid #eee;
+}
+
+.account-actions h4 {
+    color: #2E51A2;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+}
+
+.account-buttons {
+    display: flex;
+    justify-content: center;
+}
+
+.btn-logout {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.8rem 1.5rem;
+    background: #f44336;
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-logout:hover {
+    background: #d32f2f;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
+/* Mobile optimizations */
+@media (max-width: 767px) {
+    .profile-container {
+        padding: 0.5rem;
+    }
+    
+    .profile-card {
+        padding: 1.5rem;
+    }
+    
+    .profile-avatar {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .avatar-icon {
+        font-size: 1.5rem;
+    }
+    
+    .profile-header h3 {
+        font-size: 1.5rem;
+    }
+    
+    .profile-stats {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .stat-card {
+        padding: 1rem;
+    }
+    
+    .stat-number {
+        font-size: 1.8rem;
+    }
+    
+    .profile-actions .btn {
+        padding: 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .achievement {
+        padding: 0.8rem;
+    }
+    
+    .achievement-icon {
+        font-size: 1.2rem;
+    }
+    
+    .achievement-text {
+        font-size: 0.9rem;
+    }
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .profile-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    .profile-actions .btn {
+        flex: 1;
+        min-width: 200px;
+    }
+    
+    .achievements-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+    .profile-actions {
+        flex-direction: row;
+        gap: 1rem;
+    }
+    
+    .profile-actions .btn {
+        flex: 1;
+    }
+    
+    .achievements-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+    
+    .profile-stats {
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+    }
+}
+
+/* Touch optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .profile-actions .btn,
+    .btn-logout {
+        min-height: 48px;
+        padding: 1rem 1.5rem;
+    }
+}
+</style>
 {% endblock %}

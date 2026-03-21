@@ -4,6 +4,7 @@ import sys
 import os
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
+from spotipy.exceptions import SpotifyException
 from collections import Counter
 
 # Ensure the project's own directory is prioritized for imports
@@ -76,11 +77,21 @@ except ImportError:
     SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET')
     SPOTIFY_REDIRECT_URI = os.environ.get('SPOTIFY_REDIRECT_URI', 'http://localhost:5000/spotify-callback')
 
+# Fault handling and retry imports
+from fault_handling import retry_with_exponential_backoff, GracefulDegradation
+from requests.exceptions import ConnectionError
+import time
+from spotipy.oauth2 import SpotifyClientCredentials # Already imported above, but good to note its use for auth type checking
+
 # Monitoring imports with fallback
 try:
     from monitoring_system import monitor_api_calls
+<<<<<<< HEAD
     from fault_handling import fault_tolerant_api_call
     MONITORING_AVAILABLE = True
+=======
+    from fault_handling import fault_tolerant_api_call # This might be redundant if we use the new ones directly
+>>>>>>> animewatchlist-fixed
 except ImportError:
     MONITORING_AVAILABLE = False
     def monitor_api_calls(service_name):
@@ -170,7 +181,8 @@ def extract_playlist_data(playlist_url):
     
     try:
         is_playlist = "playlist/" in playlist_url
-        
+        is_guest_session = isinstance(sp.auth_manager, SpotifyClientCredentials) if sp.auth_manager else False
+
         if is_playlist:
             # Extract playlist ID
             try:
@@ -180,12 +192,13 @@ def extract_playlist_data(playlist_url):
                         return {"error": "Invalid playlist ID format"}
                 else:
                     return {"error": "Invalid playlist URL format"}
-                
+
                 print(f"🎵 Processing playlist ID: {item_id}")
-                
+
                 # Get playlist info
                 playlist_info = sp.playlist(item_id, fields="name,description,owner,public")
                 item_name = playlist_info.get("name", "Unknown Playlist")
+<<<<<<< HEAD
                 
                 # Check if playlist is accessible
                 if not playlist_info.get("public", True) and not playlist_info.get("collaborative", False):
@@ -194,6 +207,12 @@ def extract_playlist_data(playlist_url):
                 print(f"✅ Found playlist: {item_name}")
                 
                 # Get tracks
+=======
+
+                print(f"✓ Found playlist: {item_name}")
+
+                # Get tracks to analyze genres
+>>>>>>> animewatchlist-fixed
                 results = sp.playlist_tracks(
                     item_id,
                     fields="items(track(id,name,artists(id,name)))",
@@ -201,12 +220,18 @@ def extract_playlist_data(playlist_url):
                     limit=50
                 )
                 tracks = results.get("items", [])
+<<<<<<< HEAD
                 
                 # Get additional tracks if playlist is large
                 while results.get('next') and len(tracks) < 100:
                     results = sp.next(results)
                     tracks.extend(results.get("items", []))
                 
+=======
+
+            except ConnectionError as e:
+                return GracefulDegradation.handle_spotify_failure(playlist_url, e)
+>>>>>>> animewatchlist-fixed
             except spotipy.exceptions.SpotifyException as e:
                 if e.http_status == 404:
                     return {"error": "Playlist not found. Please check if the playlist exists and is public."}
@@ -216,10 +241,11 @@ def extract_playlist_data(playlist_url):
                     return {"error": "Invalid playlist URL. Please check the URL format."}
                 else:
                     return {"error": f"Spotify API error: {str(e)}"}
-            except Exception as e:
+            except Exception as e: # General exception for unforeseen issues
+                print(f"Error processing playlist URL for {playlist_url}: {str(e)}")
                 return {"error": f"Error processing playlist URL: {str(e)}"}
-                
-        else: 
+
+        else:
             # Handle album
             try:
                 if "album/" in playlist_url:
@@ -228,17 +254,25 @@ def extract_playlist_data(playlist_url):
                         return {"error": "Invalid album ID format"}
                 else:
                     return {"error": "Invalid album URL format"}
-                
+
                 print(f"💿 Processing album ID: {item_id}")
-                
+
                 album_info = sp.album(item_id)
                 item_name = album_info.get("name", "Unknown Album")
+<<<<<<< HEAD
                 
                 print(f"✅ Found album: {item_name}")
                 
+=======
+
+                print(f"✓ Found album: {item_name}")
+
+>>>>>>> animewatchlist-fixed
                 album_tracks = album_info.get("tracks", {}).get("items", [])[:50]
                 tracks = [{"track": track} for track in album_tracks]
-                
+
+            except ConnectionError as e:
+                return GracefulDegradation.handle_spotify_failure(playlist_url, e)
             except spotipy.exceptions.SpotifyException as e:
                 if e.http_status == 404:
                     return {"error": "Album not found. Please check if the album exists."}
@@ -248,7 +282,8 @@ def extract_playlist_data(playlist_url):
                     return {"error": "Invalid album URL. Please check the URL format."}
                 else:
                     return {"error": f"Spotify API error: {str(e)}"}
-            except Exception as e:
+            except Exception as e: # General exception for unforeseen issues
+                print(f"Error processing album URL for {playlist_url}: {str(e)}")
                 return {"error": f"Error processing album URL: {str(e)}"}
         
         if not tracks:
@@ -284,27 +319,53 @@ def extract_playlist_data(playlist_url):
         
         # Get genres from artists
         genres = []
+<<<<<<< HEAD
         unique_artist_ids = list(set(artists))[:50]  # Limit to avoid API quota issues
         
         # Process artists in batches
         batch_size = 50
         for i in range(0, len(unique_artist_ids), batch_size):
             batch = unique_artist_ids[i:i+batch_size]
+=======
+        unique_artist_ids = list(set(artists))[:50]  # Limit to 50 artists max for API calls
+
+        @retry_with_exponential_backoff(max_retries=3, base_delay=2.0, exceptions=(ConnectionError, SpotifyException))
+        def _fetch_artist_genres_batch(artist_ids_batch):
+            return sp.artists(artist_ids_batch)
+
+        # Process artists in batches (Spotify API allows up to 50 per request)
+        for i in range(0, len(unique_artist_ids), 50):
+            batch = unique_artist_ids[i:min(i+50, len(unique_artist_ids))]
+>>>>>>> animewatchlist-fixed
             
             try:
-                artist_info_batch = sp.artists(batch)
+                artist_info_batch = _fetch_artist_genres_batch(batch)
                 if artist_info_batch and 'artists' in artist_info_batch:
                     for artist in artist_info_batch['artists']:
                         if artist:
                             artist_genres = artist.get('genres', [])
                             genres.extend(artist_genres)
                             if artist_genres:
+<<<<<<< HEAD
                                 print(f"  🎭 {artist.get('name', 'Unknown')}: {', '.join(artist_genres[:3])}")
             except spotipy.exceptions.SpotifyException as e:
                 print(f"⚠️ Error getting artist info for batch {i//batch_size + 1}: {e}")
                 continue
             except Exception as e:
                 print(f"⚠️ Unexpected error processing artist batch: {e}")
+=======
+                                print(f"  - {artist.get('name', 'Unknown')}: {', '.join(artist_genres[:3])}")
+                
+                if is_guest_session:
+                    time.sleep(0.5) # Reduce request aggressiveness for guest sessions
+
+            except (ConnectionError, spotipy.exceptions.SpotifyException) as e:
+                print(f"⚠️ Warning: Failed to fetch a batch of artist genres for batch {i//50 + 1} after retries: {e}. Proceeding with genres collected so far.")
+                # Optionally, add more specific logging or handling here
+                continue # Continue to the next batch
+            except Exception as e: # Catch any other unexpected errors during batch processing
+                print(f"⚠️ Unexpected error processing artist batch {i//50 + 1}: {e}. Proceeding with genres collected so far.")
+>>>>>>> animewatchlist-fixed
                 continue
         
         print(f"🎯 Total genres collected: {len(genres)}")
@@ -343,8 +404,20 @@ def extract_playlist_data(playlist_url):
             return {"error": "Content not found. Please check if the URL is correct and the content exists."}
         else:
             return {"error": f"Spotify API error ({e.http_status}): {str(e)}"}
+    except ConnectionError as e: # Explicitly handle ConnectionError if it bubbles up
+        print(f"A connection error occurred: {e}")
+        return GracefulDegradation.handle_spotify_failure(playlist_url, e)
     except Exception as e:
+<<<<<<< HEAD
         print(f"❌ Unexpected error extracting data: {e}")
+=======
+        print(f"Unexpected error extracting data: {e}")
+        # It's good practice to check if it's a ConnectionError that somehow slipped through,
+        # though earlier specific handlers should catch it.
+        if isinstance(e, ConnectionError):
+            return GracefulDegradation.handle_spotify_failure(playlist_url, e)
+        
+>>>>>>> animewatchlist-fixed
         import traceback
         traceback.print_exc()
         return {"error": f"An unexpected error occurred while processing your request: {str(e)}"}
@@ -437,6 +510,7 @@ def search_spotify_content(query, content_type="playlist", limit=10):
     
     return []
 
+<<<<<<< HEAD
 def get_user_premium_status(access_token):
     """Get user's premium status from Spotify API"""
     try:
@@ -476,6 +550,71 @@ def get_user_premium_status(access_token):
         print(f"❌ Error getting user premium status: {e}")
     return None
 
+=======
+def update_playlist_details(access_token: str, playlist_id: str, name: str, description: str = None) -> tuple[bool, str | None]:
+    """
+    Updates a Spotify playlist's details (name and optionally description).
+
+    Args:
+        access_token: The Spotify access token for authentication.
+        playlist_id: The ID of the playlist to update.
+        name: The new name for the playlist.
+        description: The new description for the playlist. If None or empty, it's not updated.
+
+    Returns:
+        A tuple (success: bool, error_message: str | None).
+    """
+    try:
+        sp_local = spotipy.Spotify(auth=access_token)
+        
+        payload = {"name": name}
+        if description is not None and description.strip() != "":
+             sp_local.playlist_change_details(playlist_id, name=name, description=description)
+        else:
+            if description is None:
+                 sp_local.playlist_change_details(playlist_id, name=name)
+            else: # description is likely an empty string here, meant to clear
+                 sp_local.playlist_change_details(playlist_id, name=name, description=description)
+
+        return True, None
+    except SpotifyException as e:
+        print(f"Error updating playlist details for {playlist_id}: {e}")
+        return False, str(e)
+    except Exception as e:
+        print(f"Unexpected error in update_playlist_details for {playlist_id}: {e}")
+        return False, f"An unexpected error occurred: {str(e)}"
+
+def update_playlist_cover_image(access_token: str, playlist_id: str, image_data_base64: str) -> tuple[bool, str | None]:
+    """
+    Updates a Spotify playlist's cover image using a base64 encoded image.
+
+    Args:
+        access_token: The Spotify access token for authentication.
+        playlist_id: The ID of the playlist to update.
+        image_data_base64: A base64 encoded string of the JPEG image.
+
+    Returns:
+        A tuple (success: bool, error_message: str | None).
+    """
+    try:
+        sp_local = spotipy.Spotify(auth=access_token)
+        # The spotipy documentation for playlist_upload_cover_image states:
+        # "image_b64: base64 encoded JPEG image data, maximum payload size is 256 KB"
+        print(f"Attempting to upload cover for playlist {playlist_id}. Base64 image data length: {len(image_data_base64)} bytes.")
+        sp_local.playlist_upload_cover_image(playlist_id, image_data_base64)
+        return True, None
+    except SpotifyException as e:
+        print(f"Error uploading playlist cover image for {playlist_id}: {e}")
+        # Check for specific error messages related to image upload if needed
+        if "image" in str(e).lower() or "payload" in str(e).lower():
+            return False, f"Spotify API error (image related): {str(e)}"
+        return False, str(e)
+    except Exception as e:
+        print(f"Unexpected error in update_playlist_cover_image for {playlist_id}: {e}")
+        return False, f"An unexpected error occurred: {str(e)}"
+
+# Helper function for debugging
+>>>>>>> animewatchlist-fixed
 def debug_spotify_connection():
     """Debug Spotify connection and credentials"""
     print("🔍 Debugging Spotify connection...")
@@ -546,8 +685,25 @@ if __name__ == "__main__":
     print("🚀 Testing Spotify client standalone...")
     debug_spotify_connection()
     
+<<<<<<< HEAD
     if test_spotify_functionality():
         print("✅ All Spotify tests passed")
+=======
+    if initialize_spotify():
+        print("✓ Spotify client initialized successfully")
+        
+        # Test with a sample playlist
+        test_url = "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
+        print(f"\nTesting with playlist: {test_url}")
+        
+        is_valid, message = validate_spotify_url(test_url)
+        print(f"URL validation: {message}")
+        
+        if is_valid:
+            track_count = get_playlist_tracks_count(test_url)
+            print(f"Track count: {track_count}")
+            
+>>>>>>> animewatchlist-fixed
     else:
         print("❌ Some Spotify tests failed")
 else:

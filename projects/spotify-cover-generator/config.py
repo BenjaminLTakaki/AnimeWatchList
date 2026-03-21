@@ -39,18 +39,30 @@ except (FileNotFoundError, OSError) as e:
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 
-# Dynamic redirect URI based on environment
+# Dynamic redirect URI based on environment - FIXED
 if os.getenv("RENDER"):
-    # Production on Render - note the /spotify prefix for your app path
+    # Production on Render - CORRECTED PATH
     SPOTIFY_REDIRECT_URI = "https://www.benjamintakaki.com/spotify/spotify-callback"
+<<<<<<< HEAD
 elif os.getenv("DEVELOPMENT"):
     # Local development
     SPOTIFY_REDIRECT_URI = "http://localhost:5000/spotify-callback"
 else:
     # Fallback - try to get from environment or use default
+=======
+elif os.getenv("DEVELOPMENT") or not os.getenv("RENDER"):
+    # Local development - CORRECTED PATH
+    SPOTIFY_REDIRECT_URI = "http://localhost:5000/spotify/spotify-callback"
+else:
+    # Fallback
+>>>>>>> animewatchlist-fixed
     SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "https://www.benjamintakaki.com/spotify/spotify-callback")
 
 print(f"🔗 Using Spotify redirect URI: {SPOTIFY_REDIRECT_URI}")
+
+# Also update any other config that might affect routing
+BASE_URL = os.getenv("BASE_URL", "https://www.benjamintakaki.com" if os.getenv("RENDER") else "http://localhost:5000")
+SPOTIFY_BASE_URL = f"{BASE_URL}/spotify"
 
 # Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -63,12 +75,25 @@ SD_3_5_LARGE_ENGINE = "sd3.5-large"
 # Flask configuration
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY")
 
-# Database configuration - Render provides this automatically
-SPOTIFY_DB_URL = os.getenv('DATABASE_URL') or os.getenv('SPOTIFY_DB_URL', 'postgresql://postgres:password@localhost/portfoliodb')
+# FIXED: Use single database URL for everything (Render-optimized)
+# Render provides DATABASE_URL automatically
+MAIN_DB_URL = os.getenv('DATABASE_URL')
+
+if not MAIN_DB_URL:
+    # Fallback for local development
+    MAIN_DB_URL = 'postgresql://postgres:password@localhost/portfoliodb'
+    print("⚠️ No DATABASE_URL found, using local fallback")
+else:
+    print(f"✅ Found DATABASE_URL from Render environment")
 
 # Fix for Render's DATABASE_URL format (starts with postgres:// instead of postgresql://)
-if SPOTIFY_DB_URL and SPOTIFY_DB_URL.startswith('postgres://'):
-    SPOTIFY_DB_URL = SPOTIFY_DB_URL.replace('postgres://', 'postgresql://', 1)
+if MAIN_DB_URL and MAIN_DB_URL.startswith('postgres://'):
+    MAIN_DB_URL = MAIN_DB_URL.replace('postgres://', 'postgresql://', 1)
+
+# Use the same database for everything
+SPOTIFY_DB_URL = MAIN_DB_URL
+
+print(f"🔗 Using database: {MAIN_DB_URL[:50]}...")
 
 # Default negative prompt
 DEFAULT_NEGATIVE_PROMPT = """
