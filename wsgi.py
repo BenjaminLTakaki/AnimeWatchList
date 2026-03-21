@@ -45,23 +45,17 @@ except Exception as e:
 
 # AnimeWatchList app setup
 animewatchlist_path = os.path.join(projects_dir, 'animewatchlist')
+if animewatchlist_path not in sys.path:
+    sys.path.insert(0, animewatchlist_path)
 
 # Import the AnimeWatchList app with error handling
 try:
-<<<<<<< HEAD
-    from animewatchlist.app import app as animewatchlist_app, db as animewatchlist_db
-=======
-    # Import the factory function
-    from projects.animewatchlist.app import create_app as create_animewatchlist_app
-    
-    # Use the main app's config to create the animewatchlist app
-    # The create_app function will use environment variables for configuration
+    from animewatchlist.app import create_app as create_animewatchlist_app
+
     animewatchlist_app, animewatchlist_db = create_animewatchlist_app({
         'SQLALCHEMY_DATABASE_URI': os.environ.get('DATABASE_URL'),
         'SECRET_KEY': os.environ.get('FLASK_SECRET_KEY'),
     })
-    
->>>>>>> animewatchlist-fixed
     Migrate(animewatchlist_app, animewatchlist_db)
     print("AnimeWatchList app created successfully using factory")
     has_animewatchlist_app = True
@@ -81,7 +75,6 @@ except Exception as e:
 # Spotify Cover Generator app setup - FIXED VERSION
 spotify_path = os.path.join(projects_dir, 'spotify-cover-generator')
 
-<<<<<<< HEAD
 def import_spotify_app():
     """Safely import the Spotify app with proper error handling"""
     try:
@@ -176,43 +169,6 @@ if has_spotify_app:
         except Exception as e:
             print(f"Error serving Spotify static file {filename}: {e}")
             return "Error serving file", 500
-=======
-# Import Spotify app - FIXED PATH HANDLING
-try:
-    print(f"Setting up Spotify app from path: {spotify_path}")
-    # Store original sys.path and cwd to restore later
-    original_sys_path = sys.path.copy()
-    original_cwd = os.getcwd()
-    # Add the spotify project directory to the path FIRST
-    if spotify_path not in sys.path:
-        sys.path.insert(0, spotify_path)
-    print(f"Added Spotify path to sys.path: {spotify_path}")
-    # Change the working directory temporarily for the import
-    os.chdir(spotify_path)
-    try:
-        # Now import the app
-        from app import app as spotify_app
-        print("✅ Spotify app imported successfully")
-        has_spotify_app = True
-        # IMPORTANT: Configure the Spotify app for sub-path deployment
-        spotify_app.config['APPLICATION_ROOT'] = '/spotify'
-        spotify_app.config['PREFERRED_URL_SCHEME'] = 'https'
-        # Add context processor
-        @spotify_app.context_processor
-        def inject_spotify_vars():
-            return {'current_year': datetime.datetime.now().year}
-    finally:
-        # Always restore the working directory
-        os.chdir(original_cwd)
-except Exception as e:
-    print(f"❌ Could not import Spotify app: {e}")
-    print(f"Error type: {type(e).__name__}")
-    import traceback
-    print(f"Full traceback: {traceback.format_exc()}")
-    has_spotify_app = False
-    # Restore the original path if import failed
-    sys.path = original_sys_path
->>>>>>> animewatchlist-fixed
 
 # Configure context processors
 @skillstown_app.context_processor
@@ -303,34 +259,8 @@ def animewatchlist_static(filename):
         print(f"AnimeWatchList static file not found: {filename}")
         return f"Static file {filename} not found", 404
 
-<<<<<<< HEAD
 # Class to handle routing to the app
-=======
-if has_spotify_app:
-    @main_app.route('/spotify/static/<path:filename>')
-    def spotify_static(filename):
-        print(f"Serving Spotify static file: {filename} from {SPOTIFY_APP_STATIC_DIR}")
-        try:
-            full_path = os.path.join(SPOTIFY_APP_STATIC_DIR, filename)
-            if os.path.exists(full_path):
-                return send_from_directory(SPOTIFY_APP_STATIC_DIR, filename)
-            else:
-                print(f"Spotify static file not found: {filename}")
-                # Try fallback locations
-                fallback_paths = [
-                    os.path.join(spotify_path, 'templates', filename),
-                    os.path.join(project_root, 'static', filename)
-                ]
-                for fallback_path in fallback_paths:
-                    if os.path.exists(fallback_path):
-                        return send_from_directory(os.path.dirname(fallback_path), os.path.basename(fallback_path))
-                return f"Static file {filename} not found", 404
-        except Exception as e:
-            print(f"Error serving Spotify static file {filename}: {e}")
-            return f"Error serving static file: {e}", 500
-
-# Class to handle routing to the app - OPTIMIZED WITH ERROR HANDLING
->>>>>>> animewatchlist-fixed
+ 
 class AppDispatcher:
     def __init__(self, app):
         self.app = app
@@ -356,24 +286,6 @@ class AppDispatcher:
             environ['PATH_INFO'] = path_info
             return main_app(environ, start_response)
             
-<<<<<<< HEAD
-        # Route requests to the appropriate app
-        if path_info.startswith('/skillstown'):
-            script_name = '/skillstown'
-            environ['SCRIPT_NAME'] = script_name
-            environ['PATH_INFO'] = path_info[len(script_name):]
-            return skillstown_app(environ, start_response)
-        elif path_info.startswith('/animewatchlist'):
-            script_name = '/animewatchlist'
-            environ['SCRIPT_NAME'] = script_name
-            environ['PATH_INFO'] = path_info[len(script_name):]
-            return animewatchlist_app(environ, start_response)
-        elif has_spotify_app and path_info.startswith('/spotify'):
-            script_name = '/spotify'
-            environ['SCRIPT_NAME'] = script_name
-            environ['PATH_INFO'] = path_info[len(script_name):]
-            return spotify_app(environ, start_response) # <-- Simplified call
-=======
         # Route requests to the appropriate app with error handling
         try:
             if path_info.startswith('/skillstown'):
@@ -402,7 +314,6 @@ class AppDispatcher:
                 finally:
                     os.chdir(old_cwd)
                     sys.path = old_sys_path
->>>>>>> animewatchlist-fixed
             
             print("Routing to main app")
             return main_app(environ, start_response)
