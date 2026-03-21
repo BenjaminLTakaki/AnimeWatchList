@@ -76,6 +76,24 @@ except Exception as e:
 
 # Spotify Cover Generator app setup - FIXED VERSION
 spotify_path = os.path.join(projects_dir, 'spotify-cover-generator')
+spotify_error = None
+
+
+def build_spotify_stub(error_message):
+    """Create a simple fallback app so /spotify always has a valid route."""
+    stub_app = Flask("spotify_stub")
+
+    @stub_app.route('/')
+    @stub_app.route('/<path:path>')
+    def spotify_unavailable(path=None):
+        return f"""
+        <h1>Spotify Cover Generator - Temporarily Unavailable</h1>
+        <p>The Spotify Cover Generator is experiencing technical difficulties.</p>
+        <p>Error: {error_message}</p>
+        <p><a href=\"/\">Return to main site</a></p>
+        """
+
+    return stub_app
 
 def import_spotify_app():
     """Safely import the Spotify app with proper error handling"""
@@ -84,7 +102,7 @@ def import_spotify_app():
         
         if not os.path.exists(spotify_path):
             print(f"❌ Spotify path does not exist: {spotify_path}")
-            return None, False
+            return build_spotify_stub(f"Path not found: {spotify_path}"), False
         
         try:
             # Add spotify-cover-generator to Python path
@@ -111,30 +129,17 @@ def import_spotify_app():
         except ImportError as import_error:
             print(f"❌ Spotify app import failed: {import_error}")
             print("Creating stub Spotify app")
-            
-            stub_app = Flask("spotify_stub")
-            
-            @stub_app.route('/')
-            @stub_app.route('/<path:path>')
-            def spotify_error(path=None):
-                return f"""
-                <h1>Spotify Cover Generator - Temporarily Unavailable</h1>
-                <p>The Spotify Cover Generator is experiencing technical difficulties.</p>
-                <p>Error: {import_error}</p>
-                <p><a href=\"/\">Return to main site</a></p>
-                """
-            
-            return stub_app, False
+            return build_spotify_stub(str(import_error)), False
             
         except Exception as e:
             print(f"❌ Unexpected error importing Spotify app: {e}")
             import traceback
             print(f"Full traceback: {traceback.format_exc()}")
-            return None, False
+            return build_spotify_stub(str(e)), False
             
     except Exception as e:
         print(f"❌ Critical error in Spotify app setup: {e}")
-        return None, False
+        return build_spotify_stub(str(e)), False
 
 # Use the safe import function
 spotify_app, has_spotify_app = import_spotify_app()
@@ -235,10 +240,7 @@ def animewatchlist_redirect():
 @main_app.route('/projects/spotify-cover-generator/')
 def spotify_redirect():
     """Fixed redirect to Spotify app"""
-    if has_spotify_app:
-        return redirect('/spotify/', code=302)
-    else:
-        return "Spotify Cover Generator is currently unavailable", 503
+    return redirect('/spotify/', code=302)
 
 # Handle static files from the main app - FIXED STATIC FILE HANDLING
 @main_app.route('/skillstown/static/<path:filename>')
@@ -300,22 +302,24 @@ class AppDispatcher:
                 environ['SCRIPT_NAME'] = script_name
                 environ['PATH_INFO'] = path_info[len(script_name):]
                 return animewatchlist_app(environ, start_response)
-            elif has_spotify_app and path_info.startswith('/spotify'):
+            elif path_info.startswith('/spotify'):
                 print("Routing to Spotify app")
                 script_name = '/spotify'
                 environ['SCRIPT_NAME'] = script_name
                 environ['PATH_INFO'] = path_info[len(script_name):]
-                # CRITICAL FIX: Set the working directory and sys.path for Spotify app requests
-                old_cwd = os.getcwd()
-                old_sys_path = sys.path.copy()
-                try:
-                    os.chdir(spotify_path)
-                    if spotify_path not in sys.path:
-                        sys.path.insert(0, spotify_path)
-                    return spotify_app(environ, start_response)
-                finally:
-                    os.chdir(old_cwd)
-                    sys.path = old_sys_path
+                if has_spotify_app:
+                    # Keep spotify app imports stable during request handling.
+                    old_cwd = os.getcwd()
+                    old_sys_path = sys.path.copy()
+                    try:
+                        os.chdir(spotify_path)
+                        if spotify_path not in sys.path:
+                            sys.path.insert(0, spotify_path)
+                        return spotify_app(environ, start_response)
+                    finally:
+                        os.chdir(old_cwd)
+                        sys.path = old_sys_path
+                return spotify_app(environ, start_response)
             
             print("Routing to main app")
             return main_app(environ, start_response)
