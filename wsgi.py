@@ -19,6 +19,8 @@ if projects_dir not in sys.path:
 
 # SkillsTown app setup
 skillstown_path = os.path.join(projects_dir, 'skillstown')
+if skillstown_path not in sys.path:
+    sys.path.insert(0, skillstown_path)
 
 # Define the paths to ensure they exist before import
 os.makedirs(os.path.join(skillstown_path, 'uploads'), exist_ok=True)
