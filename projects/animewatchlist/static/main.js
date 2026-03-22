@@ -223,20 +223,47 @@ var SwipeManager = {
 
   bindEvents: function() {
     var self = this;
+    this.lockedAxis = null; // 'x' or 'y' — decided on first significant move
+
     // Touch
-    this.area.addEventListener('touchstart', function(e) { self.onStart(e.touches[0].clientX, e.touches[0].clientY); }, {passive: true});
-    this.area.addEventListener('touchmove', function(e) { self.onMove(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+    this.area.addEventListener('touchstart', function(e) {
+      self.lockedAxis = null;
+      self.onStart(e.touches[0].clientX, e.touches[0].clientY);
+    }, {passive: true});
+
+    this.area.addEventListener('touchmove', function(e) {
+      if (!self.isDragging) return;
+      var dx = Math.abs(e.touches[0].clientX - self.startX);
+      var dy = Math.abs(e.touches[0].clientY - self.startY);
+      // Lock axis after 8px of movement
+      if (!self.lockedAxis && (dx > 8 || dy > 8)) {
+        self.lockedAxis = dx > dy ? 'x' : 'y';
+      }
+      if (self.lockedAxis === 'x') {
+        e.preventDefault(); // prevent scroll while swiping horizontally
+        self.onMove(e.touches[0].clientX, e.touches[0].clientY);
+      } else if (self.lockedAxis === 'y') {
+        // Let the browser scroll vertically — cancel our drag
+        self.isDragging = false;
+        var card = self.cards[self.currentIndex];
+        if (card) { card.classList.remove('dragging'); card.style.transform = ''; }
+      }
+    }, {passive: false});
+
     this.area.addEventListener('touchend', function() { self.onEnd(); });
+
     // Mouse
     this.area.addEventListener('mousedown', function(e) { e.preventDefault(); self.onStart(e.clientX, e.clientY); });
     document.addEventListener('mousemove', function(e) { if (self.isDragging) self.onMove(e.clientX, e.clientY); });
     document.addEventListener('mouseup', function() { if (self.isDragging) self.onEnd(); });
+
     // Keyboard
     document.addEventListener('keydown', function(e) {
       if (!document.querySelector('.swipe-area')) return;
       if (e.key === 'ArrowLeft') { e.preventDefault(); self.swipeLeft(); }
       if (e.key === 'ArrowRight') { e.preventDefault(); self.swipeRight(); }
     });
+
     // Buttons
     var skipBtn = document.querySelector('.swipe-btn--skip');
     var addBtn  = document.querySelector('.swipe-btn--add');

@@ -59,6 +59,8 @@ class User(UserMixin, db.Model):
         self.password_hash = generate_password_hash(pw)
 
     def check_password(self, pw):
+        if not self.password_hash:
+            return False
         return check_password_hash(self.password_hash, pw)
 
 
@@ -651,16 +653,22 @@ def register():
         password = request.form.get("password", "")
         if not username or not password:
             flash("Username and password required", "error")
-        elif User.query.filter_by(username=username).first():
-            flash("Username already taken", "error")
         else:
-            u = User(username=username, email=email)
-            u.set_password(password)
-            db.session.add(u)
-            db.session.commit()
-            login_user(u)
-            flash("Account created", "success")
-            return redirect(_get_url_for("index"))
+            try:
+                if User.query.filter_by(username=username).first():
+                    flash("Username already taken", "error")
+                else:
+                    u = User(username=username, email=email)
+                    u.set_password(password)
+                    db.session.add(u)
+                    db.session.commit()
+                    login_user(u, remember=True)
+                    flash("Account created", "success")
+                    return redirect(_get_url_for("discover"))
+            except Exception as e:
+                db.session.rollback()
+                print(f"[Register] Database error: {e}")
+                flash("Registration failed — please try again", "error")
     return render_template("register.html", active=None, get_url_for=_get_url_for)
 
 
@@ -671,13 +679,18 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-        u = User.query.filter_by(username=username).first()
-        if not u and "@" in username:
-            u = User.query.filter_by(email=username).first()
-        if u and u.check_password(password):
-            login_user(u)
-            return redirect(_get_url_for("index"))
-        flash("Invalid credentials", "error")
+        try:
+            u = User.query.filter_by(username=username).first()
+            if not u and "@" in username:
+                u = User.query.filter_by(email=username).first()
+            if u and u.check_password(password):
+                login_user(u, remember=True)
+                return redirect(_get_url_for("discover"))
+            flash("Invalid credentials", "error")
+        except Exception as e:
+            db.session.rollback()
+            print(f"[Login] Database error: {e}")
+            flash("Login failed — please try again", "error")
     return render_template("login.html", active=None, get_url_for=_get_url_for)
 
 
@@ -712,8 +725,10 @@ def mal_authorize():
 def mal_callback():
     code  = request.args.get("code")
     state = request.args.get("state")
-    if state != session.pop("mal_state", None):
-        flash("OAuth state mismatch", "error")
+    saved_state = session.pop("mal_state", None)
+    if state != saved_state:
+        print(f"[MAL OAuth] State mismatch: got={state!r}, saved={saved_state!r}")
+        flash("OAuth state mismatch — please try again", "error")
         return redirect(_get_url_for("login"))
 
     verifier = session.pop("mal_verifier", "")
@@ -721,9 +736,10 @@ def mal_callback():
         "client_id": MAL_CLIENT_ID, "client_secret": MAL_CLIENT_SECRET,
         "code": code, "code_verifier": verifier,
         "grant_type": "authorization_code", "redirect_uri": MAL_REDIRECT_URI,
-    })
+    }, timeout=15)
     if not resp.ok:
-        flash("MAL token exchange failed", "error")
+        print(f"[MAL OAuth] Token exchange failed: {resp.status_code} {resp.text[:300]}")
+        flash("MAL token exchange failed — please try again", "error")
         return redirect(_get_url_for("login"))
 
     tokens = resp.json()
@@ -731,27 +747,41 @@ def mal_callback():
     refresh = tokens.get("refresh_token")
     expires = datetime.datetime.utcnow() + datetime.timedelta(seconds=tokens["expires_in"])
 
-    mal_info = requests.get(f"{MAL_API_BASE}/users/@me",
-                            headers={"Authorization": f"Bearer {access}"}).json()
+    try:
+        mal_info = requests.get(f"{MAL_API_BASE}/users/@me",
+                                headers={"Authorization": f"Bearer {access}"},
+                                timeout=10).json()
+    except Exception as e:
+        print(f"[MAL OAuth] Failed to fetch user info: {e}")
+        flash("Could not fetch MAL profile", "error")
+        return redirect(_get_url_for("login"))
+
     mal_uid  = mal_info.get("id")
     mal_name = mal_info.get("name")
 
-    u = User.query.get(current_user.id) if current_user.is_authenticated else None
-    if not u:
-        u = User.query.filter_by(mal_user_id=mal_uid).first()
-    if not u:
-        u = User(username=mal_name or f"mal_{mal_uid}", mal_user_id=mal_uid)
-        db.session.add(u)
+    try:
+        u = User.query.get(current_user.id) if current_user.is_authenticated else None
+        if not u:
+            u = User.query.filter_by(mal_user_id=mal_uid).first()
+        if not u:
+            u = User(username=mal_name or f"mal_{mal_uid}", mal_user_id=mal_uid)
+            db.session.add(u)
 
-    u.mal_user_id       = mal_uid
-    u.mal_username      = mal_name
-    u.mal_access_token  = access
-    u.mal_refresh_token = refresh
-    u.mal_token_expires = expires
-    db.session.commit()
-    login_user(u)
-    flash(f"Connected as {mal_name}", "success")
-    return redirect(_get_url_for("profile"))
+        u.mal_user_id       = mal_uid
+        u.mal_username      = mal_name
+        u.mal_access_token  = access
+        u.mal_refresh_token = refresh
+        u.mal_token_expires = expires
+        db.session.commit()
+        login_user(u, remember=True)
+        print(f"[MAL OAuth] Logged in user: {mal_name} (id={u.id})")
+        flash(f"Connected as {mal_name}", "success")
+        return redirect(_get_url_for("discover"))
+    except Exception as e:
+        db.session.rollback()
+        print(f"[MAL OAuth] Database error: {e}")
+        flash("Database error during login — please try again", "error")
+        return redirect(_get_url_for("login"))
 
 
 @bp.route("/auth/mal/unlink", methods=["POST"])
@@ -821,17 +851,30 @@ def create_app(app):
             "pool_pre_ping": True,
         })
 
+    # Session config — ensure login persists across requests
+    app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)
+    app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
+    app.config.setdefault("REMEMBER_COOKIE_DURATION", datetime.timedelta(days=30))
+
     db.init_app(app)
     login_manager.init_app(app)
     login_manager.login_view = "animewatchlist.login"
 
     @login_manager.user_loader
     def load_user(uid):
-        return User.query.get(int(uid))
+        try:
+            return db.session.get(User, int(uid))
+        except Exception:
+            return None
 
     app.register_blueprint(bp, url_prefix="/animewatchlist")
 
     with app.app_context():
+        db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+        if "sqlite" in db_uri:
+            print(f"[AnimeWatchList] Using SQLite: {db_uri}")
+        else:
+            print(f"[AnimeWatchList] Using PostgreSQL: {db_uri[:60]}...")
         db.create_all()
 
     return app
