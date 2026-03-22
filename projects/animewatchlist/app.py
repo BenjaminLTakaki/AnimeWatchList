@@ -205,6 +205,39 @@ LIST_TABS = [
 ]
 
 
+def _push_to_mal(mal_id, watch_status="completed", score=None, episodes=None):
+    """Push a list update to MAL. Fails silently if user isn't MAL-linked."""
+    if not current_user.is_authenticated or not current_user.mal_linked:
+        return
+    # Map local statuses to MAL API statuses
+    mal_status_map = {
+        "completed": "completed", "watching": "watching",
+        "plan_to_watch": "plan_to_watch", "dropped": "dropped",
+    }
+    body = {"status": mal_status_map.get(watch_status, "completed")}
+    if score and int(score) > 0:
+        # MAL uses 0-10 scale, our app uses 0-5 → multiply by 2
+        body["score"] = min(int(score) * 2, 10)
+    if episodes is not None and int(episodes) > 0:
+        body["num_watched_episodes"] = int(episodes)
+    try:
+        requests.put(f"{MAL_API_BASE}/anime/{mal_id}/my_list_status",
+                     headers=_mal_user(current_user), data=body, timeout=10)
+    except Exception as e:
+        print(f"[MAL Push] Failed to update {mal_id}: {e}")
+
+
+def _remove_from_mal(mal_id):
+    """Remove an anime from the user's MAL list. Fails silently."""
+    if not current_user.is_authenticated or not current_user.mal_linked:
+        return
+    try:
+        requests.delete(f"{MAL_API_BASE}/anime/{mal_id}/my_list_status",
+                        headers=_mal_user(current_user), timeout=10)
+    except Exception as e:
+        print(f"[MAL Push] Failed to remove {mal_id}: {e}")
+
+
 def _normalize_watch_status(status):
     s = (status or "").strip().lower()
     return {
@@ -267,6 +300,7 @@ def _add_or_update_user_list_item(mal_id, watch_status="completed", user_rating=
     entry.episodes_watched = int(episodes_watched or 0)
     entry.updated_at = datetime.datetime.utcnow()
     db.session.commit()
+    _push_to_mal(anime.mal_id, entry.watch_status, entry.user_rating, entry.episodes_watched)
     return anime
 
 
@@ -429,6 +463,7 @@ def add_to_list():
     entry.episodes_watched = eps
     entry.updated_at       = datetime.datetime.utcnow()
     db.session.commit()
+    _push_to_mal(anime.mal_id, status, entry.user_rating, eps)
     flash(f"Added \"{anime.title_en or anime.title}\" to your list", "success")
     return redirect(request.referrer or _get_url_for("index"))
 
@@ -469,6 +504,7 @@ def remove_anime(anime_id):
         if entry:
             db.session.delete(entry)
             db.session.commit()
+            _remove_from_mal(anime_id)
             flash("Removed", "success")
     return redirect(request.referrer or _get_url_for("watchlist"))
 
@@ -501,6 +537,7 @@ def update_entry(mal_id):
     entry.user_rating  = int(r) if r else None
     entry.updated_at   = datetime.datetime.utcnow()
     db.session.commit()
+    _push_to_mal(anime.mal_id, entry.watch_status, entry.user_rating, entry.episodes_watched)
     flash("Updated", "success")
     return redirect(request.referrer or _get_url_for("watchlist"))
 
@@ -514,6 +551,7 @@ def remove_entry(mal_id):
         if entry:
             db.session.delete(entry)
             db.session.commit()
+            _remove_from_mal(mal_id)
             flash("Removed", "success")
     return redirect(request.referrer or _get_url_for("watchlist"))
 
@@ -775,7 +813,10 @@ def mal_callback():
         db.session.commit()
         login_user(u, remember=True)
         print(f"[MAL OAuth] Logged in user: {mal_name} (id={u.id})")
-        flash(f"Connected as {mal_name}", "success")
+
+        # Auto-sync MAL anime list on login
+        synced = _sync_mal_list(u)
+        flash(f"Connected as {mal_name} — synced {synced} titles", "success")
         return redirect(_get_url_for("discover"))
     except Exception as e:
         db.session.rollback()
@@ -797,33 +838,38 @@ def mal_unlink():
     return redirect(_get_url_for("profile"))
 
 
-@bp.route("/auth/mal/sync", methods=["POST"])
-@login_required
-def mal_sync():
-    if not current_user.mal_linked:
-        flash("MAL not linked", "error")
-        return redirect(_get_url_for("profile"))
+def _sync_mal_list(user):
+    """Pull user's full MAL anime list into the local database. Returns count."""
     synced, offset = 0, 0
     fields = "list_status,num_episodes,mean,genres,studios,main_picture,alternative_titles,start_season"
+    status_map = {"watching": "watching", "completed": "completed",
+                  "on_hold": "watching", "dropped": "dropped",
+                  "plan_to_watch": "plan_to_watch"}
     while True:
-        r = requests.get(f"{MAL_API_BASE}/users/@me/animelist",
-                         headers=_mal_user(current_user),
-                         params={"fields": fields, "limit": 100, "offset": offset, "nsfw": True},
-                         timeout=15)
-        if not r.ok:
+        try:
+            r = requests.get(f"{MAL_API_BASE}/users/@me/animelist",
+                             headers=_mal_user(user),
+                             params={"fields": fields, "limit": 100,
+                                     "offset": offset, "nsfw": True},
+                             timeout=15)
+            if not r.ok:
+                print(f"[MAL Sync] API error at offset {offset}: {r.status_code}")
+                break
+        except Exception as e:
+            print(f"[MAL Sync] Request failed at offset {offset}: {e}")
             break
         data = r.json()
         for item in data.get("data", []):
             node = item["node"]
             ls   = item.get("list_status", {})
             anime = _upsert(node)
-            entry = UserAnimeList.query.filter_by(user_id=current_user.id, anime_id=anime.id).first()
+            entry = UserAnimeList.query.filter_by(
+                user_id=user.id, anime_id=anime.id).first()
             if not entry:
-                entry = UserAnimeList(user_id=current_user.id, anime_id=anime.id)
+                entry = UserAnimeList(user_id=user.id, anime_id=anime.id)
                 db.session.add(entry)
-            sm = {"watching":"watching","completed":"completed",
-                  "on_hold":"watching","dropped":"dropped","plan_to_watch":"plan_to_watch"}
-            entry.watch_status     = sm.get(ls.get("status", "plan_to_watch"), "plan_to_watch")
+            entry.watch_status     = status_map.get(
+                ls.get("status", "plan_to_watch"), "plan_to_watch")
             entry.user_rating      = ls.get("score") or None
             entry.episodes_watched = ls.get("num_episodes_watched", 0)
             synced += 1
@@ -831,6 +877,17 @@ def mal_sync():
             break
         offset += 100
     db.session.commit()
+    print(f"[MAL Sync] Synced {synced} titles for user {user.username}")
+    return synced
+
+
+@bp.route("/auth/mal/sync", methods=["POST"])
+@login_required
+def mal_sync():
+    if not current_user.mal_linked:
+        flash("MAL not linked", "error")
+        return redirect(_get_url_for("profile"))
+    synced = _sync_mal_list(current_user)
     flash(f"Synced {synced} titles from MAL", "success")
     return redirect(_get_url_for("profile"))
 
