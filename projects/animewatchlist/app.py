@@ -202,54 +202,138 @@ LIST_TABS = [
 ]
 
 
+def _normalize_watch_status(status):
+    s = (status or "").strip().lower()
+    return {
+        "watched": "completed",
+        "completed": "completed",
+        "watching": "watching",
+        "plan_to_watch": "plan_to_watch",
+        "planned": "plan_to_watch",
+        "dropped": "dropped",
+    }.get(s, "completed")
+
+
+def _to_template_anime(anime, entry=None):
+    image_url = anime.image_url or ""
+    return {
+        "id": anime.mal_id,
+        "mal_id": anime.mal_id,
+        "title": anime.title,
+        "main_picture": {"medium": image_url, "large": image_url} if image_url else None,
+        "images": {"jpg": {"image_url": image_url}} if image_url else {"jpg": {"image_url": ""}},
+        "url": f"https://myanimelist.net/anime/{anime.mal_id}",
+        "episodes": anime.episodes,
+        "score": anime.score,
+        "status": "watched" if entry else "",
+        "user_rating": entry.user_rating if entry else None,
+    }
+
+
+def _upsert_from_mal_id(mal_id):
+    anime = Anime.query.filter_by(mal_id=int(mal_id)).first()
+    if anime:
+        return anime
+    try:
+        resp = requests.get(
+            f"{MAL_API_BASE}/anime/{mal_id}",
+            headers=_mal_pub(),
+            params={"fields": ANIME_FIELDS},
+            timeout=10,
+        )
+        if resp.ok:
+            return _upsert(resp.json())
+    except Exception:
+        return None
+    return None
+
+
+def _add_or_update_user_list_item(mal_id, watch_status="completed", user_rating=None, episodes_watched=0):
+    anime = _upsert_from_mal_id(mal_id)
+    if not anime:
+        return None
+    entry = UserAnimeList.query.filter_by(user_id=current_user.id, anime_id=anime.id).first()
+    if not entry:
+        entry = UserAnimeList(user_id=current_user.id, anime_id=anime.id)
+        db.session.add(entry)
+    entry.watch_status = _normalize_watch_status(watch_status)
+    try:
+        entry.user_rating = int(user_rating) if user_rating not in (None, "") else None
+    except (TypeError, ValueError):
+        entry.user_rating = None
+    entry.episodes_watched = int(episodes_watched or 0)
+    entry.updated_at = datetime.datetime.utcnow()
+    db.session.commit()
+    return anime
+
+
 # ── Routes ─────────────────────────────────────────────────────────────────
 
 @bp.route("/")
 def index():
-    tab  = request.args.get("tab", "all")
-    page = int(request.args.get("page", 1))
-    limit, offset = 24, (page - 1) * 24
-    try:
-        if tab == "seasonal":
-            url = f"{MAL_API_BASE}/anime/season/{datetime.datetime.now().year}/{_season()}"
-            params = {"limit": limit, "fields": ANIME_FIELDS, "sort": "anime_score"}
-        else:
-            url = f"{MAL_API_BASE}/anime/ranking"
-            params = {"ranking_type": tab, "limit": limit, "offset": offset, "fields": ANIME_FIELDS}
-        resp = requests.get(url, headers=_mal_pub(), params=params, timeout=10)
-        items = [_upsert(i["node"]).to_dict() for i in (resp.json().get("data", []) if resp.ok else [])]
-    except Exception:
-        items = []
-    return render_template("index.html", anime_list=items, tabs=TABS, tab=tab,
-                           page=page, active="discover", get_url_for=_get_url_for)
+    if not current_user.is_authenticated:
+        return redirect(_get_url_for("login"))
+    return redirect(_get_url_for("search"))
 
 
-@bp.route("/search")
+@bp.route("/search", methods=["GET", "POST"])
 def search():
-    q = request.args.get("q", "").strip()
+    q = (
+        request.values.get("q", "").strip()
+        or request.values.get("query", "").strip()
+    )
     results = []
     if q:
         try:
             resp = requests.get(f"{MAL_API_BASE}/anime", headers=_mal_pub(),
                                 params={"q": q, "limit": 40, "fields": ANIME_FIELDS}, timeout=10)
             if resp.ok:
-                results = [_upsert(i["node"]).to_dict() for i in resp.json().get("data", [])]
+                models = [_upsert(i["node"]) for i in resp.json().get("data", [])]
+                user_entries = {}
+                if current_user.is_authenticated:
+                    mal_ids = [m.mal_id for m in models]
+                    links = (UserAnimeList.query
+                             .join(Anime, Anime.id == UserAnimeList.anime_id)
+                             .filter(UserAnimeList.user_id == current_user.id, Anime.mal_id.in_(mal_ids))
+                             .all())
+                    user_entries = {e.anime.mal_id: e for e in links}
+                results = [_to_template_anime(m, user_entries.get(m.mal_id)) for m in models]
         except Exception:
             pass
     return render_template("search.html", results=results, query=q,
+                           has_rating_feature=True,
                            active="search", get_url_for=_get_url_for)
 
 
 @bp.route("/list")
+@bp.route("/watched")
 @login_required
 def watchlist():
     status = request.args.get("status", "")
+    sort_by = request.args.get("sort_by", "date_added")
+    sort_order = request.args.get("sort_order", "desc")
     q = UserAnimeList.query.filter_by(user_id=current_user.id)
     if status:
         q = q.filter_by(watch_status=status)
-    entries = [e.to_dict() for e in q.order_by(UserAnimeList.updated_at.desc()).all()]
-    return render_template("list.html", entries=entries, tabs=LIST_TABS,
+    entries = q.all()
+    anime_list = [_to_template_anime(e.anime, e) for e in entries]
+
+    reverse = sort_order != "asc"
+    if sort_by == "title":
+        anime_list.sort(key=lambda x: (x.get("title") or "").lower(), reverse=reverse)
+    elif sort_by == "score":
+        anime_list.sort(key=lambda x: (x.get("score") or 0), reverse=reverse)
+    elif sort_by == "episodes":
+        anime_list.sort(key=lambda x: (x.get("episodes") or 0), reverse=reverse)
+    elif sort_by == "user_rating":
+        anime_list.sort(key=lambda x: (x.get("user_rating") or 0), reverse=reverse)
+    else:
+        anime_list.sort(key=lambda x: (x.get("id") or 0), reverse=reverse)
+
+    return render_template("list.html", anime_list=anime_list, tabs=LIST_TABS,
                            status=status, status_labels=STATUS_LABELS,
+                           sort_by=sort_by, sort_order=sort_order,
+                           has_rating_feature=True,
                            active="list", get_url_for=_get_url_for)
 
 
@@ -257,7 +341,7 @@ def watchlist():
 @login_required
 def add_to_list():
     mal_id   = request.form.get("mal_id")
-    status   = request.form.get("watch_status", "plan_to_watch")
+    status   = _normalize_watch_status(request.form.get("watch_status", "plan_to_watch"))
     rating   = request.form.get("user_rating") or None
     eps      = int(request.form.get("episodes_watched") or 0)
     if not mal_id:
@@ -287,6 +371,58 @@ def add_to_list():
     db.session.commit()
     flash(f"Added \"{anime.title_en or anime.title}\" to your list", "success")
     return redirect(request.referrer or _get_url_for("index"))
+
+
+@bp.route("/mark-search", methods=["POST"])
+@login_required
+def mark_search():
+    mal_id = request.form.get("anime_id") or request.form.get("mal_id")
+    status = request.form.get("status", "watched")
+    if not mal_id:
+        flash("Missing anime ID", "error")
+        return redirect(request.referrer or _get_url_for("search"))
+    anime = _add_or_update_user_list_item(mal_id, watch_status=status)
+    if anime:
+        flash(f"Added \"{anime.title}\" to your list", "success")
+    else:
+        flash("Could not fetch that anime from MAL", "error")
+    return redirect(request.referrer or _get_url_for("search"))
+
+
+@bp.route("/direct-mark/<int:anime_id>/<status>")
+@login_required
+def direct_mark(anime_id, status):
+    anime = _add_or_update_user_list_item(anime_id, watch_status=status)
+    if anime:
+        flash(f"Added \"{anime.title}\" to your list", "success")
+    else:
+        flash("Could not fetch that anime from MAL", "error")
+    return redirect(request.referrer or _get_url_for("search"))
+
+
+@bp.route("/remove/<int:anime_id>")
+@login_required
+def remove_anime(anime_id):
+    anime = Anime.query.filter_by(mal_id=anime_id).first()
+    if anime:
+        entry = UserAnimeList.query.filter_by(user_id=current_user.id, anime_id=anime.id).first()
+        if entry:
+            db.session.delete(entry)
+            db.session.commit()
+            flash("Removed", "success")
+    return redirect(request.referrer or _get_url_for("watchlist"))
+
+
+@bp.route("/skip")
+@login_required
+def skip():
+    return redirect(_get_url_for("search"))
+
+
+@bp.route("/fetch")
+@login_required
+def fetch():
+    return redirect(_get_url_for("search"))
 
 
 @bp.route("/list/update/<int:mal_id>", methods=["POST"])
@@ -342,16 +478,25 @@ def stats():
     top_genres = sorted(genre_count.items(), key=lambda x: x[1], reverse=True)[:10]
     top_rated  = sorted(rated, key=lambda e: e.user_rating, reverse=True)[:5]
 
+    longest_entry = max(completed, key=lambda e: (e.anime.episodes or 0), default=None)
+    highest_rated_entry = max(rated, key=lambda e: (e.user_rating or 0), default=None)
+
     stats_data = {
-        "total":          len(entries),
-        "completed":      len(completed),
-        "watching":       len(watching),
-        "plan_to_watch":  len(ptw),
-        "dropped":        len(dropped),
+        "total": len(entries),
+        "total_anime": len(entries),
+        "completed": len(completed),
+        "watching": len(watching),
+        "plan_to_watch": len(ptw),
+        "dropped": len(dropped),
         "total_episodes": total_eps,
-        "mean_score":     mean_score,
-        "genres":         top_genres,
-        "top_rated":      [e.to_dict() for e in top_rated],
+        "estimated_hours": round((total_eps * 24) / 60, 1),
+        "mean_score": mean_score,
+        "average_score": mean_score,
+        "genres": top_genres,
+        "top_genres": top_genres,
+        "top_rated": [e.to_dict() for e in top_rated],
+        "longest_anime": _to_template_anime(longest_entry.anime) if longest_entry else None,
+        "highest_rated": _to_template_anime(highest_rated_entry.anime) if highest_rated_entry else None,
     }
     return render_template("stats.html", stats=stats_data,
                            active="stats", get_url_for=_get_url_for)
@@ -399,14 +544,36 @@ def recommendations():
         except Exception:
             pass
 
-    return render_template("recommendations.html", anime_list=results,
+    recommendations_data = []
+    for item in results:
+        if isinstance(item, dict):
+            image_url = item.get("image_url") or ""
+            anime_payload = {
+                "id": item.get("mal_id") or item.get("id"),
+                "mal_id": item.get("mal_id") or item.get("id"),
+                "title": item.get("title", "Unknown"),
+                "images": {"jpg": {"image_url": image_url}},
+                "url": f"https://myanimelist.net/anime/{item.get('mal_id') or item.get('id')}",
+            }
+        else:
+            anime_payload = _to_template_anime(item)
+
+        recommendations_data.append({
+            "anime": anime_payload,
+            "score": 0.85,
+            "explanation": "Recommended from your completed and highly rated titles.",
+            "series_info": None,
+        })
+
+    return render_template("recommendations.html", recommendations=recommendations_data,
                            active="recs", get_url_for=_get_url_for)
 
 
 @bp.route("/profile")
 @login_required
 def profile():
-    return render_template("profile.html", active="profile", get_url_for=_get_url_for)
+    watched_count = UserAnimeList.query.filter_by(user_id=current_user.id).count()
+    return render_template("profile.html", stats=[watched_count, 0], active="profile", get_url_for=_get_url_for)
 
 
 # ── Auth ───────────────────────────────────────────────────────────────────
@@ -442,6 +609,8 @@ def login():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         u = User.query.filter_by(username=username).first()
+        if not u and "@" in username:
+            u = User.query.filter_by(email=username).first()
         if u and u.check_password(password):
             login_user(u)
             return redirect(_get_url_for("index"))
