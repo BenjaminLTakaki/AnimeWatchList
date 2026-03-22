@@ -51,8 +51,6 @@ try:
     from animewatchlist.app import create_app as create_animewatchlist_app
 
     animewatchlist_app = Flask("animewatchlist.app", root_path=animewatchlist_path)
-    animewatchlist_app = create_animewatchlist_app(animewatchlist_app)
-
     _db_url = os.environ.get('DATABASE_URL', '')
     if _db_url.startswith('postgres://'):
         _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
@@ -62,6 +60,8 @@ try:
     )
     animewatchlist_app.config['SQLALCHEMY_DATABASE_URI']        = _db_url or 'sqlite:///animewatchlist.db'
     animewatchlist_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    animewatchlist_app = create_animewatchlist_app(animewatchlist_app)
 
     # MAL OAuth credentials forwarded from environment
     animewatchlist_app.config['MAL_CLIENT_ID']     = os.environ.get('MAL_CLIENT_ID', '')

@@ -577,6 +577,14 @@ def mal_sync():
 
 def create_app(app):
     """Register blueprint + init db on an existing Flask app."""
+    # Ensure DB config exists before SQLAlchemy is initialized.
+    if not app.config.get("SQLALCHEMY_DATABASE_URI") and not app.config.get("SQLALCHEMY_BINDS"):
+        db_url = os.environ.get("DATABASE_URL", "")
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql://", 1)
+        app.config["SQLALCHEMY_DATABASE_URI"] = db_url or "sqlite:///animewatchlist.db"
+        app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
     db.init_app(app)
     login.init_app(app)
     login.login_view = "animewatchlist.login"
