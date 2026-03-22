@@ -9,6 +9,14 @@ load_dotenv()
 
 main_app = Flask(__name__, static_folder='.')
 
+# Local safety guard: if you're running on a developer machine with a Render
+# DATABASE_URL in .env, prefer local SQLite unless explicitly disabled.
+if not os.environ.get('RENDER') and os.environ.get('FORCE_REMOTE_DB', '0') != '1':
+    _env_db_url = os.environ.get('DATABASE_URL', '')
+    if 'render.com' in _env_db_url:
+        os.environ.pop('DATABASE_URL', None)
+        print('Local mode: ignoring Render DATABASE_URL and using local SQLite databases.')
+
 project_root = os.path.dirname(os.path.abspath(__file__))
 projects_dir = os.path.join(project_root, 'projects')
 if projects_dir not in sys.path:
@@ -23,7 +31,7 @@ os.makedirs(os.path.join(skillstown_path, 'static'), exist_ok=True)
 skillstown_error = None
 try:
     from skillstown.app import create_app
-    skillstown_app = create_app('production')
+    skillstown_app = create_app(os.environ.get('FLASK_CONFIG', 'development'))
     print("SkillsTown app imported successfully")
 except Exception as e:
     skillstown_error = str(e)
@@ -40,7 +48,10 @@ if animewatchlist_path not in sys.path:
     sys.path.insert(0, animewatchlist_path)
 
 try:
-    from animewatchlist.app import app as animewatchlist_app
+    from animewatchlist.app import create_app as create_animewatchlist_app
+
+    animewatchlist_app = Flask("animewatchlist.app", root_path=animewatchlist_path)
+    animewatchlist_app = create_animewatchlist_app(animewatchlist_app)
 
     _db_url = os.environ.get('DATABASE_URL', '')
     if _db_url.startswith('postgres://'):
@@ -66,22 +77,31 @@ try:
 
     print("AnimeWatchList app loaded successfully")
     has_animewatchlist_app = True
+    animewatchlist_error = None
 
 except Exception as e:
     import traceback
     print(f"Could not load AnimeWatchList app: {e}")
     print(traceback.format_exc())
+    animewatchlist_error = str(e)
     animewatchlist_app = Flask("animewatchlist_stub")
     has_animewatchlist_app = False
 
     @animewatchlist_app.route('/')
     @animewatchlist_app.route('/<path:path>')
     def animewatchlist_stub(path=None):
-        return f"AnimeWatchList unavailable: {e}", 503
+        return f"AnimeWatchList unavailable: {animewatchlist_error}", 503
 
 # ── Spotify Cover Generator ───────────────────────────────────────────────────
 spotify_path  = os.path.join(projects_dir, 'spotify-cover-generator')
 spotify_error = None
+
+# Spotify config expects a writable LORA_DIR; /tmp/... is not valid on Windows.
+if os.name == 'nt':
+    _lora_dir = os.environ.get('LORA_DIR', '')
+    if (not _lora_dir) or _lora_dir.startswith('/tmp'):
+        os.environ['LORA_DIR'] = os.path.join(spotify_path, 'loras')
+    os.makedirs(os.environ['LORA_DIR'], exist_ok=True)
 
 def build_spotify_stub(error_message):
     stub = Flask("spotify_stub")
@@ -139,7 +159,7 @@ def _animewatchlist_ctx():
 # ── App roots ─────────────────────────────────────────────────────────────────
 skillstown_app.config['APPLICATION_ROOT']     = '/skillstown'
 skillstown_app.config['PREFERRED_URL_SCHEME'] = 'https'
-animewatchlist_app.config['APPLICATION_ROOT'] = '/animewatchlist'
+animewatchlist_app.config['APPLICATION_ROOT'] = ''
 animewatchlist_app.config['PREFERRED_URL_SCHEME'] = 'https'
 
 SKILLSTOWN_APP_STATIC_DIR    = os.path.join(skillstown_path,    'static')
@@ -231,8 +251,10 @@ class AppDispatcher:
                 return skillstown_app(environ, start_response)
 
             elif path_info.startswith('/animewatchlist'):
-                environ['SCRIPT_NAME'] = '/animewatchlist'
-                environ['PATH_INFO']   = path_info[len('/animewatchlist'):]
+                # AnimeWatchList already registers routes under /animewatchlist.
+                # Keep PATH_INFO intact to avoid double-prefix routing issues.
+                environ['SCRIPT_NAME'] = ''
+                environ['PATH_INFO']   = path_info
                 return animewatchlist_app(environ, start_response)
 
             elif path_info.startswith('/spotify'):
