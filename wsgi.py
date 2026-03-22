@@ -59,7 +59,8 @@ try:
             os.environ.pop('DATABASE_URL', None)
 
     animewatchlist_app = Flask("animewatchlist.app", root_path=animewatchlist_path)
-    _db_url = os.environ.get('DATABASE_URL', '')
+    # Use dedicated ANIMEWATCHLIST_DATABASE_URL first, fall back to DATABASE_URL
+    _db_url = os.environ.get('ANIMEWATCHLIST_DATABASE_URL', '') or os.environ.get('DATABASE_URL', '')
     if _db_url.startswith('postgres://'):
         _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
 
@@ -68,6 +69,11 @@ try:
     )
     animewatchlist_app.config['SQLALCHEMY_DATABASE_URI']        = _db_url or 'sqlite:///animewatchlist.db'
     animewatchlist_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    # Recover from stale connections (SSL drops, idle timeouts)
+    animewatchlist_app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_recycle': 280,
+        'pool_pre_ping': True,
+    }
 
     animewatchlist_app = create_animewatchlist_app(animewatchlist_app)
 
