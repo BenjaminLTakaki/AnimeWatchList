@@ -1,607 +1,664 @@
+"""
+AnimeWatchList - Flask Backend
+MAL OAuth2 + Public API support
+"""
+
 import os
-import json
+import secrets
+import hashlib
+import base64
 import requests
-import time
 import datetime
-import traceback
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
-from flask_login import login_required, current_user
+from flask import Flask, redirect, request, jsonify, session, url_for
+from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
+from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
-from sqlalchemy import inspect
-from flask_migrate import Migrate
+from functools import wraps
 
-# Import the MAL API functions
-from anime_series_grouper import get_anime_details, get_top_anime, search_anime, get_mal_headers
-
-# Load environment variables
 load_dotenv()
 
-# MAL API base URL (replacing Jikan)
-MAL_API_BASE = "https://api.myanimelist.net/v2"
+app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+CORS(app, supports_credentials=True, origins=["http://localhost:5173", os.environ.get("FRONTEND_URL", "")])
 
-def create_app(config=None):
-    """Create and configure the Flask application."""
-    is_production = os.environ.get('RENDER', False)
-    
-    app = Flask(
-        __name__,
-        static_url_path='/static' if not is_production else '/animewatchlist/static',
-        template_folder='templates'
-    )
-    
-    # Default configuration
-    app.secret_key = os.environ.get("FLASK_SECRET_KEY", "anime_tracker_secret")
-    
-    if is_production:
-        app.config['APPLICATION_ROOT'] = '/animewatchlist'
-        app.config['PREFERRED_URL_SCHEME'] = 'https'
-        app.static_url_path = '/animewatchlist/static'
-    else:
-        app.static_url_path = '/static'
+# ── Database ──────────────────────────────────────────────────────────────────
+db_url = os.environ.get("DATABASE_URL", "sqlite:///animewatchlist.db")
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
 
-    # Apply external configuration if provided
-    if config:
-        app.config.update(config)
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db = SQLAlchemy(app)
 
-    # Define helper function for URL generation
-    def get_url_for(*args, **kwargs):
-        url = url_for(*args, **kwargs)
-        if app.config.get('APPLICATION_ROOT') and not url.startswith(app.config['APPLICATION_ROOT']):
-            url = f"{app.config['APPLICATION_ROOT']}{url}"
-        return url
+# ── MAL Config ────────────────────────────────────────────────────────────────
+MAL_CLIENT_ID     = os.environ.get("MAL_CLIENT_ID", "")
+MAL_CLIENT_SECRET = os.environ.get("MAL_CLIENT_SECRET", "")
+MAL_REDIRECT_URI  = os.environ.get("MAL_REDIRECT_URI", "http://localhost:5000/auth/mal/callback")
+MAL_API_BASE      = "https://api.myanimelist.net/v2"
+MAL_AUTH_BASE     = "https://myanimelist.net/v1/oauth2"
 
-    # Add context processor to inject variables into all templates
-    @app.context_processor
-    def inject_template_vars():
+# ── Models ────────────────────────────────────────────────────────────────────
+class User(db.Model):
+    __tablename__ = "user"
+    id             = db.Column(db.Integer, primary_key=True)
+    username       = db.Column(db.String(64), unique=True, nullable=False)
+    email          = db.Column(db.String(120), unique=True, nullable=True)
+    password_hash  = db.Column(db.String(256), nullable=True)
+    mal_user_id    = db.Column(db.Integer, unique=True, nullable=True)
+    mal_username   = db.Column(db.String(64), nullable=True)
+    mal_access_token   = db.Column(db.Text, nullable=True)
+    mal_refresh_token  = db.Column(db.Text, nullable=True)
+    mal_token_expires  = db.Column(db.DateTime, nullable=True)
+    created_at     = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+    def set_password(self, pw):
+        self.password_hash = generate_password_hash(pw)
+
+    def check_password(self, pw):
+        return check_password_hash(self.password_hash, pw)
+
+    def to_dict(self):
         return {
-            'current_year': datetime.datetime.now().year
+            "id": self.id,
+            "username": self.username,
+            "email": self.email,
+            "mal_username": self.mal_username,
+            "mal_linked": self.mal_access_token is not None,
+            "created_at": self.created_at.isoformat(),
         }
 
-    # Import and initialize auth system
-    from auth import init_auth
-    db = init_auth(app, get_url_for, lambda user_id: (0, 0))
-    migrate = Migrate(app, db)
 
-    with app.app_context():
-        try:
-            db.create_all()
-        except Exception as e:
-            print(f"Warning: Could not create tables: {e}")
+class Anime(db.Model):
+    __tablename__ = "anime"
+    id          = db.Column(db.Integer, primary_key=True)
+    mal_id      = db.Column(db.Integer, unique=True, nullable=False, index=True)
+    title       = db.Column(db.String(512), nullable=False)
+    title_en    = db.Column(db.String(512), nullable=True)
+    image_url   = db.Column(db.String(512), nullable=True)
+    episodes    = db.Column(db.Integer, nullable=True)
+    score       = db.Column(db.Float, nullable=True)
+    media_type  = db.Column(db.String(32), nullable=True)
+    status      = db.Column(db.String(64), nullable=True)
+    genres      = db.Column(db.Text, nullable=True)   # comma-separated
+    studios     = db.Column(db.Text, nullable=True)
+    synopsis    = db.Column(db.Text, nullable=True)
+    year        = db.Column(db.Integer, nullable=True)
+    season      = db.Column(db.String(16), nullable=True)
+    popularity  = db.Column(db.Integer, nullable=True)
+    rank        = db.Column(db.Integer, nullable=True)
+    updated_at  = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
-    # Now that the database is initialized, we can import the User model
-    from auth import User
+    def to_dict(self):
+        return {
+            "mal_id":     self.mal_id,
+            "title":      self.title,
+            "title_en":   self.title_en,
+            "image_url":  self.image_url,
+            "episodes":   self.episodes,
+            "score":      self.score,
+            "media_type": self.media_type,
+            "status":     self.status,
+            "genres":     self.genres.split(",") if self.genres else [],
+            "studios":    self.studios.split(",") if self.studios else [],
+            "synopsis":   self.synopsis,
+            "year":       self.year,
+            "season":     self.season,
+            "popularity": self.popularity,
+            "rank":       self.rank,
+        }
 
-    # Import and initialize user data AFTER db is initialized
-    from user_data import init_user_data, get_user_anime_list, get_status_counts, get_user_stats
-    from user_data import (mark_anime_for_user, change_anime_status_for_user, get_anime_status_for_user,
-                           update_anime_rating_for_user, rate_and_mark_anime_for_user, get_anime_rating_for_user)
 
-    # Import the recommendation engine
-    from recommendation_engine import get_recommendations
+class UserAnimeList(db.Model):
+    __tablename__ = "user_anime_list"
+    id          = db.Column(db.Integer, primary_key=True)
+    user_id     = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    anime_id    = db.Column(db.Integer, db.ForeignKey("anime.id"), nullable=False)
+    watch_status = db.Column(db.String(32), default="watching")  # watching/completed/dropped/plan_to_watch
+    user_rating = db.Column(db.Integer, nullable=True)           # 1-10
+    episodes_watched = db.Column(db.Integer, default=0)
+    added_at    = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at  = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
-    # Initialize user data models with the database from auth
-    try:
-        Anime, UserAnimeList = init_user_data(db)
-    except Exception as e:
-        print(f"Warning: Could not initialize user data models: {e}")
-        Anime = None
-        UserAnimeList = None
+    anime = db.relationship("Anime", backref="user_entries")
+    user  = db.relationship("User",  backref="anime_list")
 
-    # Now that user_data is initialized with the real get_status_counts,
-    # let's update auth's reference to it
-    import auth
-    auth.get_status_counts = get_status_counts
+    __table_args__ = (db.UniqueConstraint("user_id", "anime_id", name="uq_user_anime"),)
 
-    # Create all tables again to ensure all models are registered
-    with app.app_context():
-        try:
-            db.create_all()
-        except Exception as e:
-            print(f"Warning: Could not create all tables: {e}")
+    def to_dict(self):
+        return {
+            **self.anime.to_dict(),
+            "watch_status":      self.watch_status,
+            "user_rating":       self.user_rating,
+            "episodes_watched":  self.episodes_watched,
+            "added_at":          self.added_at.isoformat(),
+        }
 
-    # Global anime queue to serve one anime at a time
-    anime_queue = []
 
-    # Make sure data directory exists
-    os.makedirs('data', exist_ok=True)
+with app.app_context():
+    db.create_all()
 
-    def check_enhanced_features():
-        """Check if the database has enhanced features enabled."""
-        try:
-            inspector = inspect(db.engine)
-            columns = [col['name'] for col in inspector.get_columns('anime')]
-            return 'episodes_int' in columns and 'score_float' in columns
-        except:
-            return False
 
-    def check_rating_feature():
-        """Check if the database has rating feature enabled."""
-        try:
-            inspector = inspect(db.engine)
-            columns = [col['name'] for col in inspector.get_columns('user_anime_list')]
-            return 'user_rating' in columns
-        except:
-            return False
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def mal_headers_public():
+    return {"X-MAL-CLIENT-ID": MAL_CLIENT_ID}
 
-    def fetch_anime_details(anime_id):
-        """Fetch detailed anime information from MAL API - UPDATED FOR MAL API."""
-        return get_anime_details(anime_id)
 
-    def fetch_more_anime():
-        """Fetch a batch of popular anime from MAL API - UPDATED FOR MAL API."""
-        nonlocal anime_queue
-        print("Fetching popular anime from MAL API...")
-        
-        PAGE_TRACKER_FILE = os.path.join('data', "page_tracker.json")
-        
-        # Load the current page from file for persistence
-        try:
-            if os.path.exists(PAGE_TRACKER_FILE):
-                with open(PAGE_TRACKER_FILE, 'r') as f:
-                    current_page = json.load(f).get('current_page', 0)
-            else:
-                current_page = 0
-        except Exception:
-            current_page = 0
-        
-        print(f"Current offset: {current_page}")
-        
-        # MAL API ranking types to cycle through
-        ranking_types = ['all', 'airing', 'tv', 'movie', 'bypopularity']
-        ranking_type = ranking_types[current_page % len(ranking_types)]
-        
-        try:
-            print(f"Requesting {ranking_type} anime")
-            
-            # Use the helper function to get top anime WITH OFFSET
-            offset = (current_page // len(ranking_types)) * 20
-            top_anime_list = get_top_anime(ranking_type=ranking_type, limit=20, offset=offset)
+def mal_headers_user(user: User):
+    """Return bearer headers; refresh token if expired."""
+    if user.mal_token_expires and datetime.datetime.utcnow() > user.mal_token_expires:
+        _refresh_mal_token(user)
+    return {"Authorization": f"Bearer {user.mal_access_token}"}
 
-            
-            # Increment the page for next time
-            current_page += 1
-            
-            # Save the updated page number to file
-            os.makedirs(os.path.dirname(PAGE_TRACKER_FILE), exist_ok=True)
-            with open(PAGE_TRACKER_FILE, 'w') as f:
-                json.dump({'current_page': current_page}, f)
-            
-            # Get user's anime IDs to avoid duplicates
-            user_anime_ids = []
-            if current_user.is_authenticated:
-                try:
-                    watched_list = get_user_anime_list(current_user.id)
-                    user_anime_ids = [a["id"] for a in watched_list]
-                except Exception as e:
-                    print(f"Warning: Could not get user anime list: {e}")
-            
-            queue_ids = [a["id"] for a in anime_queue]
-            
-            # Track how many new anime we add
-            added_count = 0
-            
-            # Process each anime entry from MAL API
-            for item in top_anime_list:
-                anime_id = item.get("mal_id")
-                
-                # Skip if already in our lists or queue
-                if anime_id in user_anime_ids or anime_id in queue_ids:
-                    continue
-                
-                # Format the anime data to match the expected structure
-                anime = {
-                    "id": anime_id,
-                    "title": item.get("title", "Unknown Title"),
-                    "episodes": item.get("episodes") if item.get("episodes") is not None else "N/A",
-                    "main_picture": {
-                        "medium": item.get("main_picture", {}).get("medium", "")
-                    },
-                    "score": item.get("score", "N/A")
-                }
-                
-                anime_queue.append(anime)
-                added_count += 1
-            
-            print(f"Added {added_count} new anime to queue")
-            if added_count > 0:
-                flash(f"Successfully fetched {added_count} new popular anime!")
-            else:
-                flash("No new anime found to add. Try again later.")
-                
-        except Exception as e:
-            print(f"Error fetching anime: {e}")
-            flash(f"Error fetching anime: {e}")
 
-    def get_next_anime():
-        """Return the next anime from the queue; fetch more if needed."""
-        nonlocal anime_queue
-        if not anime_queue:
-            fetch_more_anime()
-        return anime_queue[0] if anime_queue else None
+def _refresh_mal_token(user: User):
+    resp = requests.post(f"{MAL_AUTH_BASE}/token", data={
+        "grant_type":    "refresh_token",
+        "refresh_token": user.mal_refresh_token,
+        "client_id":     MAL_CLIENT_ID,
+        "client_secret": MAL_CLIENT_SECRET,
+    })
+    if resp.ok:
+        data = resp.json()
+        user.mal_access_token  = data["access_token"]
+        user.mal_refresh_token = data.get("refresh_token", user.mal_refresh_token)
+        user.mal_token_expires = datetime.datetime.utcnow() + datetime.timedelta(seconds=data["expires_in"])
+        db.session.commit()
 
-    def skip_current_anime():
-        """Skip the current anime by removing it from the queue."""
-        nonlocal anime_queue
-        if anime_queue:
-            skipped_anime = anime_queue.pop(0)
-            print(f"Skipped anime: {skipped_anime.get('title', 'Unknown')}")
-            return skipped_anime
-        return None
 
-    @app.route("/")
-    def index():
-        """Display one anime at a time along with total watched count and rating option."""
-        current_anime = get_next_anime()
-        
-        watched_count = 0
-        current_rating = None
-        
-        if current_user.is_authenticated:
-            try:
-                watched_count, _ = get_status_counts(current_user.id)
-                if current_anime and check_rating_feature():
-                    current_rating = get_anime_rating_for_user(current_user.id, current_anime['id'])
-            except Exception as e:
-                print(f"Error getting status counts: {e}")
-                flash("There was an issue accessing your anime lists.")
-        
-        return render_template("index.html", 
-                               anime=current_anime,
-                               watched_count=watched_count,
-                               current_rating=current_rating,
-                               has_rating_feature=check_rating_feature(),
-                               get_url_for=get_url_for,
-                               is_authenticated=current_user.is_authenticated)
+def _upsert_anime(data: dict) -> Anime:
+    """Insert or update anime from MAL API response dict."""
+    mal_id = data.get("id") or data.get("mal_id")
+    anime  = Anime.query.filter_by(mal_id=mal_id).first()
+    if not anime:
+        anime = Anime(mal_id=mal_id)
+        db.session.add(anime)
 
-    @app.route("/skip")
-    def skip():
-        """Skip the current anime without marking it."""
-        skipped_anime = skip_current_anime()
-        if skipped_anime:
-            flash(f"Skipped '{skipped_anime.get('title', 'Unknown anime')}'")
+    alts = data.get("alternative_titles", {})
+    anime.title      = data.get("title", "Unknown")
+    anime.title_en   = alts.get("en") or data.get("title_en")
+    anime.image_url  = (data.get("main_picture") or {}).get("large") or (data.get("main_picture") or {}).get("medium")
+    anime.episodes   = data.get("num_episodes") or data.get("episodes")
+    anime.score      = data.get("mean") or data.get("score")
+    anime.media_type = data.get("media_type")
+    anime.status     = data.get("status")
+    anime.synopsis   = data.get("synopsis")
+    anime.popularity = data.get("popularity")
+    anime.rank       = data.get("rank")
+    ss = data.get("start_season") or {}
+    anime.year   = ss.get("year")
+    anime.season = ss.get("season")
+    anime.genres  = ",".join(g["name"] for g in data.get("genres",  []) if isinstance(g, dict))
+    anime.studios = ",".join(s["name"] for s in data.get("studios", []) if isinstance(s, dict))
+    anime.updated_at = datetime.datetime.utcnow()
+    db.session.commit()
+    return anime
+
+
+def require_auth(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        user_id = session.get("user_id")
+        if not user_id:
+            return jsonify({"error": "Unauthorized"}), 401
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        return f(user, *args, **kwargs)
+    return wrapper
+
+
+# ── Auth Routes ───────────────────────────────────────────────────────────────
+@app.post("/auth/register")
+def register():
+    body = request.json or {}
+    username = body.get("username", "").strip()
+    email    = body.get("email", "").strip()
+    password = body.get("password", "")
+    if not username or not password:
+        return jsonify({"error": "Username and password required"}), 400
+    if User.query.filter_by(username=username).first():
+        return jsonify({"error": "Username taken"}), 409
+    user = User(username=username, email=email or None)
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+    session["user_id"] = user.id
+    return jsonify(user.to_dict()), 201
+
+
+@app.post("/auth/login")
+def login():
+    body = request.json or {}
+    username = body.get("username", "").strip()
+    password = body.get("password", "")
+    user = User.query.filter_by(username=username).first()
+    if not user or not user.check_password(password):
+        return jsonify({"error": "Invalid credentials"}), 401
+    session["user_id"] = user.id
+    return jsonify(user.to_dict())
+
+
+@app.post("/auth/logout")
+def logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.get("/auth/me")
+def me():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify(None)
+    user = User.query.get(user_id)
+    return jsonify(user.to_dict() if user else None)
+
+
+# ── MAL OAuth ─────────────────────────────────────────────────────────────────
+def _pkce_pair():
+    verifier  = base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b"=").decode()
+    challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode()).digest()
+    ).rstrip(b"=").decode()
+    return verifier, challenge
+
+
+@app.get("/auth/mal/authorize")
+def mal_authorize():
+    verifier, challenge = _pkce_pair()
+    state = secrets.token_urlsafe(16)
+    session["mal_pkce_verifier"] = verifier
+    session["mal_state"]         = state
+    params = (
+        f"response_type=code"
+        f"&client_id={MAL_CLIENT_ID}"
+        f"&redirect_uri={MAL_REDIRECT_URI}"
+        f"&state={state}"
+        f"&code_challenge={challenge}"
+        f"&code_challenge_method=plain"
+    )
+    return redirect(f"{MAL_AUTH_BASE}/authorize?{params}")
+
+
+@app.get("/auth/mal/callback")
+def mal_callback():
+    code      = request.args.get("code")
+    state     = request.args.get("state")
+    if state != session.pop("mal_state", None):
+        return jsonify({"error": "State mismatch"}), 400
+
+    verifier = session.pop("mal_pkce_verifier", "")
+    resp = requests.post(f"{MAL_AUTH_BASE}/token", data={
+        "client_id":     MAL_CLIENT_ID,
+        "client_secret": MAL_CLIENT_SECRET,
+        "code":          code,
+        "code_verifier": verifier,
+        "grant_type":    "authorization_code",
+        "redirect_uri":  MAL_REDIRECT_URI,
+    })
+    if not resp.ok:
+        return jsonify({"error": "Token exchange failed", "detail": resp.text}), 400
+
+    tokens = resp.json()
+    access  = tokens["access_token"]
+    refresh = tokens.get("refresh_token")
+    expires = datetime.datetime.utcnow() + datetime.timedelta(seconds=tokens["expires_in"])
+
+    # fetch MAL user info
+    mal_user_resp = requests.get(f"{MAL_API_BASE}/users/@me", headers={"Authorization": f"Bearer {access}"})
+    mal_info = mal_user_resp.json() if mal_user_resp.ok else {}
+    mal_user_id  = mal_info.get("id")
+    mal_username = mal_info.get("name")
+
+    # link to existing session user or find by mal_id or create new user
+    user_id = session.get("user_id")
+    user = User.query.get(user_id) if user_id else None
+    if not user:
+        user = User.query.filter_by(mal_user_id=mal_user_id).first()
+    if not user:
+        user = User(username=mal_username or f"mal_{mal_user_id}", mal_user_id=mal_user_id)
+        db.session.add(user)
+
+    user.mal_user_id       = mal_user_id
+    user.mal_username      = mal_username
+    user.mal_access_token  = access
+    user.mal_refresh_token = refresh
+    user.mal_token_expires = expires
+    db.session.commit()
+    session["user_id"] = user.id
+
+    frontend = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+    return redirect(f"{frontend}/profile?mal_linked=1")
+
+
+@app.delete("/auth/mal/unlink")
+@require_auth
+def mal_unlink(user):
+    user.mal_access_token  = None
+    user.mal_refresh_token = None
+    user.mal_token_expires = None
+    user.mal_user_id       = None
+    user.mal_username      = None
+    db.session.commit()
+    return jsonify(user.to_dict())
+
+
+# ── MAL API Proxy ─────────────────────────────────────────────────────────────
+ANIME_FIELDS = (
+    "id,title,alternative_titles,main_picture,mean,rank,popularity,"
+    "num_episodes,media_type,status,genres,studios,synopsis,start_season,"
+    "broadcast,source,average_episode_duration,rating,pictures,background,"
+    "related_anime,recommendations"
+)
+
+
+@app.get("/api/anime/<int:mal_id>")
+def get_anime(mal_id):
+    resp = requests.get(
+        f"{MAL_API_BASE}/anime/{mal_id}",
+        headers=mal_headers_public(),
+        params={"fields": ANIME_FIELDS},
+    )
+    if not resp.ok:
+        return jsonify({"error": "Not found"}), 404
+    anime = _upsert_anime(resp.json())
+    return jsonify(anime.to_dict())
+
+
+@app.get("/api/anime/search")
+def search_anime():
+    q     = request.args.get("q", "")
+    limit = min(int(request.args.get("limit", 20)), 100)
+    if not q:
+        return jsonify([])
+    resp = requests.get(
+        f"{MAL_API_BASE}/anime",
+        headers=mal_headers_public(),
+        params={"q": q, "limit": limit, "fields": ANIME_FIELDS},
+    )
+    if not resp.ok:
+        return jsonify([])
+    results = []
+    for item in resp.json().get("data", []):
+        anime = _upsert_anime(item["node"])
+        results.append(anime.to_dict())
+    return jsonify(results)
+
+
+@app.get("/api/anime/ranking")
+def get_ranking():
+    ranking_type = request.args.get("ranking_type", "all")
+    limit  = min(int(request.args.get("limit", 20)), 100)
+    offset = int(request.args.get("offset", 0))
+    resp = requests.get(
+        f"{MAL_API_BASE}/anime/ranking",
+        headers=mal_headers_public(),
+        params={"ranking_type": ranking_type, "limit": limit, "offset": offset, "fields": ANIME_FIELDS},
+    )
+    if not resp.ok:
+        return jsonify([])
+    results = []
+    for item in resp.json().get("data", []):
+        anime = _upsert_anime(item["node"])
+        results.append(anime.to_dict())
+    return jsonify(results)
+
+
+@app.get("/api/anime/seasonal")
+def get_seasonal():
+    year   = request.args.get("year",   datetime.datetime.now().year)
+    season = request.args.get("season", _current_season())
+    limit  = min(int(request.args.get("limit", 20)), 100)
+    resp = requests.get(
+        f"{MAL_API_BASE}/anime/season/{year}/{season}",
+        headers=mal_headers_public(),
+        params={"limit": limit, "fields": ANIME_FIELDS, "sort": "anime_score"},
+    )
+    if not resp.ok:
+        return jsonify([])
+    results = []
+    for item in resp.json().get("data", []):
+        anime = _upsert_anime(item["node"])
+        results.append(anime.to_dict())
+    return jsonify(results)
+
+
+def _current_season():
+    m = datetime.datetime.now().month
+    if m in [12, 1, 2]:  return "winter"
+    if m in [3, 4, 5]:   return "spring"
+    if m in [6, 7, 8]:   return "summer"
+    return "fall"
+
+
+# ── User List Routes ──────────────────────────────────────────────────────────
+@app.get("/api/list")
+@require_auth
+def get_list(user):
+    status = request.args.get("status")
+    query  = UserAnimeList.query.filter_by(user_id=user.id)
+    if status:
+        query = query.filter_by(watch_status=status)
+    entries = query.order_by(UserAnimeList.updated_at.desc()).all()
+    return jsonify([e.to_dict() for e in entries])
+
+
+@app.post("/api/list")
+@require_auth
+def add_to_list(user):
+    body     = request.json or {}
+    mal_id   = body.get("mal_id")
+    status   = body.get("watch_status", "plan_to_watch")
+    rating   = body.get("user_rating")
+    eps      = body.get("episodes_watched", 0)
+    if not mal_id:
+        return jsonify({"error": "mal_id required"}), 400
+
+    # fetch from MAL if not in DB
+    anime = Anime.query.filter_by(mal_id=mal_id).first()
+    if not anime:
+        resp = requests.get(
+            f"{MAL_API_BASE}/anime/{mal_id}",
+            headers=mal_headers_public(),
+            params={"fields": ANIME_FIELDS},
+        )
+        if resp.ok:
+            anime = _upsert_anime(resp.json())
         else:
-            flash("No anime to skip")
-        
-        # If the queue is empty after skipping, fetch more
-        if not anime_queue:
-            fetch_more_anime()
-        
-        return redirect(get_url_for("index"))
+            return jsonify({"error": "Anime not found on MAL"}), 404
 
-    @app.route("/mark", methods=["POST"])
-    @login_required
-    def mark():
-        """Mark the current anime as watched only."""
-        status = request.form.get("status")
-        anime_json = request.form.get("anime")
-        
-        if status != "watched":
-            flash("Only 'watched' status is supported")
-            return redirect(get_url_for("index"))
-            
-        if not anime_json:
-            flash("Error: No anime data provided")
-            return redirect(get_url_for("index"))
-        
-        try:
-            anime_data = json.loads(anime_json)
-            
-            # Fetch detailed anime information from MAL API if enhanced features are available
-            if check_enhanced_features():
-                detailed_anime = fetch_anime_details(anime_data["id"])
-                if detailed_anime:
-                    anime_data.update(detailed_anime)
-            
-            # Mark the anime for the current user
-            mark_anime_for_user(current_user.id, anime_data, status)
-            flash(f"Added '{anime_data['title']}' to your watched list!")
-            
-            # Remove the marked anime from the queue
-            nonlocal anime_queue
-            anime_queue = [a for a in anime_queue if a["id"] != anime_data["id"]]
-            
-            # If the queue is empty, try to fetch more anime
-            if not anime_queue:
-                fetch_more_anime()
-                
-        except json.decoder.JSONDecodeError as e:
-            flash(f"Error: Invalid anime data format: {e}")
-            return redirect(get_url_for("index"))
-        except Exception as e:
-            flash(f"Error marking anime: {e}")
-            return redirect(get_url_for("index"))
-        
-        return redirect(get_url_for("index"))
+    entry = UserAnimeList.query.filter_by(user_id=user.id, anime_id=anime.id).first()
+    if not entry:
+        entry = UserAnimeList(user_id=user.id, anime_id=anime.id)
+        db.session.add(entry)
 
-    @app.route("/rate_anime", methods=["POST"])
-    @login_required
-    def rate_anime():
-        """Rate an anime and optionally mark it as watched."""
-        if not check_rating_feature():
-            return jsonify({"success": False, "message": "Rating feature not available"})
-        
-        try:
-            anime_id = request.form.get("anime_id")
-            rating = request.form.get("rating")
-            
-            if not anime_id:
-                return jsonify({"success": False, "message": "Anime ID required"})
-            
-            # Validate rating
-            try:
-                rating = int(rating) if rating is not None else None
-                if rating is not None and not (0 <= rating <= 5):
-                    return jsonify({"success": False, "message": "Rating must be between 0 and 5"})
-            except ValueError:
-                return jsonify({"success": False, "message": "Invalid rating format"})
-            
-            anime_id = int(anime_id)
-            marked_as_watched = False
-            
-            # Check if anime is already in user's list
-            current_status = get_anime_status_for_user(current_user.id, anime_id)
-            
-            if current_status == 'watched':
-                # Update existing rating
-                success = update_anime_rating_for_user(current_user.id, anime_id, rating)
-                if not success:
-                    return jsonify({"success": False, "message": "Failed to update rating"})
-            else:
-                # If rating > 0, mark as watched automatically
-                if rating and rating > 0:
-                    # Fetch anime data to mark as watched
-                    anime_data = None
-                    
-                    # First check if it's in our queue
-                    nonlocal anime_queue
-                    anime_data = next((a for a in anime_queue if a["id"] == anime_id), None)
-                    
-                    if not anime_data:
-                        # Fetch from API
-                        anime_data = fetch_anime_details(anime_id)
-                    
-                    if anime_data:
-                        mark_anime_for_user(current_user.id, anime_data, 'watched', rating)
-                        marked_as_watched = True
-                        
-                        # Remove from queue if it was there
-                        anime_queue = [a for a in anime_queue if a["id"] != anime_id]
-                    else:
-                        return jsonify({"success": False, "message": "Could not fetch anime data"})
-                else:
-                    # Just update rating without marking as watched (for rating 0 or None)
-                    # But anime needs to exist in watched list to have a rating
-                    if rating == 0:
-                        success = update_anime_rating_for_user(current_user.id, anime_id, None)
-                        if not success:
-                            return jsonify({"success": False, "message": "Anime not in your watched list"})
-                    else:
-                        return jsonify({"success": False, "message": "Anime must be watched to rate it"})
-            
-            return jsonify({
-                "success": True, 
-                "message": "Rating saved successfully",
-                "marked_as_watched": marked_as_watched
-            })
-            
-        except Exception as e:
-            print(f"Error in rate_anime: {e}")
-            traceback.print_exc()
-            return jsonify({"success": False, "message": "Internal server error"})
+    entry.watch_status      = status
+    entry.user_rating       = rating
+    entry.episodes_watched  = eps
+    entry.updated_at        = datetime.datetime.utcnow()
+    db.session.commit()
+    return jsonify(entry.to_dict()), 201
 
-    @app.route("/direct_mark/<int:anime_id>/<status>")
-    @login_required
-    def direct_mark(anime_id, status):
-        """Alternative method to mark anime by ID directly."""
-        if status != "watched":
-            flash("Only 'watched' status is supported")
-            return redirect(get_url_for("index"))
-        
-        # Check if this anime is in our queue
-        nonlocal anime_queue
-        anime = next((a for a in anime_queue if a["id"] == anime_id), None)
-        
-        if not anime:
-            # If not in queue, fetch it from the API
-            try:
-                anime = fetch_anime_details(anime_id)
-                if not anime:
-                    flash("Error fetching anime details")
-                    return redirect(get_url_for("index"))
-            except Exception as e:
-                flash(f"Error fetching anime details: {e}")
-                return redirect(get_url_for("index"))
-        else:
-            # Fetch detailed information for anime in queue if enhanced features are available
-            if check_enhanced_features():
-                detailed_anime = fetch_anime_details(anime_id)
-                if detailed_anime:
-                    anime.update(detailed_anime)
-        
-        # Mark the anime for the current user
-        mark_anime_for_user(current_user.id, anime, status)
-        flash(f"Added '{anime['title']}' to your watched list!")
-        
-        # Remove from queue if present
-        anime_queue = [a for a in anime_queue if a["id"] != anime_id]
-        
-        # If the queue is empty, try to fetch more anime
-        if not anime_queue:
-            fetch_more_anime()
-        
-        return redirect(get_url_for("index"))
 
-    @app.route("/fetch")
-    def fetch():
-        """Manually trigger a fetch for more anime."""
-        fetch_more_anime()
-        flash("Fetched additional anime!")
-        return redirect(get_url_for("index"))
+@app.patch("/api/list/<int:mal_id>")
+@require_auth
+def update_list_entry(user, mal_id):
+    anime = Anime.query.filter_by(mal_id=mal_id).first()
+    if not anime:
+        return jsonify({"error": "Not found"}), 404
+    entry = UserAnimeList.query.filter_by(user_id=user.id, anime_id=anime.id).first()
+    if not entry:
+        return jsonify({"error": "Not in list"}), 404
 
-    @app.route("/watched")
-    @login_required
-    def watched():
-        """Display the list of anime marked as watched with ratings."""
-        print(f"User {current_user.id} attempting to access /watched route.")
-        try:
-            # Get sorting parameters
-            sort_by = request.args.get('sort_by', 'date_added')
-            sort_order = request.args.get('sort_order', 'desc')
-            
-            print(f"Calling get_user_anime_list for user {current_user.id} with sorting: {sort_by} {sort_order}")
-            watched_list = get_user_anime_list(current_user.id, sort_by, sort_order)
-            print(f"Successfully retrieved watched_list for user {current_user.id}. Count: {len(watched_list)}")
-            
-            return render_template("list.html",
-                                 anime_list=watched_list, 
-                                 list_type="Watched",
-                                 has_rating_feature=check_rating_feature(),
-                                 sort_by=sort_by,
-                                 sort_order=sort_order,
-                                 get_url_for=get_url_for)
-        except Exception as e:
-            detailed_error = traceback.format_exc()
-            print(f"Error in /watched route for user {current_user.id}: {e}\n{detailed_error}")
-            flash("Error loading your watched list. Please try again.")
-            return redirect(get_url_for("index"))
+    body = request.json or {}
+    if "watch_status"      in body: entry.watch_status      = body["watch_status"]
+    if "user_rating"       in body: entry.user_rating       = body["user_rating"]
+    if "episodes_watched"  in body: entry.episodes_watched  = body["episodes_watched"]
+    entry.updated_at = datetime.datetime.utcnow()
+    db.session.commit()
+    return jsonify(entry.to_dict())
 
-    @app.route("/recommendations")
-    @login_required
-    def recommendations():
-        """Display personalized anime recommendations."""
-        try:
-            # Get user's watched list, which includes ratings
-            # The recommendation engine needs the 'mal_id' and 'user_rating' keys
-            watched_list = get_user_anime_list(current_user.id, fetch_details=True)
 
-            if not watched_list:
-                flash("You need to watch and rate some anime before we can provide recommendations.", "info")
-                return render_template("recommendations.html", recommendations=[])
+@app.delete("/api/list/<int:mal_id>")
+@require_auth
+def remove_from_list(user, mal_id):
+    anime = Anime.query.filter_by(mal_id=mal_id).first()
+    if not anime:
+        return jsonify({"error": "Not found"}), 404
+    entry = UserAnimeList.query.filter_by(user_id=user.id, anime_id=anime.id).first()
+    if entry:
+        db.session.delete(entry)
+        db.session.commit()
+    return jsonify({"ok": True})
 
-            # Generate recommendations
-            # Using test_mode=True to limit API calls during testing.
-            # For production, this should be False.
-            recs = get_recommendations(watched_list, test_mode=True)
 
-            return render_template("recommendations.html", recommendations=recs, get_url_for=get_url_for)
-        except Exception as e:
-            print(f"Error generating recommendations: {e}")
-            traceback.print_exc()
-            flash("Sorry, there was an error generating recommendations. Please try again later.", "danger")
-            return redirect(get_url_for("index"))
+# ── Stats Route ───────────────────────────────────────────────────────────────
+@app.get("/api/stats")
+@require_auth
+def get_stats(user):
+    entries = UserAnimeList.query.filter_by(user_id=user.id).all()
+    if not entries:
+        return jsonify({"total": 0, "completed": 0, "watching": 0, "plan_to_watch": 0,
+                        "dropped": 0, "total_episodes": 0, "mean_score": 0,
+                        "genres": {}, "top_rated": []})
 
-    @app.route("/stats")
-    @login_required
-    def stats():
-        """Display comprehensive statistics for the user including rating stats."""
-        try:
-            user_stats = get_user_stats(current_user.id)
-            return render_template("stats.html", 
-                                 stats=user_stats, 
-                                 has_rating_feature=check_rating_feature(),
-                                 get_url_for=get_url_for)
-        except Exception as e:
-            print(f"Error getting user stats: {e}")
-            flash("Error loading statistics. Please try again later.")
-            return redirect(get_url_for("index"))
+    completed   = [e for e in entries if e.watch_status == "completed"]
+    watching    = [e for e in entries if e.watch_status == "watching"]
+    ptw         = [e for e in entries if e.watch_status == "plan_to_watch"]
+    dropped     = [e for e in entries if e.watch_status == "dropped"]
+    rated       = [e for e in entries if e.user_rating]
+    total_eps   = sum((e.anime.episodes or 0) for e in completed)
+    mean_score  = round(sum(e.user_rating for e in rated) / len(rated), 2) if rated else 0
 
-    @app.route("/remove_anime/<int:anime_id>")
-    @login_required
-    def remove_anime(anime_id):
-        """Remove an anime from the user's watched list."""
-        try:
-            success = change_anime_status_for_user(current_user.id, anime_id, 'remove')
-            
-            if success:
-                if Anime:
-                    anime = Anime.query.filter_by(mal_id=anime_id).first()
-                    anime_title = anime.title if anime else "the anime"
-                else:
-                    anime_title = "the anime"
-                flash(f"Removed '{anime_title}' from your watched list!")
-            else:
-                flash("Could not remove anime. Anime not found in your list.")
-        except Exception as e:
-            print(f"Error removing anime: {e}")
-            flash("Error removing anime. Please try again.")
-        
-        return redirect(request.referrer or get_url_for("watched"))
+    genre_count = {}
+    for e in entries:
+        for g in (e.anime.genres or "").split(","):
+            g = g.strip()
+            if g: genre_count[g] = genre_count.get(g, 0) + 1
 
-    @app.route("/search", methods=["GET", "POST"])
-    def search():
-        """Search for anime by title with rating display - UPDATED FOR MAL API."""
-        results = []
-        query = request.args.get("query", "") or request.form.get("query", "")
-        
-        if query:
-            session['search_query'] = query
-        
-        if query:
-            try:
-                # Use MAL API search instead of Jikan
-                search_results = search_anime(query, limit=20)
-                
-                for item in search_results:
-                    anime = {
-                        "id": item.get("mal_id"),
-                        "title": item.get("title"),
-                        "episodes": item.get("episodes") if item.get("episodes") is not None else "N/A",
-                        "main_picture": {
-                            "medium": item.get("main_picture", {}).get("medium", "")
-                        },
-                        "score": item.get("score", "N/A"),
-                        "status": None,
-                        "user_rating": None
-                    }
-                    
-                    # Check if the user is authenticated and get the anime status and rating
-                    if current_user.is_authenticated:
-                        try:
-                            anime["status"] = get_anime_status_for_user(current_user.id, anime["id"])
-                            if check_rating_feature():
-                                anime["user_rating"] = get_anime_rating_for_user(current_user.id, anime["id"])
-                        except Exception as e:
-                            print(f"Error getting anime status/rating: {e}")
-                    
-                    results.append(anime)
-                    
-                if not results:
-                    flash("No results found. Try a different search term.")
-            except Exception as e:
-                flash(f"Error searching for anime: {e}")
-        
-        return render_template("search.html", 
-                             results=results, 
-                             query=query, 
-                             has_rating_feature=check_rating_feature(),
-                             get_url_for=get_url_for)
+    top_rated = sorted(rated, key=lambda e: e.user_rating, reverse=True)[:5]
 
-    @app.route("/mark_search", methods=["POST"])
-    @login_required
-    def mark_search():
-        """Mark an anime from search results as watched."""
-        anime_id = request.form.get("anime_id")
-        status = request.form.get("status")
-        query = session.get('search_query', '')
-        
-        if not anime_id or status != "watched":
-            flash("Missing required parameters or invalid status")
-            return redirect(url_for('search', query=query))
-        
-        try:
-            anime_data = fetch_anime_details(anime_id)
-            if anime_data:
-                mark_anime_for_user(current_user.id, anime_data, status)
-                flash(f"Added anime to your watched list!")
-            else:
-                flash("Error fetching anime details")
-        except Exception as e:
-            flash(f"Error marking anime: {e}")
-            
-        return redirect(url_for('search', query=query))
+    return jsonify({
+        "total":          len(entries),
+        "completed":      len(completed),
+        "watching":       len(watching),
+        "plan_to_watch":  len(ptw),
+        "dropped":        len(dropped),
+        "total_episodes": total_eps,
+        "mean_score":     mean_score,
+        "genres":         genre_count,
+        "top_rated":      [e.to_dict() for e in top_rated],
+    })
 
-    return app, db
+
+# ── MAL Sync Route ────────────────────────────────────────────────────────────
+@app.post("/api/mal/sync")
+@require_auth
+def mal_sync(user):
+    """Sync user's MAL list into local DB."""
+    if not user.mal_access_token:
+        return jsonify({"error": "MAL not linked"}), 400
+
+    synced = 0
+    offset = 0
+    fields = "list_status,num_episodes,mean,genres,studios,main_picture,alternative_titles,start_season"
+
+    while True:
+        resp = requests.get(
+            f"{MAL_API_BASE}/users/@me/animelist",
+            headers=mal_headers_user(user),
+            params={"fields": fields, "limit": 100, "offset": offset, "nsfw": True},
+        )
+        if not resp.ok:
+            break
+        data = resp.json()
+        for item in data.get("data", []):
+            node       = item["node"]
+            ls         = item.get("list_status", {})
+            anime      = _upsert_anime(node)
+            entry      = UserAnimeList.query.filter_by(user_id=user.id, anime_id=anime.id).first()
+            if not entry:
+                entry  = UserAnimeList(user_id=user.id, anime_id=anime.id)
+                db.session.add(entry)
+
+            status_map = {"watching": "watching", "completed": "completed",
+                          "on_hold": "watching", "dropped": "dropped",
+                          "plan_to_watch": "plan_to_watch"}
+            entry.watch_status     = status_map.get(ls.get("status", "plan_to_watch"), "plan_to_watch")
+            entry.user_rating      = ls.get("score") or None
+            entry.episodes_watched = ls.get("num_episodes_watched", 0)
+            synced += 1
+
+        if not data.get("paging", {}).get("next"):
+            break
+        offset += 100
+
+    db.session.commit()
+    return jsonify({"synced": synced})
+
+
+# ── Recommendations Route ─────────────────────────────────────────────────────
+@app.get("/api/recommendations")
+@require_auth
+def get_recommendations(user):
+    completed = UserAnimeList.query.filter_by(
+        user_id=user.id, watch_status="completed"
+    ).order_by(UserAnimeList.user_rating.desc().nullslast()).limit(10).all()
+
+    if not completed:
+        # Fallback: top seasonal
+        resp = requests.get(
+            f"{MAL_API_BASE}/anime/ranking",
+            headers=mal_headers_public(),
+            params={"ranking_type": "all", "limit": 20, "fields": ANIME_FIELDS},
+        )
+        if resp.ok:
+            results = [_upsert_anime(i["node"]).to_dict() for i in resp.json().get("data", [])]
+            return jsonify(results)
+        return jsonify([])
+
+    # collect related anime from MAL for top 5 highest rated
+    watched_ids = {e.anime.mal_id for e in UserAnimeList.query.filter_by(user_id=user.id).all()}
+    recs = {}
+
+    for entry in completed[:5]:
+        resp = requests.get(
+            f"{MAL_API_BASE}/anime/{entry.anime.mal_id}",
+            headers=mal_headers_public(),
+            params={"fields": "recommendations,related_anime"},
+        )
+        if not resp.ok:
+            continue
+        data = resp.json()
+        for r in data.get("recommendations", [])[:5]:
+            node = r.get("node", {})
+            mid  = node.get("id")
+            if mid and mid not in watched_ids:
+                recs[mid] = node
+
+    results = []
+    for mid, node in list(recs.items())[:20]:
+        full = requests.get(
+            f"{MAL_API_BASE}/anime/{mid}",
+            headers=mal_headers_public(),
+            params={"fields": ANIME_FIELDS},
+        )
+        if full.ok:
+            anime = _upsert_anime(full.json())
+            results.append(anime.to_dict())
+
+    return jsonify(results)
+
 
 if __name__ == "__main__":
-    app, _ = create_app()
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
+
+# ── Frontend SPA ──────────────────────────────────────────────────────────────
+# Serves the bundled React app for all non-API/auth routes.
+# Place animewatchlist.html in projects/animewatchlist/templates/
+from flask import render_template as _render_template
+
+@app.route("/ui")
+@app.route("/ui/<path:frontend_path>")
+def spa(frontend_path=None):
+    return _render_template("animewatchlist.html")

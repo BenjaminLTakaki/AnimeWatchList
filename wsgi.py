@@ -5,214 +5,147 @@ from flask import Flask, send_from_directory, redirect, request
 from dotenv import load_dotenv
 from flask_migrate import Migrate
 
-# Load environment variables
 load_dotenv()
 
-# Create a main application to serve static files
 main_app = Flask(__name__, static_folder='.')
 
-# Set the Python path to include the project directories
 project_root = os.path.dirname(os.path.abspath(__file__))
 projects_dir = os.path.join(project_root, 'projects')
 if projects_dir not in sys.path:
     sys.path.insert(0, projects_dir)
 
-# SkillsTown app setup
-skillstown_path = os.path.join(projects_dir, 'skillstown')
-
-# Define the paths to ensure they exist before import
+# ── SkillsTown ────────────────────────────────────────────────────────────────
+skillstown_path  = os.path.join(projects_dir, 'skillstown')
 os.makedirs(os.path.join(skillstown_path, 'uploads'), exist_ok=True)
 os.makedirs(os.path.join(skillstown_path, 'static', 'data'), exist_ok=True)
 os.makedirs(os.path.join(skillstown_path, 'static'), exist_ok=True)
 
-# Import SkillsTown app with factory pattern
 skillstown_error = None
 try:
-    # projects_dir is already in sys.path
     from skillstown.app import create_app
     skillstown_app = create_app('production')
     print("SkillsTown app imported successfully")
 except Exception as e:
     skillstown_error = str(e)
     print(f"Could not import SkillsTown app: {skillstown_error}")
-    print(f"Current sys.path: {sys.path}")
-    print("Creating a stub SkillsTown app")
     skillstown_app = Flask("skillstown_stub")
-    
+
     @skillstown_app.route('/')
     def skillstown_index():
         return f"SkillsTown is currently unavailable. Error: {skillstown_error}"
 
-# AnimeWatchList app setup
+# ── AnimeWatchList (new unified app) ─────────────────────────────────────────
 animewatchlist_path = os.path.join(projects_dir, 'animewatchlist')
 if animewatchlist_path not in sys.path:
     sys.path.insert(0, animewatchlist_path)
 
-# Import the AnimeWatchList app with error handling
 try:
-    from animewatchlist.app import create_app as create_animewatchlist_app
+    from animewatchlist.app import app as animewatchlist_app
 
-    animewatchlist_app, animewatchlist_db = create_animewatchlist_app({
-        'SQLALCHEMY_DATABASE_URI': os.environ.get('DATABASE_URL'),
-        'SECRET_KEY': os.environ.get('FLASK_SECRET_KEY'),
-    })
-    Migrate(animewatchlist_app, animewatchlist_db)
-    print("AnimeWatchList app created successfully using factory")
+    _db_url = os.environ.get('DATABASE_URL', '')
+    if _db_url.startswith('postgres://'):
+        _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+
+    animewatchlist_app.config['SECRET_KEY'] = os.environ.get(
+        'FLASK_SECRET_KEY', os.environ.get('SECRET_KEY', 'change-me')
+    )
+    animewatchlist_app.config['SQLALCHEMY_DATABASE_URI']        = _db_url or 'sqlite:///animewatchlist.db'
+    animewatchlist_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    # MAL OAuth credentials forwarded from environment
+    animewatchlist_app.config['MAL_CLIENT_ID']     = os.environ.get('MAL_CLIENT_ID', '')
+    animewatchlist_app.config['MAL_CLIENT_SECRET']  = os.environ.get('MAL_CLIENT_SECRET', '')
+    animewatchlist_app.config['MAL_REDIRECT_URI']   = os.environ.get(
+        'MAL_REDIRECT_URI',
+        'https://benjamintakaki.com/auth/mal/callback'
+    )
+
+    from animewatchlist.app import db as animewatchlist_db
+    with animewatchlist_app.app_context():
+        animewatchlist_db.create_all()
+
+    print("AnimeWatchList app loaded successfully")
     has_animewatchlist_app = True
+
 except Exception as e:
-    print(f"Could not create AnimeWatchList app from factory: {e}")
     import traceback
-    print(f"Full traceback: {traceback.format_exc()}")
-    print("Creating a stub AnimeWatchList app")
+    print(f"Could not load AnimeWatchList app: {e}")
+    print(traceback.format_exc())
     animewatchlist_app = Flask("animewatchlist_stub")
-    
-    @animewatchlist_app.route('/')
-    def animewatchlist_index():
-        return "AnimeWatchList is currently unavailable. Database connection issues. Please check your PostgreSQL setup."
-    
     has_animewatchlist_app = False
 
-# Spotify Cover Generator app setup - FIXED VERSION
-spotify_path = os.path.join(projects_dir, 'spotify-cover-generator')
+    @animewatchlist_app.route('/')
+    @animewatchlist_app.route('/<path:path>')
+    def animewatchlist_stub(path=None):
+        return f"AnimeWatchList unavailable: {e}", 503
+
+# ── Spotify Cover Generator ───────────────────────────────────────────────────
+spotify_path  = os.path.join(projects_dir, 'spotify-cover-generator')
 spotify_error = None
 
-
 def build_spotify_stub(error_message):
-    """Create a simple fallback app so /spotify always has a valid route."""
-    stub_app = Flask("spotify_stub")
+    stub = Flask("spotify_stub")
 
-    @stub_app.route('/')
-    @stub_app.route('/<path:path>')
+    @stub.route('/')
+    @stub.route('/<path:path>')
     def spotify_unavailable(path=None):
-        return f"""
-        <h1>Spotify Cover Generator - Temporarily Unavailable</h1>
-        <p>The Spotify Cover Generator is experiencing technical difficulties.</p>
-        <p>Error: {error_message}</p>
-        <p><a href=\"/\">Return to main site</a></p>
-        """
+        return f"<h1>Spotify Cover Generator unavailable</h1><p>{error_message}</p><p><a href='/'>Home</a></p>"
 
-    return stub_app
+    return stub
 
 def import_spotify_app():
-    """Safely import the Spotify app with proper error handling"""
     try:
-        print(f"Setting up Spotify app from path: {spotify_path}")
-        
         if not os.path.exists(spotify_path):
-            print(f"❌ Spotify path does not exist: {spotify_path}")
             return build_spotify_stub(f"Path not found: {spotify_path}"), False
-        
-        try:
-            # Add spotify-cover-generator to Python path
-            if spotify_path not in sys.path:
-                sys.path.insert(0, spotify_path)
-            
-            print(f"Attempting Spotify import. sys.path: {sys.path}")
-            
-            # Import directly from app.py in the spotify-cover-generator directory
-            from app import app as spotify_app
-            
-            # Test basic app functionality
-            with spotify_app.app_context():
-                try:
-                    from extensions import db
-                    db.session.execute(db.text('SELECT 1'))
-                    print("✓ Spotify app database connection verified")
-                except Exception as db_error:
-                    print(f"⚠️ Spotify database issue: {db_error}")
-            
-            print("✅ Spotify app imported successfully")
-            return spotify_app, True
-            
-        except ImportError as import_error:
-            print(f"❌ Spotify app import failed: {import_error}")
-            print("Creating stub Spotify app")
-            return build_spotify_stub(str(import_error)), False
-            
-        except Exception as e:
-            print(f"❌ Unexpected error importing Spotify app: {e}")
-            import traceback
-            print(f"Full traceback: {traceback.format_exc()}")
-            return build_spotify_stub(str(e)), False
-            
+        if spotify_path not in sys.path:
+            sys.path.insert(0, spotify_path)
+        from app import app as sp_app
+        with sp_app.app_context():
+            try:
+                from extensions import db
+                db.session.execute(db.text('SELECT 1'))
+            except Exception as db_err:
+                print(f"Spotify DB warning: {db_err}")
+        print("Spotify app imported successfully")
+        return sp_app, True
     except Exception as e:
-        print(f"❌ Critical error in Spotify app setup: {e}")
+        import traceback
+        print(f"Spotify import failed: {e}")
+        print(traceback.format_exc())
         return build_spotify_stub(str(e)), False
 
-# Use the safe import function
 spotify_app, has_spotify_app = import_spotify_app()
 
-# Configure Spotify app if it was imported successfully
-if has_spotify_app and spotify_app:
-    try:
-        spotify_app.config['APPLICATION_ROOT'] = '/spotify'
-        spotify_app.config['PREFERRED_URL_SCHEME'] = 'https'
-        
-        @spotify_app.context_processor
-        def inject_spotify_vars():
-            return {
-                'current_year': datetime.datetime.now().year
-            }
-        
-        print("✓ Spotify app configured successfully")
-    except Exception as config_error:
-        print(f"⚠️ Spotify app configuration warning: {config_error}")
-else:
-    print("⚠️ Spotify app not available")
-
-# Update the static file serving for Spotify
 if has_spotify_app:
+    spotify_app.config['APPLICATION_ROOT']      = '/spotify'
+    spotify_app.config['PREFERRED_URL_SCHEME']  = 'https'
     SPOTIFY_APP_STATIC_DIR = os.path.join(spotify_path, 'static')
-    
+
     @main_app.route('/spotify/static/<path:filename>')
     def spotify_static(filename):
-        try:
-            if os.path.exists(os.path.join(SPOTIFY_APP_STATIC_DIR, filename)):
-                return send_from_directory(SPOTIFY_APP_STATIC_DIR, filename)
-            else:
-                return f"Static file {filename} not found", 404
-        except Exception as e:
-            print(f"Error serving Spotify static file {filename}: {e}")
-            return "Error serving file", 500
+        if os.path.exists(os.path.join(SPOTIFY_APP_STATIC_DIR, filename)):
+            return send_from_directory(SPOTIFY_APP_STATIC_DIR, filename)
+        return f"Static file {filename} not found", 404
 
-# Configure context processors
+# ── Context processors ────────────────────────────────────────────────────────
 @skillstown_app.context_processor
-def inject_skillstown_vars():
-    return {
-        'current_year': datetime.datetime.now().year
-    }
+def _skillstown_ctx():
+    return {'current_year': datetime.datetime.now().year}
 
 @animewatchlist_app.context_processor
-def inject_animewatchlist_vars():
-    return {
-        'current_year': datetime.datetime.now().year
-    }
+def _animewatchlist_ctx():
+    return {'current_year': datetime.datetime.now().year}
 
-if has_spotify_app:
-    @spotify_app.context_processor
-    def inject_spotify_vars():
-        return {
-            'current_year': datetime.datetime.now().year
-        }
-
-# Configure app roots
-skillstown_app.config['APPLICATION_ROOT'] = '/skillstown'
+# ── App roots ─────────────────────────────────────────────────────────────────
+skillstown_app.config['APPLICATION_ROOT']     = '/skillstown'
 skillstown_app.config['PREFERRED_URL_SCHEME'] = 'https'
-
 animewatchlist_app.config['APPLICATION_ROOT'] = '/animewatchlist'
 animewatchlist_app.config['PREFERRED_URL_SCHEME'] = 'https'
 
-if has_spotify_app:
-    spotify_app.config['APPLICATION_ROOT'] = '/spotify'
-    spotify_app.config['PREFERRED_URL_SCHEME'] = 'https'
-
-# Define static folders explicitly
-SKILLSTOWN_APP_STATIC_DIR = os.path.join(skillstown_path, 'static')
+SKILLSTOWN_APP_STATIC_DIR    = os.path.join(skillstown_path,    'static')
 ANIMEWATCHLIST_APP_STATIC_DIR = os.path.join(animewatchlist_path, 'static')
-if has_spotify_app:
-    SPOTIFY_APP_STATIC_DIR = os.path.join(spotify_path, 'static')
 
-# Set up routes for the main application to serve static files
+# ── Main app routes ───────────────────────────────────────────────────────────
 @main_app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
@@ -223,7 +156,6 @@ def serve_static(path):
         return send_from_directory('.', path)
     return "File not found", 404
 
-# Create direct routes to the apps
 @main_app.route('/projects/skillstown')
 @main_app.route('/projects/skillstown/')
 def skillstown_redirect():
@@ -237,136 +169,95 @@ def animewatchlist_redirect():
 @main_app.route('/projects/spotify-cover-generator')
 @main_app.route('/projects/spotify-cover-generator/')
 def spotify_redirect():
-    """Fixed redirect to Spotify app"""
     return redirect('/spotify/', code=302)
 
-# Handle static files from the main app - FIXED STATIC FILE HANDLING
+# ── The new SPA route: serve animewatchlist.html for all /animewatchlist/* ───
+# This is separate from the API backend -- the React frontend is served here,
+# and the API calls go to the same /animewatchlist prefix via the dispatcher.
+# Since the React app is bundled as one file, Flask just needs to serve it
+# at the root of the sub-app. All /api/* and /auth/* routes are handled by
+# animewatchlist_app directly.
+
 @main_app.route('/skillstown/static/<path:filename>')
 def skillstown_static(filename):
-    print(f"Serving SkillsTown static file: {filename} from {SKILLSTOWN_APP_STATIC_DIR}")
     if os.path.exists(os.path.join(SKILLSTOWN_APP_STATIC_DIR, filename)):
         return send_from_directory(SKILLSTOWN_APP_STATIC_DIR, filename)
-    else:
-        print(f"SkillsTown static file not found: {filename}")
-        if os.path.exists(os.path.join('static', filename)):
-            return send_from_directory('static', filename)
-        return f"Static file {filename} not found", 404
+    if os.path.exists(os.path.join('static', filename)):
+        return send_from_directory('static', filename)
+    return f"Static file {filename} not found", 404
 
 @main_app.route('/animewatchlist/static/<path:filename>')
 def animewatchlist_static(filename):
-    print(f"Serving AnimeWatchList static file: {filename} from {ANIMEWATCHLIST_APP_STATIC_DIR}")
     if os.path.exists(os.path.join(ANIMEWATCHLIST_APP_STATIC_DIR, filename)):
         return send_from_directory(ANIMEWATCHLIST_APP_STATIC_DIR, filename)
-    else:
-        print(f"AnimeWatchList static file not found: {filename}")
-        return f"Static file {filename} not found", 404
+    return f"Static file {filename} not found", 404
 
-# Class to handle routing to the app
- 
+# ── Health check ──────────────────────────────────────────────────────────────
+@main_app.route('/health')
+def health_check():
+    return {
+        'status': 'healthy',
+        'apps': {
+            'skillstown':     skillstown_error is None,
+            'animewatchlist': has_animewatchlist_app,
+            'spotify':        has_spotify_app,
+        }
+    }
+
+# ── WSGI dispatcher ───────────────────────────────────────────────────────────
 class AppDispatcher:
     def __init__(self, app):
         self.app = app
-        
+
     def __call__(self, environ, start_response):
         path_info = environ.get('PATH_INFO', '')
-        print(f"🔍 AppDispatcher handling request: {path_info}")
-        
-        # Clean up double paths (fix for /animewatchlist/animewatchlist/static/)
+
+        # Fix double-path bug
         if '/animewatchlist/animewatchlist/' in path_info:
             path_info = path_info.replace('/animewatchlist/animewatchlist/', '/animewatchlist/')
             environ['PATH_INFO'] = path_info
-            print(f"Fixed double path to: {path_info}")
-        
-        # Handle static file requests
-        if path_info.startswith('/skillstown/static/'):
-            environ['PATH_INFO'] = path_info
+
+        # Static file shortcuts -- handled by main_app routes above
+        for prefix in ('/skillstown/static/', '/animewatchlist/static/'):
+            if path_info.startswith(prefix):
+                return main_app(environ, start_response)
+        if has_spotify_app and path_info.startswith('/spotify/static/'):
             return main_app(environ, start_response)
-        elif path_info.startswith('/animewatchlist/static/'):
-            environ['PATH_INFO'] = path_info
-            return main_app(environ, start_response)
-        elif has_spotify_app and path_info.startswith('/spotify/static/'):
-            environ['PATH_INFO'] = path_info
-            return main_app(environ, start_response)
-            
-        # Route requests to the appropriate app with error handling
+
         try:
             if path_info.startswith('/skillstown'):
-                script_name = '/skillstown'
-                environ['SCRIPT_NAME'] = script_name
-                environ['PATH_INFO'] = path_info[len(script_name):]
+                environ['SCRIPT_NAME'] = '/skillstown'
+                environ['PATH_INFO']   = path_info[len('/skillstown'):]
                 return skillstown_app(environ, start_response)
+
             elif path_info.startswith('/animewatchlist'):
-                script_name = '/animewatchlist'
-                environ['SCRIPT_NAME'] = script_name
-                environ['PATH_INFO'] = path_info[len(script_name):]
+                environ['SCRIPT_NAME'] = '/animewatchlist'
+                environ['PATH_INFO']   = path_info[len('/animewatchlist'):]
                 return animewatchlist_app(environ, start_response)
+
             elif path_info.startswith('/spotify'):
-                print("Routing to Spotify app")
-                script_name = '/spotify'
-                environ['SCRIPT_NAME'] = script_name
-                environ['PATH_INFO'] = path_info[len(script_name):]
+                environ['SCRIPT_NAME'] = '/spotify'
+                environ['PATH_INFO']   = path_info[len('/spotify'):]
                 if has_spotify_app:
-                    # Keep spotify app imports stable during request handling.
                     old_cwd = os.getcwd()
-                    old_sys_path = sys.path.copy()
                     try:
                         os.chdir(spotify_path)
-                        if spotify_path not in sys.path:
-                            sys.path.insert(0, spotify_path)
                         return spotify_app(environ, start_response)
                     finally:
                         os.chdir(old_cwd)
-                        sys.path = old_sys_path
                 return spotify_app(environ, start_response)
-            
-            print("Routing to main app")
+
             return main_app(environ, start_response)
-            
+
         except Exception as e:
-            print(f"Error in AppDispatcher routing: {e}")
-            # Return a 500 error response
-            status = '500 Internal Server Error'
+            print(f"AppDispatcher error: {e}")
+            status  = '500 Internal Server Error'
             headers = [('Content-Type', 'text/html')]
             start_response(status, headers)
-            error_message = f"""
-            <html>
-            <head><title>Application Error</title></head>
-            <body>
-            <h1>Application Error</h1>
-            <p>There was an error processing your request: {str(e)}</p>
-            <p><a href="/">Return to Home</a></p>
-            </body>
-            </html>
-            """.encode('utf-8')
-            return [error_message]
+            return [f"<h1>500</h1><p>{e}</p><p><a href='/'>Home</a></p>".encode()]
 
-# Set up the WSGI application with our custom dispatcher
+
 application = AppDispatcher(main_app)
-
-# Health check endpoint for monitoring
-@main_app.route('/health')
-def health_check():
-    """Simple health check endpoint for monitoring"""
-    try:
-        # Basic database connectivity test for AnimeWatchList
-        if has_animewatchlist_app:
-            with animewatchlist_app.app_context():
-                # Simple query to test database
-                from projects.animewatchlist.auth import User
-                user_count = User.query.count()
-                return {
-                    'status': 'healthy',
-                    'users': user_count,
-                    'apps': {
-                        'skillstown': skillstown_error is None,
-                        'animewatchlist': True,
-                        'spotify': has_spotify_app
-                    }
-                }
-        else:
-            return {'status': 'partial', 'message': 'Some apps unavailable'}
-    except Exception as e:
-        return {'status': 'unhealthy', 'error': str(e)}, 500
 
 if __name__ == "__main__":
     from werkzeug.serving import run_simple
