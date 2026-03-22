@@ -22,7 +22,7 @@ bp = Blueprint(
 )
 
 db    = SQLAlchemy()
-login = LoginManager()
+login_manager = LoginManager()
 
 MAL_CLIENT_ID     = os.environ.get("MAL_CLIENT_ID", "")
 MAL_CLIENT_SECRET = os.environ.get("MAL_CLIENT_SECRET", "")
@@ -586,10 +586,10 @@ def create_app(app):
         app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     db.init_app(app)
-    login.init_app(app)
-    login.login_view = "animewatchlist.login"
+    login_manager.init_app(app)
+    login_manager.login_view = "animewatchlist.login"
 
-    @login.user_loader
+    @login_manager.user_loader
     def load_user(uid):
         return User.query.get(int(uid))
 
