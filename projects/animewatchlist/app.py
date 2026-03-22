@@ -3,6 +3,7 @@ AnimeWatchList — Flask app (Jinja2 templates, MAL API, MAL OAuth)
 Drop this into projects/animewatchlist/ and register with wsgi.py.
 """
 import os, secrets, hashlib, base64, datetime, requests
+from urllib.parse import quote
 from flask import (Flask, render_template, redirect, request,
                    session, flash, url_for, Blueprint, jsonify)
 from flask_sqlalchemy import SQLAlchemy
@@ -702,7 +703,7 @@ def mal_authorize():
     session["mal_verifier"] = v
     session["mal_state"]    = state
     params = (f"response_type=code&client_id={MAL_CLIENT_ID}"
-              f"&redirect_uri={MAL_REDIRECT_URI}&state={state}"
+              f"&redirect_uri={quote(MAL_REDIRECT_URI, safe='')}&state={state}"
               f"&code_challenge={v}&code_challenge_method=plain")
     return redirect(f"{MAL_AUTH_BASE}/authorize?{params}")
 
