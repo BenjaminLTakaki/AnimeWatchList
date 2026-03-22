@@ -11,7 +11,7 @@ from flask_login import (LoginManager, UserMixin, login_user,
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=False)   # don't overwrite values already set by wsgi.py
 
 # ── App & blueprint ────────────────────────────────────────────────────────
 bp = Blueprint(

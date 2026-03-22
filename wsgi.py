@@ -11,7 +11,9 @@ main_app = Flask(__name__, static_folder='.')
 
 # Local safety guard: if you're running on a developer machine with a Render
 # DATABASE_URL in .env, prefer local SQLite unless explicitly disabled.
-if not os.environ.get('RENDER') and os.environ.get('FORCE_REMOTE_DB', '0') != '1':
+_render_flag = os.environ.get('RENDER', '').lower()
+_is_render = _render_flag not in ('', '0', 'false', 'no')
+if not _is_render and os.environ.get('FORCE_REMOTE_DB', '0') != '1':
     _env_db_url = os.environ.get('DATABASE_URL', '')
     if 'render.com' in _env_db_url:
         os.environ.pop('DATABASE_URL', None)
@@ -49,6 +51,12 @@ if animewatchlist_path not in sys.path:
 
 try:
     from animewatchlist.app import create_app as create_animewatchlist_app
+
+    # Re-strip Render DATABASE_URL in case app.py's load_dotenv() re-added it
+    if not _is_render and os.environ.get('FORCE_REMOTE_DB', '0') != '1':
+        _reloaded = os.environ.get('DATABASE_URL', '')
+        if 'render.com' in _reloaded:
+            os.environ.pop('DATABASE_URL', None)
 
     animewatchlist_app = Flask("animewatchlist.app", root_path=animewatchlist_path)
     _db_url = os.environ.get('DATABASE_URL', '')
