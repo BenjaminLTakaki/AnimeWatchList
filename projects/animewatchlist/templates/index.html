@@ -1,187 +1,123 @@
 {% extends "base.html" %}
 
-{% block title %}Home - Anime Tracker{% endblock %}
+{% block title %}Discover - AnimeList{% endblock %}
 
 {% block content %}
 {% if not current_user.is_authenticated %}
-<div class="welcome-message">
-    <h2>Welcome to Anime Tracker</h2>
-    <p>Discover new anime and track what you've watched with your personal ratings</p>
-    <div class="features-list">
-        <div class="feature-item">
-            <span class="feature-icon">TV</span>
-            <span>Track watched anime</span>
-        </div>
-        <div class="feature-item">
-            <span class="feature-icon">⭐</span>
-            <span>Rate with stars</span>
-        </div>
-        <div class="feature-item">
-            <span class="feature-icon">📊</span>
-            <span>View statistics</span>
-        </div>
-    </div>
-    <div class="action-buttons">
-        <a href="{{ get_url_for('login') }}" class="btn btn-primary">Login</a>
-        <a href="{{ get_url_for('register') }}" class="btn btn-secondary">Register</a>
-    </div>
-</div>
-{% elif anime %}
-<div class="anime-card">
-    <h2>
-        <a href="https://myanimelist.net/anime/{{ anime.id }}" target="_blank" class="anime-title-link">
-            {{ anime.title }}
-        </a>
-    </h2>
-    
-    {% if anime.main_picture and anime.main_picture.medium %}
-    <img src="{{ anime.main_picture.medium }}" alt="{{ anime.title }}" loading="lazy">
-    {% endif %}
-    
-    <div class="anime-info">
-        <p><strong>Episodes:</strong> {{ anime.episodes }}</p>
-        {% if anime.score and anime.score != "N/A" %}
-        <p><strong>MAL Score:</strong> {{ anime.score }}/10</p>
-        {% endif %}
-    </div>
+{# ── Welcome (logged out) ──────────────────────────────────────── #}
+<div class="welcome">
+  <h2>AnimeList</h2>
+  <p>Discover, track and rate anime. Swipe right to add, left to skip.</p>
 
-    {% if has_rating_feature %}
-    <!-- Rating Form -->
-    <div class="rating-form" data-anime-id="{{ anime.id }}">
-        <h4>Rate this anime (0-5 stars)</h4>
-        <p class="rating-help">Rating automatically adds to your watched list</p>
-        <div class="rating-form-container" data-anime-id="{{ anime.id }}" data-current-rating="{{ current_rating or 0 }}">
-            <!-- Star rating will be initialized here by JavaScript -->
-        </div>
+  <div class="welcome-features">
+    <div class="welcome-feature">
+      <div class="welcome-feature__icon">TV</div>
+      <span>Track anime</span>
     </div>
-    {% endif %}
+    <div class="welcome-feature">
+      <div class="welcome-feature__icon">5</div>
+      <span>Rate 1-5</span>
+    </div>
+    <div class="welcome-feature">
+      <div class="welcome-feature__icon">#</div>
+      <span>Statistics</span>
+    </div>
+  </div>
 
-    <div class="action-buttons">
-        <a href="{{ get_url_for('direct_mark', anime_id=anime.id, status='watched') }}" 
-           class="btn btn-success">
-           Add to Watched
-        </a>
-        <a href="{{ get_url_for('skip') }}" 
-           class="btn btn-skip">
-           Skip This Anime
-        </a>
-    </div>
-</div>
+  <div class="welcome-actions">
+    <a href="{{ get_url_for('login') }}" class="btn btn--solid">Sign In</a>
+    <a href="{{ get_url_for('register') }}" class="btn">Create Account</a>
+  </div>
 
-{% if watched_count > 0 %}
-<div class="user-stats-summary">
-    <h3>Your Collection</h3>
-    <div class="stats-quick">
-        <div class="stat-item">
-            <span class="stat-number">{{ watched_count }}</span>
-            <span class="stat-label">Anime Watched</span>
-        </div>
-    </div>
-    <div class="quick-links">
-        <a href="{{ get_url_for('watched') }}" class="btn btn-secondary">View My List</a>
-        <a href="{{ get_url_for('stats') }}" class="btn btn-secondary">View Stats</a>
-    </div>
+  <div class="auth-divider" style="margin-top:32px;">or</div>
+
+  <a href="{{ get_url_for('mal_authorize') }}" class="auth-mal" style="max-width:380px;margin:12px auto 0;">
+    <span class="auth-mal__badge">MAL</span>
+    Continue with MyAnimeList
+  </a>
 </div>
-{% endif %}
 
 {% else %}
-<div class="no-anime">
-    <h2>No more anime available</h2>
-    <p>Try fetching more anime or search for specific titles</p>
-    
-    <div class="action-buttons">
-        <a href="{{ get_url_for('fetch') }}" class="btn btn-primary">Get More Anime</a>
-        <a href="{{ get_url_for('search') }}" class="btn btn-secondary">Search Anime</a>
+{# ── Discovery / Swipe ─────────────────────────────────────────── #}
+<div class="discover-wrap">
+  <h1 class="page-title" style="font-size:28px;margin-bottom:4px;">Discover</h1>
+  <p class="page-subtitle" style="margin-bottom:24px;">Swipe right to add &middot; Left to skip &middot; Arrow keys work too</p>
+
+  {# Category tabs #}
+  <div class="tabs" style="justify-content:center;margin-bottom:24px;">
+    <a href="{{ get_url_for('discover', ranking='all') }}"
+       class="tab {% if ranking|default('all') == 'all' %}active{% endif %}">Top</a>
+    <a href="{{ get_url_for('discover', ranking='airing') }}"
+       class="tab {% if ranking == 'airing' %}active{% endif %}">Airing</a>
+    <a href="{{ get_url_for('discover', ranking='bypopularity') }}"
+       class="tab {% if ranking == 'bypopularity' %}active{% endif %}">Popular</a>
+    <a href="{{ get_url_for('discover', ranking='movie') }}"
+       class="tab {% if ranking == 'movie' %}active{% endif %}">Films</a>
+  </div>
+
+  {% if anime_batch %}
+  <div class="swipe-area"
+       data-offset="{{ offset|default(0) }}"
+       data-ranking="{{ ranking|default('all') }}"
+       data-api-url="{{ get_url_for('api_discover') }}"
+       data-add-base="{{ get_url_for('direct_mark', anime_id=0, status='STATUS') }}">
+
+    {% for anime in anime_batch|reverse %}
+    <div class="swipe-card"
+         data-mal-id="{{ anime.mal_id }}"
+         data-add-url="{{ get_url_for('direct_mark', anime_id=anime.mal_id, status='completed') }}">
+
+      {% set img = '' %}
+      {% if anime.main_picture %}
+        {% set img = anime.main_picture.large or anime.main_picture.medium or '' %}
+      {% elif anime.images and anime.images.jpg %}
+        {% set img = anime.images.jpg.image_url or '' %}
+      {% endif %}
+      <img class="swipe-card__img" src="{{ img }}" alt="{{ anime.title }}">
+      <div class="swipe-card__gradient"></div>
+
+      <div class="swipe-hint swipe-hint--skip">SKIP</div>
+      <div class="swipe-hint swipe-hint--add">ADD</div>
+
+      <div class="swipe-card__info">
+        <div class="swipe-card__title">{{ anime.title }}</div>
+        <div class="swipe-card__meta">
+          {% if anime.episodes %}
+          <span class="swipe-card__badge">{{ anime.episodes }} eps</span>
+          {% endif %}
+          {% if anime.score %}
+          <span class="swipe-card__badge swipe-card__badge--score">&#9733; {{ anime.score }}</span>
+          {% endif %}
+        </div>
+      </div>
     </div>
-    
-    {% if watched_count > 0 %}
-    <div class="action-buttons">
-        <a href="{{ get_url_for('watched') }}" class="btn btn-secondary">View My Watched List</a>
+    {% endfor %}
+  </div>
+
+  <div class="swipe-actions">
+    <button class="swipe-btn swipe-btn--skip" title="Skip (Left arrow)">&#10005;</button>
+    <button class="swipe-btn swipe-btn--add" title="Add to list (Right arrow)">&#10003;</button>
+  </div>
+
+  {% if watched_count > 0 %}
+  <div style="text-align:center;margin-top:16px;">
+    <span style="font-size:11px;color:#555;letter-spacing:.06em;">{{ watched_count }} anime in your list</span>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="discover-empty">
+    <p style="font-family:'Playfair Display',serif;font-style:italic;font-size:18px;color:#444;">
+      No more anime to discover
+    </p>
+    <p style="color:#333;font-size:11px;margin-top:8px;">
+      Try a different category or search for something specific
+    </p>
+    <div style="margin-top:24px;">
+      <a href="{{ get_url_for('search') }}" class="btn">Search Anime</a>
     </div>
-    {% endif %}
+  </div>
+  {% endif %}
 </div>
 {% endif %}
-
-<style>
-/* Index page specific styles */
-.rating-form {
-    background: var(--bg-elevated);
-    border-radius: var(--radius-sm);
-    padding: 1.5rem;
-    margin: 1.5rem 0;
-    border-left: 3px solid var(--primary);
-    text-align: center;
-}
-
-.rating-form h4 {
-    color: var(--primary-hover);
-    margin-bottom: 0.5rem;
-    font-size: 1.05rem;
-}
-
-.rating-help {
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    margin-bottom: 1rem;
-    font-style: italic;
-}
-
-.rating-form .rating-form-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.anime-info {
-    margin: 1.5rem 0;
-}
-
-.anime-info p {
-    margin: 0.5rem 0;
-    font-size: 0.95rem;
-    color: var(--text-secondary);
-}
-
-.discover-section {
-    text-align: center;
-    margin-bottom: 2rem;
-    padding: 1.5rem;
-    background: var(--bg-card);
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-}
-
-.discover-section h2 {
-    color: var(--primary-hover);
-    margin-bottom: 0.5rem;
-    font-size: 1.4rem;
-}
-
-.discover-section p {
-    color: var(--text-secondary);
-    margin: 0;
-}
-
-.alternative-actions {
-    margin-top: 2rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--border);
-    text-align: center;
-}
-
-.small-text {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-bottom: 1rem;
-}
-
-@media (max-width: 767px) {
-    .rating-form {
-        padding: 1rem;
-        margin: 1rem 0;
-    }
-}
-</style>
 {% endblock %}

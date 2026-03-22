@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benjamin Takaki - CV</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 0; /* Remove all margins */
+        }
+
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                background-color: white;
+                margin: 0;
+                padding: 0;
+            }
+            .cv-container {
+                margin: 0;
+                box-shadow: none;
+                width: 100%;
+                height: 100vh;
+            }
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            font-size: 12px; /* Increased base font size */
+            line-height: 1.4; /* Increased line height */
+        }
+
+        @media screen {
+            body {
+                padding: 0;
+                background-color: white;
+            }
+            .cv-container {
+                margin: 0;
+                width: 100vw;
+                height: 100vh;
+            }
+        }
+
+        .cv-container {
+            max-width: none;
+            margin: 0;
+            box-shadow: none;
+            width: 100vw;
+            min-height: 100vh;
+            display: flex;
+            background: white;
+        }
+
+        .left-column {
+            width: 39%;
+            background-color: #e8e8e8;
+            padding: 25px;
+            box-sizing: border-box;
+        }
+
+        .right-column {
+            width: 61%;
+            padding: 25px;
+            box-sizing: border-box;
+        }
+
+        .header-name {
+            font-size: 32px;
+            font-weight: bold;
+            line-height: 1;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .header-subtitle {
+            font-size: 12px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        .photo-placeholder {
+            width: 35mm;
+            height: 45mm;
+            background-color: #d0d0d0;
+            margin: 15px auto 20px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #333;
+            padding-bottom: 4px;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 8px;
+            font-size: 11px;
+        }
+
+        .contact-icon {
+            width: 55px;
+            margin-right: 8px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .contact-text {
+            word-break: break-all;
+        }
+
+        .skills-category {
+            margin-bottom: 12px;
+            font-size: 11px;
+        }
+
+        .skills-category strong {
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 2px;
+        }
+
+        .experience-item, .project-item, .education-item {
+            margin-bottom: 15px;
+        }
+
+        .experience-date, .project-year {
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 10px;
+            color: #444;
+        }
+
+        .experience-title, .project-name, .institution {
+            font-weight: bold;
+            font-size: 14px;
+            margin: 2px 0;
+        }
+        
+        .experience-company {
+            font-style: italic;
+            color: #666;
+            font-size: 11px;
+            margin-bottom: 5px;
+        }
+
+        ul {
+            padding-left: 16px;
+            margin: 4px 0;
+        }
+
+        li, .project-description {
+            font-size: 11px;
+            margin-bottom: 3px;
+            line-height: 1.3;
+        }
+
+        .experience-skills {
+            font-size: 11px;
+            margin-top: 6px;
+        }
+        
+        .intro-text {
+            font-size: 12px;
+            line-height: 1.4;
+            margin-bottom: 15px;
+        }
+
+        .interest-item {
+            margin-bottom: 12px;
+            font-size: 11px;
+        }
+
+        .skills-summary {
+            margin: 15px 0;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="cv-container">
+        <div class="left-column">
+            <div class="header-name">Benjamin<br>TAKAKI</div>
+            <div class="header-subtitle">ICT STUDENT</div>
+
+            <img src="CV_image.jpg" alt="Benjamin Takaki" class="photo-placeholder" style="object-fit: cover; border-radius: 5px;">
+
+            <div class="contact-item">
+                <div class="contact-icon">Email:</div>
+                <div class="contact-text">bentakaki7@gmail.com</div>
+            </div>
+            <div class="contact-item">
+                <div class="contact-icon">Phone:</div>
+                <div class="contact-text">+31 6 45243724</div>
+            </div>
+            <div class="contact-item">
+                <div class="contact-icon">Address:</div>
+                <div class="contact-text">Prins Hendrikstraat 50 E, Eindhoven</div>
+            </div>
+            <div class="contact-item">
+                <div class="contact-icon">LinkedIn:</div>
+                <div class="contact-text">linkedin.com/in/benjamin-takaki</div>
+            </div>
+            <div class="contact-item">
+                <div class="contact-icon">Portfolio:</div>
+                <div class="contact-text">benjamintakaki.com</div>
+            </div>
+            <div class="contact-item">
+                <div class="contact-icon">GitHub:</div>
+                <div class="contact-text">github.com/BenjaminLTakaki</div>
+            </div>
+
+            <div class="section-title">COMPETENCES</div>
+            <div class="skills-category">
+                <strong>Development:</strong><br>
+                Python/Flask, JavaScript, SQL, PostgreSQL, C#, HTML/CSS, FastAPI, Docker
+            </div>
+            <div class="skills-category">
+                <strong>Data & AI:</strong><br>
+                Machine Learning, NLP, Data Analysis, Gemini AI, spaCy
+            </div>
+            <div class="skills-category">
+                <strong>Cloud & APIs:</strong><br>
+                Git, Cloud Deployment (Render), REST/OAuth
+            </div>
+            <div class="skills-category">
+                <strong>Languages:</strong><br>
+                English (C2), French (C2), Japanese (B1), Dutch (A1)
+            </div>
+
+            <div class="section-title">INTERESTS</div>
+            <div class="interest-item">
+                <strong>Machine Learning & AI:</strong><br>
+                Specialized focus on NLP and data analysis applications
+            </div>
+            <div class="interest-item">
+                <strong>Guitar:</strong><br>
+                Music composition and performance
+            </div>
+            <div class="interest-item">
+                <strong>Gaming:</strong><br>
+                Video games and strategic board games
+            </div>
+            <div class="interest-item">
+                <strong>Anime:</strong><br>
+                Japanese animation and culture enthusiast
+            </div>
+        </div>
+
+        <div class="right-column">
+            <div class="intro-text">
+                ICT student with a focus on Machine Learning and Data Analysis, possessing over 3 years of experience in full-stack web development. Born in Bangkok and having lived in Senegal, India, and Japan, I am now based in the Netherlands, bringing a diverse international perspective to my work. I specialize in building and deploying production-ready applications with expertise in API integration, database design, and AI-powered systems.
+            </div>
+
+            <div class="section-title">EDUCATION</div>
+            <div class="education-item">
+                <span class="experience-date">2024 - Present</span>
+                <div class="institution">Bachelor of ICT</div>
+                <div style="font-style: italic; font-size: 9.5px;">Fontys University of Applied Sciences, Netherlands</div>
+            </div>
+
+            <div class="section-title">NOTABLE PROJECTS & SKILLS</div>
+            <div class="project-item">
+                <div><span class="project-year">2023/2024 -</span> <span class="project-name">Spotify Cover Generator</span></div>
+                <div class="project-description">Built an application that generates album artwork based on music genre and mood using a machine learning algorithm.</div>
+            </div>
+            <div class="project-item">
+                <div><span class="project-year">2023 -</span> <span class="project-name">Audio Recognition System</span></div>
+                <div class="project-description">Developed a music identification system using audio fingerprinting and a feature extraction pipeline.</div>
+            </div>
+            
+            <div class="skills-summary">
+                <strong>Notable Skills Developed:</strong> Problem-solving, international collaboration, adaptability, precision and rigor for project success.
+            </div>
+
+            <div class="section-title">EXPERIENCE</div>
+            <div class="experience-item">
+                <div class="experience-date">2021 - PRESENT</div>
+                <div class="experience-title">Full-Stack Developer (Self-Directed Projects)</div>
+                <div class="experience-company">Independent Development</div>
+                <ul>
+                    <li>Developed and maintained several web applications with AI features, ensuring high availability.</li>
+                    <li>Created applications using machine learning, NLP, and real-time data processing.</li>
+                    <li>Implemented user authentication and deployed applications to the cloud.</li>
+                </ul>
+                <div class="experience-skills">
+                    <strong>Skills Developed:</strong> Full-stack development, AI integration, project management, cloud deployment.
+                </div>
+            </div>
+            <div class="experience-item">
+                <div class="experience-date">2021 - PRESENT</div>
+                <div class="experience-title">Camp Counselor</div>
+                <div class="experience-company">Nanbo's Discovery Camp, Chiba, Japan</div>
+                <ul>
+                    <li>Organized activities for children at seasonal camps for over three years.</li>
+                    <li>Practiced leadership and communication in a multicultural setting.</li>
+                </ul>
+                <div class="experience-skills">
+                    <strong>Skills Developed:</strong> Leadership, cross-cultural communication, event planning, team coordination.
+                </div>
+            </div>
+            <div class="experience-item">
+                <div class="experience-date">AUGUST 2023 - PRESENT</div>
+                <div class="experience-title">Waiter / Kitchen Support</div>
+                <div class="experience-company">Sushi Haru, Eindhoven, Netherlands</div>
+                <ul>
+                    <li>Took customer orders and assisted with kitchen duties in a busy restaurant.</li>
+                    <li>Helped with dishwashing and food prep.</li>
+                </ul>
+                <div class="experience-skills">
+                    <strong>Skills Developed:</strong> Customer service, multitasking, kitchen operations, time management.
+                </div>
+            </div>
+            <div class="experience-item">
+                <div class="experience-date">2020 - PRESENT</div>
+                <div class="experience-title">Festival Participant & Shishi Group</div>
+                <div class="experience-company">Summer Festival, Tōkamachi, Niigata, Japan</div>
+                <ul>
+                    <li>Supervised children during traditional festival events as part of the Shishi Group.</li>
+                </ul>
+                <div class="experience-skills">
+                    <strong>Skills Developed:</strong> Cultural leadership, child supervision, traditional ceremony preservation.
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,284 +1,80 @@
 {% extends "base.html" %}
 
-{% block title %}Profile - Anime Tracker{% endblock %}
+{% block title %}Profile - AnimeList{% endblock %}
 
 {% block content %}
 <div class="profile-container">
-    <div class="profile-card">
-        <div class="profile-header">
-            <div class="profile-avatar">
-                <span class="avatar-icon"></span>
-            </div>
-            <h3>Welcome, {{ current_user.username }}!</h3>
-            <p class="profile-email">{{ current_user.email }}</p>
-            {% if current_user.date_joined %}
-            <p class="profile-date">Member since {{ current_user.date_joined.strftime('%B %Y') }}</p>
-            {% endif %}
-        </div>
+  <h1 class="page-title" style="font-size:28px;">{{ current_user.username }}</h1>
+  {% if current_user.created_at %}
+  <p class="page-subtitle">Member since {{ current_user.created_at.strftime('%B %Y') }}</p>
+  {% endif %}
 
-        <div class="profile-stats">
-            <div class="stat-card">
-                <div class="stat-number">{{ stats[0] if stats and stats|length >= 2 else 0 }}</div>
-                <div class="stat-label">Anime Watched</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">{{ (stats[0] * 24) | round(1) if stats and stats|length >= 2 else 0 }}</div>
-                <div class="stat-label">Episodes (Est.)</div>
-            </div>
-        </div>
-
-        <div class="profile-actions">
-            <a href="{{ get_url_for('watched') }}" class="btn btn-primary">
-                <span class="btn-icon"></span>
-                View Watched List
-            </a>
-            <a href="{{ get_url_for('stats') }}" class="btn btn-secondary">
-                <span class="btn-icon"></span>
-                View Detailed Stats
-            </a>
-            <a href="{{ get_url_for('search') }}" class="btn btn-secondary">
-                <span class="btn-icon"></span>
-                Search Anime
-            </a>
-        </div>
-
-        {% if stats and stats[0] > 0 %}
-        <div class="quick-achievements">
-            <h4>Quick Stats</h4>
-            <div class="achievements-grid">
-                <div class="achievement">
-                    <span class="achievement-icon"></span>
-                    <span class="achievement-text">{{ stats[0] }} anime completed</span>
-                </div>
-                {% if stats[0] >= 10 %}
-                <div class="achievement">
-                    <span class="achievement-icon"></span>
-                    <span class="achievement-text">Anime Enthusiast</span>
-                </div>
-                {% endif %}
-                {% if stats[0] >= 50 %}
-                <div class="achievement">
-                    <span class="achievement-icon"></span>
-                    <span class="achievement-text">Otaku Level Achieved</span>
-                </div>
-                {% endif %}
-                {% if stats[0] >= 100 %}
-                <div class="achievement">
-                    <span class="achievement-icon"></span>
-                    <span class="achievement-text">Anime Master</span>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
-
-        <div class="account-actions">
-            <h4>Account</h4>
-            <div class="account-buttons">
-                <a href="{{ get_url_for('logout') }}" class="btn-logout">
-                    <span class="btn-icon">🚪</span>
-                    Logout
-                </a>
-            </div>
-        </div>
+  {# ── Stats ────────────────────────────────────────────────────── #}
+  <div class="stats-grid" style="grid-template-columns:1fr 1fr;gap:24px;margin:32px 0;">
+    <div class="stat-card">
+      <div class="stat-number">{{ watched_count }}</div>
+      <div class="stat-label">Anime</div>
     </div>
+    <div class="stat-card">
+      <div class="stat-number">{{ total_episodes }}</div>
+      <div class="stat-label">Episodes</div>
+    </div>
+  </div>
+
+  {# ── MAL Connection ───────────────────────────────────────────── #}
+  <div class="profile-section">
+    <div class="profile-section__title">MyAnimeList</div>
+
+    {% if current_user.mal_linked %}
+    <div class="mal-status">
+      <div class="mal-dot"></div>
+      <span class="mal-username">Connected as <span>{{ current_user.mal_username or 'MAL User' }}</span></span>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <form method="POST" action="{{ get_url_for('mal_sync') }}" style="display:inline;">
+        <button type="submit" class="btn btn--sm">Sync MAL List</button>
+      </form>
+      <form method="POST" action="{{ get_url_for('mal_unlink') }}" style="display:inline;"
+            onsubmit="return confirm('Disconnect your MAL account?')">
+        <button type="submit" class="btn btn--sm btn--danger">Disconnect</button>
+      </form>
+    </div>
+    {% else %}
+    <div class="mal-status">
+      <div class="mal-dot mal-dot--off"></div>
+      <span class="mal-username">Not connected</span>
+    </div>
+    <a href="{{ get_url_for('mal_authorize') }}" class="auth-mal" style="max-width:300px;">
+      <span class="auth-mal__badge">MAL</span>
+      Connect MyAnimeList
+    </a>
+    <p style="font-size:10px;color:#444;margin-top:8px;">
+      Link your MAL account to import your anime list and sync ratings.
+    </p>
+    {% endif %}
+  </div>
+
+  {# ── Quick Actions ────────────────────────────────────────────── #}
+  <div class="profile-section">
+    <div class="profile-section__title">Quick Actions</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="{{ get_url_for('watchlist') }}" class="btn btn--sm">My List</a>
+      <a href="{{ get_url_for('stats') }}" class="btn btn--sm">Stats</a>
+      <a href="{{ get_url_for('search') }}" class="btn btn--sm">Search</a>
+      <a href="{{ get_url_for('discover') }}" class="btn btn--sm">Discover</a>
+    </div>
+  </div>
+
+  {# ── Account ──────────────────────────────────────────────────── #}
+  <div class="profile-section">
+    <div class="profile-section__title">Account</div>
+    <div style="display:flex;gap:24px;align-items:center;">
+      {% if current_user.email %}
+      <span style="font-size:11px;color:#555;">{{ current_user.email }}</span>
+      {% endif %}
+      <a href="{{ get_url_for('logout') }}" class="btn btn--sm btn--danger">Logout</a>
+    </div>
+  </div>
 </div>
-
-<style>
-.profile-container {
-    max-width: 600px;
-    margin: 0 auto;
-    padding: 1rem;
-}
-
-.profile-card {
-    background: var(--bg-card);
-    backdrop-filter: var(--glass);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border);
-    padding: 2rem;
-    text-align: center;
-}
-
-.profile-header {
-    margin-bottom: 2rem;
-    padding-bottom: 2rem;
-    border-bottom: 1px solid var(--border);
-}
-
-.profile-avatar {
-    width: 80px;
-    height: 80px;
-    background: linear-gradient(135deg, var(--primary), var(--accent));
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 1rem auto;
-    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
-}
-
-.avatar-icon {
-    font-size: 2rem;
-    color: white;
-}
-
-.profile-header h3 {
-    font-size: 1.6rem;
-    background: linear-gradient(135deg, var(--primary-hover), var(--accent));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin: 0 0 0.5rem 0;
-    font-weight: 700;
-}
-
-.profile-email {
-    color: var(--text-secondary);
-    margin: 0.3rem 0;
-    font-size: 0.95rem;
-}
-
-.profile-date {
-    color: var(--text-muted);
-    margin: 0.3rem 0;
-    font-size: 0.85rem;
-}
-
-.profile-stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
-
-.profile-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 0.8rem;
-    margin-bottom: 2rem;
-}
-
-.profile-actions .btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.8rem;
-    padding: 0.9rem 1.5rem;
-    font-size: 0.92rem;
-    font-weight: 600;
-    width: 100%;
-}
-
-.btn-icon {
-    font-size: 1.1rem;
-}
-
-.quick-achievements {
-    margin-bottom: 2rem;
-    padding-top: 2rem;
-    border-top: 1px solid var(--border);
-}
-
-.quick-achievements h4 {
-    color: var(--primary-hover);
-    margin-bottom: 1rem;
-    font-size: 1.1rem;
-}
-
-.achievements-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-}
-
-.achievement {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.9rem 1rem;
-    background: var(--bg-elevated);
-    border-radius: var(--radius-xs);
-    border-left: 3px solid var(--success);
-    transition: transform 0.2s ease;
-}
-
-.achievement:hover {
-    transform: translateX(4px);
-}
-
-.achievement:nth-child(2) { border-left-color: var(--warning); }
-.achievement:nth-child(3) { border-left-color: var(--accent); }
-
-.achievement-icon {
-    font-size: 1.3rem;
-    flex-shrink: 0;
-}
-
-.achievement-text {
-    font-weight: 600;
-    color: var(--text-primary);
-    font-size: 0.9rem;
-}
-
-.account-actions {
-    padding-top: 2rem;
-    border-top: 1px solid var(--border);
-}
-
-.account-actions h4 {
-    color: var(--text-secondary);
-    margin-bottom: 1rem;
-    font-size: 1rem;
-}
-
-.account-buttons {
-    display: flex;
-    justify-content: center;
-}
-
-.btn-logout {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.7rem 1.5rem;
-    background: rgba(248, 113, 113, 0.12);
-    color: var(--danger);
-    border: 1px solid rgba(248, 113, 113, 0.25);
-    text-decoration: none;
-    border-radius: var(--radius-sm);
-    font-weight: 600;
-    transition: all 0.2s ease;
-    font-size: 0.9rem;
-}
-
-.btn-logout:hover {
-    background: var(--danger);
-    color: #fff;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(248, 113, 113, 0.3);
-}
-
-@media (max-width: 767px) {
-    .profile-stats {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (min-width: 768px) {
-    .profile-actions {
-        flex-direction: row;
-        flex-wrap: wrap;
-    }
-    .profile-actions .btn {
-        flex: 1;
-        min-width: 180px;
-    }
-    .achievements-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-</style>
 {% endblock %}

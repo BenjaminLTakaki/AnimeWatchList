@@ -1,210 +1,112 @@
 {% extends "base.html" %}
 
-{% block title %}Watched Anime - Anime Tracker{% endblock %}
+{% block title %}My List - AnimeList{% endblock %}
 
 {% block content %}
-<div class="watched-container">
-    <h2>My Watched Anime</h2>
-    
-    {% if anime_list %}
-    <!-- Anime Count and Sorting -->
-    <div class="list-controls">
-        <div class="anime-count">
-            <p><strong>{{ anime_list|length }}</strong> anime in your watched list</p>
-        </div>
-        
-        <!-- Sort Controls -->
-        <div class="sort-controls">
-            <form method="GET" class="sort-form">
-                <label for="sort_by">Sort by:</label>
-                <select name="sort_by" id="sort_by" class="sort-select" onchange="this.form.submit()">
-                    <option value="date_added" {{ 'selected' if sort_by == 'date_added' else '' }}>Date Added</option>
-                    <option value="title" {{ 'selected' if sort_by == 'title' else '' }}>Title</option>
-                    <option value="score" {{ 'selected' if sort_by == 'score' else '' }}>MAL Score</option>
-                    <option value="episodes" {{ 'selected' if sort_by == 'episodes' else '' }}>Episodes</option>
-                    {% if has_rating_feature %}
-                    <option value="user_rating" {{ 'selected' if sort_by == 'user_rating' else '' }}>My Rating</option>
-                    {% endif %}
-                </select>
-                
-                <select name="sort_order" class="sort-select" onchange="this.form.submit()">
-                    <option value="desc" {{ 'selected' if sort_order == 'desc' else '' }}>High to Low</option>
-                    <option value="asc" {{ 'selected' if sort_order == 'asc' else '' }}>Low to High</option>
-                </select>
-            </form>
-        </div>
-    </div>
+<h1 class="page-title">My List</h1>
 
-    <!-- Simple Anime Grid -->
-    <div class="anime-list">
-        {% for anime in anime_list %}
-        <div class="anime-item" data-anime-id="{{ anime.id }}">
-            <h3>
-                <a href="https://myanimelist.net/anime/{{ anime.id }}" target="_blank" class="anime-title-link">
-                    {{ anime.title }}
-                </a>
-            </h3>
-            
-            {% if anime.main_picture and anime.main_picture.medium %}
-            <img src="{{ anime.main_picture.medium }}" alt="{{ anime.title }}" loading="lazy">
-            {% endif %}
-            
-            <div class="anime-details">
-                <p><strong>Episodes:</strong> {{ anime.episodes }}</p>
-                
-                <!-- Rating Row with MAL Score and User Rating -->
-                <div class="rating-row">
-                    {% if anime.score and anime.score != "N/A" and anime.score != "0" %}
-                    <div class="mal-score">
-                        <span>MAL: {{ anime.score }}/10</span>
-                    </div>
-                    {% endif %}
-                    
-                    {% if has_rating_feature %}
-                    <div class="user-rating">
-                        <span class="user-rating-label">My Rating:</span>
-                        <div class="rating-display-container" data-rating="{{ anime.user_rating or 0 }}" data-anime-id="{{ anime.id }}">
-                            <!-- Star rating will be initialized here -->
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                
-                {% if has_rating_feature %}
-                <!-- Interactive Rating Form -->
-                <div class="rating-form compact">
-                    <h4>Update Rating</h4>
-                    <div class="rating-form-container" data-anime-id="{{ anime.id }}" data-current-rating="{{ anime.user_rating or 0 }}">
-                        <!-- Interactive star rating will be initialized here -->
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Remove Button -->
-            <div class="status-actions">
-                <a href="{{ get_url_for('remove_anime', anime_id=anime.id) }}" 
-                   class="remove-btn"
-                   onclick="return confirm('Remove {{ anime.title }} from your watched list? This will also remove your rating.')">
-                    Remove from List
-                </a>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    
-    {% else %}
-    <div class="empty-list">
-        <h3>No anime in your watched list yet</h3>
-        <p>Start by discovering and marking anime as watched!</p>
-        <div class="action-buttons">
-            <a href="{{ get_url_for('index') }}" class="btn btn-primary">Discover Anime</a>
-            <a href="{{ get_url_for('search') }}" class="btn btn-secondary">Search Anime</a>
-        </div>
-    </div>
-    {% endif %}
+{# ── Status Tabs ────────────────────────────────────────────────── #}
+<div class="tabs">
+  {% for tab in tabs %}
+  <a href="{{ get_url_for('watchlist', status=tab.id, sort_by=sort_by, sort_order=sort_order) }}"
+     class="tab {% if status == tab.id %}active{% endif %}">
+    {{ tab.label }}
+  </a>
+  {% endfor %}
 </div>
 
-<style>
-.list-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    flex-wrap: wrap;
-    gap: 1rem;
-}
+{% if anime_list %}
+{# ── Sort Controls ──────────────────────────────────────────────── #}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+  <span style="font-size:11px;color:#555;">{{ anime_list|length }} anime</span>
 
-.sort-controls {
-    background: var(--bg-card);
-    border-radius: var(--radius-sm);
-    padding: 0.8rem 1rem;
-    border: 1px solid var(--border);
-}
+  <form method="GET" action="{{ get_url_for('watchlist') }}" style="display:flex;gap:8px;align-items:center;">
+    {% if status %}
+    <input type="hidden" name="status" value="{{ status }}">
+    {% endif %}
+    <select name="sort_by" class="field select" onchange="this.form.submit()"
+            style="background:var(--card);border:1px solid var(--dim);color:#888;font-size:10px;padding:6px 8px;letter-spacing:.05em;">
+      <option value="date_added" {{ 'selected' if sort_by == 'date_added' }}>Date Added</option>
+      <option value="title" {{ 'selected' if sort_by == 'title' }}>Title</option>
+      <option value="score" {{ 'selected' if sort_by == 'score' }}>MAL Score</option>
+      <option value="episodes" {{ 'selected' if sort_by == 'episodes' }}>Episodes</option>
+      <option value="user_rating" {{ 'selected' if sort_by == 'user_rating' }}>My Rating</option>
+    </select>
+    <select name="sort_order" onchange="this.form.submit()"
+            style="background:var(--card);border:1px solid var(--dim);color:#888;font-size:10px;padding:6px 8px;letter-spacing:.05em;">
+      <option value="desc" {{ 'selected' if sort_order == 'desc' }}>High-Low</option>
+      <option value="asc" {{ 'selected' if sort_order == 'asc' }}>Low-High</option>
+    </select>
+  </form>
+</div>
 
-.sort-form {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
+{# ── Anime Grid ─────────────────────────────────────────────────── #}
+<div class="anime-grid">
+  {% for anime in anime_list %}
+  <div class="anime-card" data-mal-id="{{ anime.mal_id }}">
+    <div class="anime-card__poster">
+      {% set img = '' %}
+      {% if anime.main_picture %}
+        {% set img = anime.main_picture.large or anime.main_picture.medium or '' %}
+      {% elif anime.images and anime.images.jpg %}
+        {% set img = anime.images.jpg.image_url or '' %}
+      {% endif %}
+      {% if img %}
+      <img src="{{ img }}" alt="{{ anime.title }}" loading="lazy">
+      {% endif %}
 
-.sort-form label {
-    font-weight: 500;
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-}
+      {% if anime.score %}
+      <div class="anime-card__score">{{ anime.score }}</div>
+      {% endif %}
+      {% if anime.user_rating %}
+      <div class="anime-card__user-score">{{ anime.user_rating }}/5</div>
+      {% endif %}
 
-.sort-select {
-    padding: 0.5rem 0.8rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xs);
-    font-size: 0.85rem;
-    background: var(--bg-base);
-    color: var(--text-primary);
-    cursor: pointer;
-}
+      <div class="anime-card__overlay">
+        <div class="anime-card__overlay-title">{{ anime.title }}</div>
+        {% if anime.episodes %}
+        <div style="font-size:9px;color:#888;margin-bottom:6px;">{{ anime.episodes }} episodes</div>
+        {% endif %}
 
-.sort-select:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 2px var(--primary-dim);
-}
+        <a href="{{ get_url_for('remove_anime', anime_id=anime.mal_id) }}"
+           class="anime-card__overlay-btn anime-card__overlay-btn--danger"
+           onclick="return confirm('Remove from list?')">
+          Remove
+        </a>
+      </div>
+    </div>
 
-.rating-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin: 0.5rem 0;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    padding: 0.5rem 0;
-    border-top: 1px solid var(--border-subtle);
-}
+    <div class="anime-card__info">
+      <div class="anime-card__title">
+        <a href="https://myanimelist.net/anime/{{ anime.mal_id }}" target="_blank" style="color:inherit;">{{ anime.title }}</a>
+      </div>
+      <div class="anime-card__tags">
+        {% if anime.episodes %}<span class="anime-card__tag">{{ anime.episodes }} ep</span>{% endif %}
+        {% if anime.watch_status %}
+        <span class="anime-card__tag" style="color:{% if anime.watch_status == 'completed' %}var(--green){% elif anime.watch_status == 'dropped' %}var(--accent){% else %}var(--gold){% endif %}">
+          {{ status_labels.get(anime.watch_status, anime.watch_status) }}
+        </span>
+        {% endif %}
+      </div>
 
-.rating-form.compact {
-    background: var(--bg-elevated);
-    border-radius: var(--radius-xs);
-    padding: 0.8rem;
-    margin: 0.8rem 1.2rem;
-    border-left: 3px solid var(--primary);
-}
+      {# Inline star rating #}
+      <div class="star-rating-interactive"
+           data-mal-id="{{ anime.mal_id }}"
+           data-current-rating="{{ anime.user_rating or 0 }}"
+           data-action-url="{{ get_url_for('update_entry', mal_id=anime.mal_id) }}"
+           style="margin-top:6px;"></div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
 
-.rating-form.compact h4 {
-    color: var(--primary-hover);
-    margin-bottom: 0.5rem;
-    font-size: 0.85rem;
-    text-align: center;
-}
-
-.rating-form.compact .rating-form-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-@media (max-width: 767px) {
-    .list-controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .anime-count,
-    .sort-controls {
-        width: 100%;
-        text-align: center;
-    }
-
-    .sort-form {
-        justify-content: center;
-        gap: 0.6rem;
-    }
-
-    .sort-select {
-        min-width: 120px;
-        min-height: 44px;
-        font-size: 16px;
-    }
-}
-</style>
+{% else %}
+<div class="empty">
+  {% if status %}
+  No anime with status "{{ status_labels.get(status, status) }}"
+  {% else %}
+  Your list is empty &mdash; <a href="{{ get_url_for('discover') }}" style="color:var(--gold);">discover anime</a>
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}

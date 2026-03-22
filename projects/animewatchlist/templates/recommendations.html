@@ -1,168 +1,46 @@
 {% extends "base.html" %}
 
-{% block title %}Your Recommendations{% endblock %}
+{% block title %}For You - AnimeList{% endblock %}
 
 {% block content %}
-<div class="recommendations-page">
-    <h1>Your Personalized Anime Recommendations</h1>
-    <p>Based on your watched list and ratings, here are some series you might enjoy.</p>
+<h1 class="page-title">For You</h1>
+<p class="page-subtitle" style="margin-bottom:32px;">Based on your completed and highly rated titles</p>
 
-    {% if recommendations %}
-        <div class="recommendations-list">
-            {% for rec in recommendations %}
-                <div class="recommendation-card">
-                    {% if rec['anime']['images']['jpg']['image_url'] %}
-                    <div class="rec-image">
-                        <img src="{{ rec['anime']['images']['jpg']['image_url'] }}" alt="{{ rec['anime']['title'] }}">
-                    </div>
-                    {% endif %}
-                    <div class="rec-content">
-                        <h3 class="rec-title">
-                            <a href="{{ rec['anime']['url'] }}" target="_blank">
-                                {{ rec['anime']['title'] }}
-                            </a>
-                        </h3>
-                        <p class="rec-score">Match Score: <strong>{{ "%.0f"|format(rec.score * 100) }}%</strong></p>
-                        <p class="rec-explanation">
-                            <strong>Why you might like it:</strong> {{ rec.explanation }}
-                        </p>
-                        {% if rec.series_info and rec.series_info.total_seasons > 1 %}
-                            <p class="series-info">
-                                This is the start of a series with {{ rec.series_info.total_seasons }} parts.
-                            </p>
-                        {% endif %}
-                        <div class="rec-actions">
-                            <a href="{{ get_url_for('direct_mark', anime_id=rec['anime']['mal_id'], status='watched') }}" class="btn btn-primary">Add to Watched</a>
-                        </div>
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
-    {% else %}
-        <div class="no-recommendations">
-            <h2>We couldn't find any recommendations for you right now.</h2>
-            <p>Try watching and rating more anime to improve your recommendations. Or try again later.</p>
-        </div>
+{% if recommendations %}
+<div class="rec-list">
+  {% for rec in recommendations %}
+  <div class="rec-card">
+    {% set img = '' %}
+    {% if rec.anime.images and rec.anime.images.jpg %}
+      {% set img = rec.anime.images.jpg.image_url or '' %}
     {% endif %}
+    {% if img %}
+    <img class="rec-card__poster" src="{{ img }}" alt="{{ rec.anime.title }}" loading="lazy">
+    {% endif %}
+
+    <div class="rec-card__body">
+      <div class="rec-card__title">
+        <a href="{{ rec.anime.url or 'https://myanimelist.net/anime/' ~ (rec.anime.mal_id or rec.anime.id) }}" target="_blank">
+          {{ rec.anime.title }}
+        </a>
+      </div>
+      <div class="rec-card__score">{{ "%.0f"|format(rec.score * 100) }}% match</div>
+      <div class="rec-card__text">{{ rec.explanation }}</div>
+      {% if rec.series_info and rec.series_info.total_seasons is defined and rec.series_info.total_seasons > 1 %}
+      <div style="font-size:10px;color:var(--gold);margin-bottom:8px;font-style:italic;">
+        Series with {{ rec.series_info.total_seasons }} parts
+      </div>
+      {% endif %}
+      <a href="{{ get_url_for('direct_mark', anime_id=rec.anime.mal_id or rec.anime.id, status='completed') }}"
+         class="btn btn--sm">Add to List</a>
+    </div>
+  </div>
+  {% endfor %}
 </div>
 
-<style>
-.recommendations-page h1 {
-    text-align: center;
-    background: linear-gradient(135deg, var(--primary-hover), var(--accent));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 0.5rem;
-    font-size: 1.8rem;
-}
-.recommendations-page > p {
-    text-align: center;
-    color: var(--text-secondary);
-    margin-bottom: 2.5rem;
-    font-size: 1.05rem;
-}
-.recommendations-list {
-    display: grid;
-    gap: 1.2rem;
-}
-.recommendation-card {
-    display: flex;
-    gap: 1.5rem;
-    background: var(--bg-card);
-    backdrop-filter: var(--glass);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    padding: 1.5rem;
-    border: 1px solid var(--border);
-    border-left: 4px solid var(--primary);
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.recommendation-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg), var(--glow);
-    border-color: rgba(99, 102, 241, 0.3);
-}
-.rec-image {
-    flex-shrink: 0;
-}
-.rec-image img {
-    width: 120px;
-    height: 180px;
-    object-fit: cover;
-    border-radius: var(--radius-sm);
-    box-shadow: var(--shadow);
-}
-.rec-content {
-    flex-grow: 1;
-}
-.rec-title {
-    margin-top: 0;
-    margin-bottom: 0.5rem;
-}
-.rec-title a {
-    color: var(--primary-hover);
-    text-decoration: none;
-    font-size: 1.2rem;
-    font-weight: 600;
-    transition: color 0.2s ease;
-}
-.rec-title a:hover {
-    color: var(--accent);
-}
-.rec-score {
-    font-size: 1rem;
-    color: var(--text-primary);
-    margin-bottom: 0.8rem;
-}
-.rec-score strong {
-    color: var(--success);
-}
-.rec-explanation {
-    color: var(--text-secondary);
-    margin-bottom: 1rem;
-    line-height: 1.5;
-    font-size: 0.9rem;
-}
-.series-info {
-    font-style: italic;
-    color: var(--primary-hover);
-    background: var(--primary-dim);
-    padding: 0.4rem 0.8rem;
-    border-radius: var(--radius-xs);
-    display: inline-block;
-    font-size: 0.85rem;
-    border: 1px solid var(--border);
-}
-.rec-actions {
-    margin-top: 1.2rem;
-}
-.no-recommendations {
-    text-align: center;
-    padding: 3rem;
-    background: var(--bg-card);
-    backdrop-filter: var(--glass);
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-}
-.no-recommendations h2 {
-    color: var(--primary-hover);
-}
-.no-recommendations p {
-    color: var(--text-secondary);
-}
-
-@media (max-width: 767px) {
-    .recommendation-card {
-        flex-direction: column;
-    }
-    .rec-image {
-        text-align: center;
-    }
-    .rec-image img {
-        width: 140px;
-        height: auto;
-    }
-}
-</style>
+{% else %}
+<div class="empty">
+  Not enough data yet &mdash; rate more anime to get personalized recommendations
+</div>
+{% endif %}
 {% endblock %}

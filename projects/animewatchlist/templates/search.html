@@ -1,384 +1,102 @@
 {% extends "base.html" %}
 
-{% block title %}Search Anime - Anime Tracker{% endblock %}
+{% block title %}Search - AnimeList{% endblock %}
 
 {% block content %}
-<div class="search-container">
-    <h2>Search Anime</h2>
-    
-    <form method="POST" action="{{ get_url_for('search') }}" class="search-form">
-        <div class="search-input">
-            <input type="text" 
-                   name="query" 
-                   placeholder="Enter anime title..." 
-                   value="{{ query }}" 
-                   required
-                   autocomplete="off">
-            <button type="submit" aria-label="Search">
-                <span class="search-icon">🔍</span>
-                <span class="search-text">Search</span>
-            </button>
-        </div>
-    </form>
+<h1 class="page-title">Search</h1>
 
-    {% if query and results %}
-    <div class="search-results">
-        <h3>Search Results for "{{ query }}"</h3>
-        <p class="results-count">Found {{ results|length }} results</p>
-        
-        <div class="anime-list">
-            {% for anime in results %}
-            <div class="anime-item" data-anime-id="{{ anime.id }}">
-                <h3>
-                    <a href="https://myanimelist.net/anime/{{ anime.id }}" target="_blank" class="anime-title-link">
-                        {{ anime.title }}
-                    </a>
-                </h3>
-                
-                {% if anime.main_picture and anime.main_picture.medium %}
-                <img src="{{ anime.main_picture.medium }}" alt="{{ anime.title }}" loading="lazy">
-                {% endif %}
-                
-                <div class="anime-details">
-                    <p><strong>Episodes:</strong> {{ anime.episodes }}</p>
-                    
-                    <!-- Rating Row -->
-                    <div class="rating-row">
-                        {% if anime.score and anime.score != "N/A" %}
-                        <div class="mal-score">
-                            <span>MAL: {{ anime.score }}/10</span>
-                        </div>
-                        {% endif %}
-                        
-                        {% if current_user.is_authenticated and has_rating_feature and anime.user_rating is not none %}
-                        <div class="user-rating">
-                            <span class="user-rating-label">My Rating:</span>
-                            <div class="rating-display-container" data-rating="{{ anime.user_rating or 0 }}">
-                                <!-- Star rating will be initialized here -->
-                            </div>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
+<form method="POST" action="{{ get_url_for('search') }}" class="search-bar">
+  <div class="search-bar__wrap">
+    <input class="search-bar__input" type="text" name="query" id="live-search"
+           placeholder="Search anime..."
+           value="{{ query }}" autocomplete="off">
+    <button class="search-bar__btn" type="submit" aria-label="Search">&#8594;</button>
+  </div>
+  {% if not query %}
+  <div class="search-hint">Search by English or Japanese title</div>
+  {% endif %}
+</form>
 
-                {% if current_user.is_authenticated %}
-                    {% if anime.status == "watched" %}
-                    <div class="status-badge watched">✓ Watched</div>
-                    
-                    {% if has_rating_feature %}
-                    <!-- Rating Form for watched anime -->
-                    <div class="rating-form compact">
-                        <h4>Update Rating</h4>
-                        <div class="rating-form-container" data-anime-id="{{ anime.id }}" data-current-rating="{{ anime.user_rating or 0 }}">
-                            <!-- Interactive star rating will be initialized here -->
-                        </div>
-                    </div>
-                    {% endif %}
-                    
-                    <div class="status-actions">
-                        <a href="{{ get_url_for('remove_anime', anime_id=anime.id) }}" 
-                           class="remove-btn"
-                           onclick="return confirm('Remove {{ anime.title }} from your watched list?')">
-                            Remove from List
-                        </a>
-                    </div>
-                    {% else %}
-                    
-                    {% if has_rating_feature %}
-                    <!-- Rating Form for unwatched anime -->
-                    <div class="rating-form">
-                        <h4>Rate & Add to Watched</h4>
-                        <p class="rating-help">Rating will automatically add to your watched list</p>
-                        <div class="rating-form-container" data-anime-id="{{ anime.id }}" data-current-rating="0">
-                            <!-- Interactive star rating will be initialized here -->
-                        </div>
-                    </div>
-                    {% endif %}
-                    
-                    <form action="{{ get_url_for('mark_search') }}" method="POST" class="mark-form">
-                        <input type="hidden" name="anime_id" value="{{ anime.id }}">
-                        <button type="submit" name="status" value="watched" class="btn btn-primary mark-btn">
-                            ✓ Mark as Watched
-                        </button>
-                    </form>
-                    {% endif %}
-                {% else %}
-                <div class="auth-required">
-                    <a href="{{ get_url_for('login') }}" class="login-to-mark">
-                        Login to track this anime
-                    </a>
-                </div>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    
-    {% elif query %}
-    <div class="no-results">
-        <h3>No results found</h3>
-        <p>No results found for "<strong>{{ query }}</strong>". Try a different search term or check your spelling.</p>
-        <div class="search-suggestions">
-            <h4>Search Tips:</h4>
-            <ul>
-                <li>Try using English or Japanese titles</li>
-                <li>Check for typos in your search</li>
-                <li>Use shorter, more general terms</li>
-                <li>Try searching for alternative titles</li>
-            </ul>
-        </div>
-    </div>
-    
-    {% else %}
-    <div class="search-help">
-        <h3>Find Your Next Anime</h3>
-        <p>Search our database of thousands of anime titles. You can search by:</p>
-        <div class="search-features">
-            <div class="feature">
-                <span class="feature-icon">📝</span>
-                <span>Anime title (English or Japanese)</span>
-            </div>
-            <div class="feature">
-                <span class="feature-icon">🎯</span>
-                <span>Exact or partial matches</span>
-            </div>
-            <div class="feature">
-                <span class="feature-icon">⭐</span>
-                <span>Popular and classic series</span>
-            </div>
-            {% if has_rating_feature %}
-            <div class="feature">
-                <span class="feature-icon">⭐</span>
-                <span>Rate with 0-5 stars</span>
-            </div>
-            {% endif %}
-        </div>
-        
-        {% if current_user.is_authenticated %}
-        <div class="quick-actions">
-            <p>Or explore:</p>
-            <div class="action-buttons">
-                <a href="{{ get_url_for('index') }}" class="btn btn-primary">Discover Popular</a>
-                <a href="{{ get_url_for('watched') }}" class="btn btn-secondary">My Watched List</a>
-            </div>
-        </div>
+{% if query and results %}
+<p style="text-align:center;font-size:10px;color:#555;letter-spacing:.06em;margin-bottom:24px;">
+  {{ results|length }} results for "{{ query }}"
+</p>
+
+<div class="anime-grid">
+  {% for anime in results %}
+  <div class="anime-card" data-anime-id="{{ anime.id }}">
+    <div class="anime-card__poster">
+      {% set img = '' %}
+      {% if anime.main_picture %}
+        {% set img = anime.main_picture.large or anime.main_picture.medium or '' %}
+      {% elif anime.images and anime.images.jpg %}
+        {% set img = anime.images.jpg.image_url or '' %}
+      {% endif %}
+      {% if img %}
+      <img src="{{ img }}" alt="{{ anime.title }}" loading="lazy">
+      {% endif %}
+
+      {% if anime.score %}
+      <div class="anime-card__score">{{ anime.score }}</div>
+      {% endif %}
+
+      {% if anime.user_rating %}
+      <div class="anime-card__user-score">{{ anime.user_rating }}/5</div>
+      {% endif %}
+
+      <div class="anime-card__overlay">
+        <div class="anime-card__overlay-title">{{ anime.title }}</div>
+        {% if anime.episodes %}
+        <div style="font-size:9px;color:#888;margin-bottom:6px;">{{ anime.episodes }} episodes</div>
         {% endif %}
+
+        {% if current_user.is_authenticated %}
+          {% if anime.status == "watched" %}
+          <a href="{{ get_url_for('remove_anime', anime_id=anime.id) }}"
+             class="anime-card__overlay-btn anime-card__overlay-btn--danger"
+             onclick="return confirm('Remove from list?')">
+            Remove
+          </a>
+          {% else %}
+          <a href="{{ get_url_for('direct_mark', anime_id=anime.id, status='completed') }}"
+             class="anime-card__overlay-btn">
+            Add to List
+          </a>
+          {% endif %}
+        {% else %}
+        <a href="{{ get_url_for('login') }}" class="anime-card__overlay-btn">Sign in to add</a>
+        {% endif %}
+      </div>
     </div>
-    {% endif %}
+
+    <div class="anime-card__info">
+      <div class="anime-card__title">
+        <a href="https://myanimelist.net/anime/{{ anime.id }}" target="_blank" style="color:inherit;">{{ anime.title }}</a>
+      </div>
+      <div class="anime-card__tags">
+        {% if anime.episodes %}<span class="anime-card__tag">{{ anime.episodes }} ep</span>{% endif %}
+        {% if anime.status == "watched" %}<span class="anime-card__tag" style="color:var(--green);">In list</span>{% endif %}
+      </div>
+      {% if current_user.is_authenticated and anime.status == "watched" and has_rating_feature %}
+      <div class="star-rating-interactive"
+           data-mal-id="{{ anime.id }}"
+           data-current-rating="{{ anime.user_rating or 0 }}"
+           data-action-url="{{ get_url_for('mark_search') }}"
+           style="margin-top:6px;"></div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
 </div>
 
-<style>
-.search-container {
-    max-width: 1000px;
-    margin: 0 auto;
-}
+{% elif query %}
+<div class="empty">
+  No results for "{{ query }}"
+</div>
 
-.search-container h2 {
-    text-align: center;
-    background: linear-gradient(135deg, var(--primary-hover), var(--accent));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 2rem;
-    font-size: 1.8rem;
-}
-
-.search-form {
-    margin-bottom: 2rem;
-}
-
-.search-results h3 {
-    color: var(--primary-hover);
-    margin-bottom: 0.5rem;
-    font-size: 1.3rem;
-    text-align: center;
-}
-
-.results-count {
-    color: var(--text-muted);
-    margin-bottom: 2rem;
-    text-align: center;
-    font-weight: 500;
-    font-size: 0.9rem;
-}
-
-.mark-form {
-    margin-top: auto;
-    padding: 0 1.2rem 1.2rem;
-}
-
-.mark-btn {
-    width: 100%;
-    justify-content: center;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.status-badge {
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-xs);
-    font-weight: 600;
-    text-align: center;
-    margin: 0 1.2rem 0.8rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    font-size: 0.85rem;
-}
-
-.status-badge.watched {
-    background: rgba(52, 211, 153, 0.1);
-    color: var(--success);
-    border: 1px solid rgba(52, 211, 153, 0.25);
-}
-
-.auth-required {
-    margin-top: auto;
-    text-align: center;
-    padding: 0 1.2rem 1.2rem;
-}
-
-.login-to-mark {
-    display: inline-block;
-    padding: 0.7rem 1.5rem;
-    background: var(--primary-dim);
-    color: var(--primary-hover);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    text-decoration: none;
-    font-weight: 600;
-    transition: all 0.2s ease;
-    width: 100%;
-    box-sizing: border-box;
-    font-size: 0.9rem;
-}
-
-.login-to-mark:hover {
-    background: var(--primary);
-    color: #fff;
-    transform: translateY(-2px);
-}
-
-.no-results, .search-help {
-    text-align: center;
-    background: var(--bg-card);
-    backdrop-filter: var(--glass);
-    border-radius: var(--radius);
-    padding: 3rem 2rem;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-}
-
-.no-results h3, .search-help h3 {
-    color: var(--primary-hover);
-    margin-bottom: 1rem;
-    font-size: 1.4rem;
-}
-
-.no-results p {
-    color: var(--text-secondary);
-    margin-bottom: 2rem;
-    font-size: 1.05rem;
-}
-
-.search-suggestions {
-    text-align: left;
-    max-width: 400px;
-    margin: 0 auto;
-    padding: 1.5rem;
-    background: var(--bg-elevated);
-    border-radius: var(--radius-sm);
-}
-
-.search-suggestions h4 {
-    color: var(--primary-hover);
-    margin-bottom: 1rem;
-    font-size: 1rem;
-}
-
-.search-suggestions ul {
-    margin: 0;
-    padding-left: 1.5rem;
-    color: var(--text-secondary);
-}
-
-.search-suggestions li {
-    margin-bottom: 0.5rem;
-    line-height: 1.4;
-    font-size: 0.9rem;
-}
-
-.search-features {
-    display: flex;
-    justify-content: center;
-    gap: 2rem;
-    margin: 2rem 0;
-    flex-wrap: wrap;
-}
-
-.feature {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 120px;
-    text-align: center;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-}
-
-.search-help .feature-icon {
-    font-size: 1.8rem;
-}
-
-.quick-actions {
-    margin-top: 2rem;
-    padding-top: 2rem;
-    border-top: 1px solid var(--border);
-}
-
-.quick-actions p {
-    margin-bottom: 1rem;
-    color: var(--text-muted);
-}
-
-.rating-help {
-    color: var(--text-muted);
-    font-size: 0.82rem;
-    margin-bottom: 0.8rem;
-    font-style: italic;
-    text-align: center;
-}
-
-.rating-form .rating-form-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-@media (max-width: 767px) {
-    .search-input {
-        max-width: 100%;
-        margin: 0 0 2rem 0;
-    }
-    .search-text {
-        display: none;
-    }
-    .search-features {
-        gap: 1rem;
-        flex-direction: column;
-        align-items: center;
-    }
-    .feature {
-        min-width: auto;
-        flex-direction: row;
-        gap: 1rem;
-        text-align: left;
-        width: 100%;
-        max-width: 300px;
-    }
-}
-</style>
+{% else %}
+<div class="empty">
+  Type a title to search
+</div>
+{% endif %}
 {% endblock %}

@@ -15,15 +15,21 @@
 <nav class="nav">
   <div class="nav-inner">
     <a href="{{ get_url_for('index') }}" class="nav-logo">Anime<span>LIST</span></a>
+
+    <button class="nav-hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+
     <div class="nav-links">
-      <a href="{{ get_url_for('index') }}" class="nav-link {% if active == 'discover' %}active{% endif %}">Discover</a>
-      <a href="{{ get_url_for('search') }}" class="nav-link {% if active == 'search' %}active{% endif %}">Search</a>
       {% if current_user.is_authenticated %}
+        <a href="{{ get_url_for('discover') }}" class="nav-link {% if active == 'discover' %}active{% endif %}">Discover</a>
+        <a href="{{ get_url_for('search') }}" class="nav-link {% if active == 'search' %}active{% endif %}">Search</a>
         <a href="{{ get_url_for('watchlist') }}" class="nav-link {% if active == 'list' %}active{% endif %}">My List</a>
         <a href="{{ get_url_for('stats') }}" class="nav-link {% if active == 'stats' %}active{% endif %}">Stats</a>
         <a href="{{ get_url_for('recommendations') }}" class="nav-link {% if active == 'recs' %}active{% endif %}">For You</a>
         <a href="{{ get_url_for('profile') }}" class="nav-link {% if active == 'profile' %}active{% endif %}">Profile</a>
       {% else %}
+        <a href="{{ get_url_for('search') }}" class="nav-link {% if active == 'search' %}active{% endif %}">Search</a>
         <a href="{{ get_url_for('login') }}" class="nav-link nav-link--cta">Sign In</a>
       {% endif %}
     </div>

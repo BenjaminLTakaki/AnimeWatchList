@@ -4,7 +4,7 @@ Drop this into projects/animewatchlist/ and register with wsgi.py.
 """
 import os, secrets, hashlib, base64, datetime, requests
 from flask import (Flask, render_template, redirect, request,
-                   session, flash, url_for, Blueprint)
+                   session, flash, url_for, Blueprint, jsonify)
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (LoginManager, UserMixin, login_user,
                          logout_user, login_required, current_user)
@@ -272,8 +272,65 @@ def _add_or_update_user_list_item(mal_id, watch_status="completed", user_rating=
 @bp.route("/")
 def index():
     if not current_user.is_authenticated:
-        return redirect(_get_url_for("login"))
-    return redirect(_get_url_for("search"))
+        return render_template("index.html", anime=None, active="discover", get_url_for=_get_url_for)
+    return redirect(_get_url_for("discover"))
+
+
+@bp.route("/discover")
+@login_required
+def discover():
+    """Swipe-style discovery — returns a batch of anime for the card stack."""
+    watched_ids = {e.anime.mal_id for e in UserAnimeList.query.filter_by(user_id=current_user.id).all()}
+    watched_count = len(watched_ids)
+    ranking = request.args.get("ranking", "all")
+    offset = int(request.args.get("offset", 0))
+    batch = []
+    try:
+        resp = requests.get(f"{MAL_API_BASE}/anime/ranking", headers=_mal_pub(),
+                            params={"ranking_type": ranking, "limit": 50,
+                                    "offset": offset, "fields": ANIME_FIELDS},
+                            timeout=10)
+        if resp.ok:
+            for item in resp.json().get("data", []):
+                node = item["node"]
+                mid = node.get("id")
+                if mid not in watched_ids:
+                    anime = _upsert(node)
+                    batch.append(_to_template_anime(anime))
+                if len(batch) >= 10:
+                    break
+    except Exception:
+        pass
+    return render_template("index.html", anime_batch=batch, watched_count=watched_count,
+                           ranking=ranking, offset=offset,
+                           active="discover", get_url_for=_get_url_for)
+
+
+@bp.route("/api/discover")
+@login_required
+def api_discover():
+    """JSON endpoint to fetch more cards without full page reload."""
+    watched_ids = {e.anime.mal_id for e in UserAnimeList.query.filter_by(user_id=current_user.id).all()}
+    ranking = request.args.get("ranking", "all")
+    offset = int(request.args.get("offset", 0))
+    batch = []
+    try:
+        resp = requests.get(f"{MAL_API_BASE}/anime/ranking", headers=_mal_pub(),
+                            params={"ranking_type": ranking, "limit": 50,
+                                    "offset": offset, "fields": ANIME_FIELDS},
+                            timeout=10)
+        if resp.ok:
+            for item in resp.json().get("data", []):
+                node = item["node"]
+                mid = node.get("id")
+                if mid not in watched_ids:
+                    anime = _upsert(node)
+                    batch.append(_to_template_anime(anime))
+                if len(batch) >= 10:
+                    break
+    except Exception:
+        pass
+    return jsonify(batch)
 
 
 @bp.route("/search", methods=["GET", "POST"])
@@ -572,8 +629,13 @@ def recommendations():
 @bp.route("/profile")
 @login_required
 def profile():
-    watched_count = UserAnimeList.query.filter_by(user_id=current_user.id).count()
-    return render_template("profile.html", stats=[watched_count, 0], active="profile", get_url_for=_get_url_for)
+    entries = UserAnimeList.query.filter_by(user_id=current_user.id).all()
+    watched_count = len(entries)
+    total_eps = sum((e.anime.episodes or 0) for e in entries if e.watch_status == "completed")
+    return render_template("profile.html",
+                           watched_count=watched_count,
+                           total_episodes=total_eps,
+                           active="profile", get_url_for=_get_url_for)
 
 
 # ── Auth ───────────────────────────────────────────────────────────────────
@@ -628,20 +690,20 @@ def logout():
 # ── MAL OAuth ──────────────────────────────────────────────────────────────
 
 def _pkce():
+    # MAL uses code_challenge_method=plain, so challenge == verifier
     v = base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b"=").decode()
-    c = base64.urlsafe_b64encode(hashlib.sha256(v.encode()).digest()).rstrip(b"=").decode()
-    return v, c
+    return v
 
 
 @bp.route("/auth/mal/authorize")
 def mal_authorize():
-    v, c = _pkce()
+    v = _pkce()
     state = secrets.token_urlsafe(16)
     session["mal_verifier"] = v
     session["mal_state"]    = state
     params = (f"response_type=code&client_id={MAL_CLIENT_ID}"
               f"&redirect_uri={MAL_REDIRECT_URI}&state={state}"
-              f"&code_challenge={c}&code_challenge_method=plain")
+              f"&code_challenge={v}&code_challenge_method=plain")
     return redirect(f"{MAL_AUTH_BASE}/authorize?{params}")
 
 
