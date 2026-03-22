@@ -313,33 +313,64 @@ def index():
     return redirect(_get_url_for("discover"))
 
 
+def _get_seen_ids():
+    """IDs the user has already seen this session (watched + skipped)."""
+    watched = {e.anime.mal_id for e in
+               UserAnimeList.query.filter_by(user_id=current_user.id).all()}
+    skipped = set(session.get("skipped_ids", []))
+    return watched | skipped
+
+
+def _fetch_discover_batch(ranking, offset, seen_ids, count=20):
+    """Pull up to `count` unseen anime from MAL ranking API."""
+    batch = []
+    api_offset = offset
+    # May need multiple pages if many are filtered out
+    for _ in range(3):
+        try:
+            resp = requests.get(f"{MAL_API_BASE}/anime/ranking", headers=_mal_pub(),
+                                params={"ranking_type": ranking, "limit": 500,
+                                        "offset": api_offset, "fields": ANIME_FIELDS},
+                                timeout=15)
+            if not resp.ok:
+                break
+            items = resp.json().get("data", [])
+            if not items:
+                break
+            for item in items:
+                node = item["node"]
+                mid = node.get("id")
+                if mid not in seen_ids:
+                    anime = _upsert(node)
+                    batch.append(_to_template_anime(anime))
+                    seen_ids.add(mid)
+                if len(batch) >= count:
+                    break
+            api_offset += len(items)
+            if len(batch) >= count:
+                break
+        except Exception:
+            break
+    return batch, api_offset
+
+
 @bp.route("/discover")
 @login_required
 def discover():
     """Swipe-style discovery — returns a batch of anime for the card stack."""
-    watched_ids = {e.anime.mal_id for e in UserAnimeList.query.filter_by(user_id=current_user.id).all()}
-    watched_count = len(watched_ids)
     ranking = request.args.get("ranking", "all")
+    # Reset skipped list when switching categories
+    prev_ranking = session.get("discover_ranking")
+    if prev_ranking != ranking:
+        session["skipped_ids"] = []
+        session["discover_ranking"] = ranking
+    seen_ids = _get_seen_ids()
+    watched_count = len({e.anime.mal_id for e in
+                         UserAnimeList.query.filter_by(user_id=current_user.id).all()})
     offset = int(request.args.get("offset", 0))
-    batch = []
-    try:
-        resp = requests.get(f"{MAL_API_BASE}/anime/ranking", headers=_mal_pub(),
-                            params={"ranking_type": ranking, "limit": 50,
-                                    "offset": offset, "fields": ANIME_FIELDS},
-                            timeout=10)
-        if resp.ok:
-            for item in resp.json().get("data", []):
-                node = item["node"]
-                mid = node.get("id")
-                if mid not in watched_ids:
-                    anime = _upsert(node)
-                    batch.append(_to_template_anime(anime))
-                if len(batch) >= 10:
-                    break
-    except Exception:
-        pass
+    batch, next_offset = _fetch_discover_batch(ranking, offset, seen_ids, count=20)
     return render_template("index.html", anime_batch=batch, watched_count=watched_count,
-                           ranking=ranking, offset=offset,
+                           ranking=ranking, offset=next_offset,
                            active="discover", get_url_for=_get_url_for)
 
 
@@ -347,27 +378,29 @@ def discover():
 @login_required
 def api_discover():
     """JSON endpoint to fetch more cards without full page reload."""
-    watched_ids = {e.anime.mal_id for e in UserAnimeList.query.filter_by(user_id=current_user.id).all()}
     ranking = request.args.get("ranking", "all")
     offset = int(request.args.get("offset", 0))
-    batch = []
-    try:
-        resp = requests.get(f"{MAL_API_BASE}/anime/ranking", headers=_mal_pub(),
-                            params={"ranking_type": ranking, "limit": 50,
-                                    "offset": offset, "fields": ANIME_FIELDS},
-                            timeout=10)
-        if resp.ok:
-            for item in resp.json().get("data", []):
-                node = item["node"]
-                mid = node.get("id")
-                if mid not in watched_ids:
-                    anime = _upsert(node)
-                    batch.append(_to_template_anime(anime))
-                if len(batch) >= 10:
-                    break
-    except Exception:
-        pass
-    return jsonify(batch)
+    seen_ids = _get_seen_ids()
+    # Also exclude IDs the client already has (sent as query param)
+    shown = request.args.get("shown", "")
+    if shown:
+        seen_ids |= {int(x) for x in shown.split(",") if x.isdigit()}
+    batch, next_offset = _fetch_discover_batch(ranking, offset, seen_ids, count=20)
+    return jsonify({"anime": batch, "next_offset": next_offset})
+
+
+@bp.route("/api/skip", methods=["POST"])
+@login_required
+def api_skip():
+    """Track skipped anime so they don't reappear."""
+    mal_id = request.json.get("mal_id") if request.is_json else request.form.get("mal_id")
+    if mal_id:
+        skipped = session.get("skipped_ids", [])
+        mid = int(mal_id)
+        if mid not in skipped:
+            skipped.append(mid)
+            session["skipped_ids"] = skipped
+    return jsonify({"ok": True})
 
 
 @bp.route("/search", methods=["GET", "POST"])

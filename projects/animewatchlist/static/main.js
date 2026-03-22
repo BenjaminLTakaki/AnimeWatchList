@@ -193,6 +193,8 @@ var SwipeManager = {
   currentX: 0,
   isDragging: false,
   threshold: 80,
+  shownIds: [],
+  loading: false,
 
   init: function() {
     var area = document.querySelector('.swipe-area');
@@ -200,6 +202,8 @@ var SwipeManager = {
     this.area = area;
     this.cards = Array.from(area.querySelectorAll('.swipe-card'));
     this.currentIndex = 0;
+    // Track all initially loaded IDs
+    this.shownIds = this.cards.map(function(c) { return c.dataset.malId; });
     this.setupCards();
     this.bindEvents();
   },
@@ -207,16 +211,22 @@ var SwipeManager = {
   setupCards: function() {
     for (var i = 0; i < this.cards.length; i++) {
       var card = this.cards[i];
-      if (i < this.currentIndex) {
+      var rel = i - this.currentIndex;
+      if (rel < 0) {
         card.style.display = 'none';
-      } else if (i === this.currentIndex) {
+      } else if (rel === 0) {
+        card.style.display = '';
         card.style.transform = '';
         card.style.opacity = '1';
-        card.style.zIndex = this.cards.length - i;
+        card.style.zIndex = 100;
+      } else if (rel <= 3) {
+        card.style.display = '';
+        card.style.transform = 'scale(' + (1 - rel * 0.03) + ') translateY(' + (rel * 4) + 'px)';
+        card.style.opacity = rel > 2 ? '0' : '1';
+        card.style.zIndex = 100 - rel;
       } else {
-        card.style.transform = 'scale(' + (1 - (i - this.currentIndex) * 0.03) + ')';
-        card.style.opacity = i - this.currentIndex > 2 ? '0' : '1';
-        card.style.zIndex = this.cards.length - i;
+        // Hide cards far in the stack to save rendering
+        card.style.display = 'none';
       }
     }
   },
@@ -338,6 +348,13 @@ var SwipeManager = {
       }
     } else {
       card.classList.add('exit-left');
+      // Report skip to server so it doesn't come back
+      var skipUrl = this.area.dataset.apiUrl.replace('/api/discover', '/api/skip');
+      fetch(skipUrl, {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({mal_id: malId})
+      }).catch(function(){});
     }
 
     this.currentIndex++;
@@ -346,8 +363,8 @@ var SwipeManager = {
     var self = this;
     setTimeout(function() {
       self.setupCards();
-      // Check if we need more cards
-      if (self.currentIndex >= self.cards.length - 2) {
+      // Pre-fetch when running low
+      if (self.currentIndex >= self.cards.length - 5 && !self.loading) {
         self.loadMore();
       }
       if (self.currentIndex >= self.cards.length) {
@@ -357,24 +374,32 @@ var SwipeManager = {
   },
 
   loadMore: function() {
+    if (this.loading) return;
+    this.loading = true;
     var self = this;
-    var nextOffset = parseInt(this.area.dataset.offset || 0) + 50;
+    var nextOffset = parseInt(this.area.dataset.offset || 0);
     var ranking = this.area.dataset.ranking || 'all';
-    var apiUrl = this.area.dataset.apiUrl + '?ranking=' + ranking + '&offset=' + nextOffset;
+    var apiUrl = this.area.dataset.apiUrl + '?ranking=' + ranking +
+                 '&offset=' + nextOffset + '&shown=' + this.shownIds.join(',');
 
     fetch(apiUrl, {credentials: 'same-origin'})
       .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (!data || !data.length) return;
-        self.area.dataset.offset = nextOffset;
-        data.forEach(function(anime) {
-          var card = self.createCard(anime);
+      .then(function(resp) {
+        var anime = resp.anime || resp;
+        if (resp.next_offset) self.area.dataset.offset = resp.next_offset;
+        if (!anime || !anime.length) return;
+        anime.forEach(function(a) {
+          var id = String(a.mal_id || a.id);
+          if (self.shownIds.indexOf(id) !== -1) return; // skip dupes
+          self.shownIds.push(id);
+          var card = self.createCard(a);
           self.area.appendChild(card);
           self.cards.push(card);
         });
         self.setupCards();
       })
-      .catch(function(){});
+      .catch(function(){})
+      .finally(function() { self.loading = false; });
   },
 
   createCard: function(anime) {
@@ -387,13 +412,16 @@ var SwipeManager = {
     if (anime.main_picture) imgUrl = anime.main_picture.large || anime.main_picture.medium || '';
     else if (anime.images && anime.images.jpg) imgUrl = anime.images.jpg.image_url || '';
 
+    // Escape HTML in title
+    var title = (anime.title || 'Unknown').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
     card.innerHTML =
-      '<img class="swipe-card__img" src="' + imgUrl + '" alt="">' +
+      '<img class="swipe-card__img" src="' + imgUrl + '" alt="" loading="eager">' +
       '<div class="swipe-card__gradient"></div>' +
       '<div class="swipe-hint swipe-hint--skip">SKIP</div>' +
       '<div class="swipe-hint swipe-hint--add">ADD</div>' +
       '<div class="swipe-card__info">' +
-        '<div class="swipe-card__title">' + (anime.title || 'Unknown') + '</div>' +
+        '<div class="swipe-card__title">' + title + '</div>' +
         '<div class="swipe-card__meta">' +
           (anime.episodes ? '<span class="swipe-card__badge">' + anime.episodes + ' eps</span>' : '') +
           (anime.score ? '<span class="swipe-card__badge swipe-card__badge--score">\u2605 ' + anime.score + '</span>' : '') +
