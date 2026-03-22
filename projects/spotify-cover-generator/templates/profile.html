@@ -176,16 +176,18 @@
         }
 
         .profile-section {
-            background: #1a1a1a;
+            background: var(--bg-surface);
+            backdrop-filter: var(--glass);
+            border: 1px solid var(--border);
             margin-bottom: 30px;
             padding: 30px;
-            border-radius: 15px;
+            border-radius: var(--radius);
         }
 
         .profile-section h2 {
             margin-top: 0;
             margin-bottom: 20px;
-            color: #1DB954;
+            color: var(--spotify);
         }
 
         .nav-links {
@@ -196,24 +198,24 @@
         .user-info .info-item {
             margin-bottom: 15px;
             padding: 10px;
-            background: #0a0a0a;
-            border-radius: 8px;
+            background: var(--bg-input);
+            border-radius: var(--radius-xs);
         }
 
         .premium-badge {
-            background: linear-gradient(45deg, #1DB954, #1ed760);
+            background: linear-gradient(135deg, var(--spotify), var(--spotify-light));
             color: white;
             padding: 4px 12px;
-            border-radius: 15px;
+            border-radius: var(--radius-pill);
             font-size: 12px;
             font-weight: bold;
         }
 
         .free-badge {
-            background: #333;
-            color: #ccc;
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
             padding: 4px 12px;
-            border-radius: 15px;
+            border-radius: var(--radius-pill);
             font-size: 12px;
             font-weight: bold;
         }
@@ -223,18 +225,18 @@
             align-items: center;
             gap: 15px;
             padding: 20px;
-            border-radius: 10px;
+            border-radius: var(--radius-sm);
             margin-bottom: 20px;
         }
 
         .connection-status.connected {
             background: rgba(29, 185, 84, 0.1);
-            border: 1px solid #1DB954;
+            border: 1px solid var(--spotify);
         }
 
         .connection-status.disconnected {
             background: rgba(231, 76, 60, 0.1);
-            border: 1px solid #e74c3c;
+            border: 1px solid var(--danger);
         }
 
         .status-icon {
@@ -248,7 +250,7 @@
 
         .spotify-actions li {
             margin: 5px 0;
-            color: #ccc;
+            color: var(--text-secondary);
         }
 
         .spotify-connect {
@@ -272,32 +274,32 @@
         .stat-item {
             text-align: center;
             padding: 20px;
-            background: #0a0a0a;
-            border-radius: 10px;
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
         }
 
         .stat-number {
             font-size: 2em;
             font-weight: bold;
-            color: #1DB954;
+            color: var(--spotify);
             margin-bottom: 5px;
         }
 
         .stat-label {
-            color: #ccc;
+            color: var(--text-secondary);
             font-size: 14px;
         }
 
         .limit-notice {
             background: rgba(231, 76, 60, 0.1);
-            border: 1px solid #e74c3c;
+            border: 1px solid var(--danger);
             padding: 15px;
-            border-radius: 8px;
+            border-radius: var(--radius-sm);
             text-align: center;
         }
 
         .upgrade-link {
-            color: #1DB954;
+            color: var(--spotify);
             text-decoration: none;
             font-weight: bold;
         }
@@ -314,8 +316,8 @@
         .generation-item {
             padding: 15px;
             margin-bottom: 10px;
-            background: #0a0a0a;
-            border-radius: 8px;
+            background: var(--bg-input);
+            border-radius: var(--radius-xs);
         }
 
         .generation-info {
@@ -326,21 +328,21 @@
         }
 
         .mood-tag {
-            background: #1DB954;
+            background: var(--spotify);
             color: white;
             padding: 2px 8px;
-            border-radius: 12px;
+            border-radius: var(--radius-pill);
             font-size: 12px;
         }
 
         .generation-date {
-            color: #666;
+            color: var(--text-muted);
             font-size: 12px;
             margin-left: auto;
         }
 
         .generation-genres {
-            color: #ccc;
+            color: var(--text-secondary);
             font-size: 14px;
         }
 
@@ -351,28 +353,28 @@
         }
 
         .button.upgrade {
-            background: linear-gradient(45deg, #1DB954, #1ed760);
+            background: linear-gradient(135deg, var(--spotify), var(--spotify-light));
         }
 
         .flash-message {
             padding: 12px;
             margin: 10px 0;
-            border-radius: 8px;
+            border-radius: var(--radius-xs);
             text-align: center;
         }
 
         .flash-message.success {
-            background: #1DB954;
+            background: var(--spotify);
             color: white;
         }
 
         .flash-message.error {
-            background: #e74c3c;
+            background: var(--danger);
             color: white;
         }
 
         .flash-message.info {
-            background: #3498db;
+            background: var(--info);
             color: white;
         }
 

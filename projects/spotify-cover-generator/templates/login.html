@@ -10,14 +10,16 @@
             max-width: 500px;
             margin: 50px auto;
             padding: 40px;
-            background: #1e1e1e;
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            background: var(--bg-surface);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: var(--glass);
+            border: 1px solid var(--border);
         }
         
         .auth-title {
             text-align: center;
-            color: #1DB954;
+            color: var(--spotify);
             margin-bottom: 30px;
             font-size: 2rem;
         }
@@ -25,10 +27,10 @@
         .spotify-btn {
             width: 100%;
             padding: 15px;
-            background: #1DB954;
-            color: #000000;
+            background: var(--spotify);
+            color: var(--bg-deep);
             border: none;
-            border-radius: 25px;
+            border-radius: var(--radius-pill);
             font-size: 1.1rem;
             font-weight: bold;
             text-decoration: none;
@@ -42,7 +44,7 @@
         }
         
         .spotify-btn:hover {
-            background: #1ed760;
+            background: var(--spotify-light);
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(29, 185, 84, 0.3);
         }
@@ -62,7 +64,7 @@
             text-align: center;
             margin: 30px 0;
             position: relative;
-            color: #666;
+            color: var(--text-muted);
         }
         
         .divider::after {
@@ -72,12 +74,12 @@
             left: 0;
             right: 0;
             height: 1px;
-            background: #333;
+            background: var(--border);
             z-index: 1;
         }
         
         .divider span {
-            background: #1e1e1e;
+            background: var(--bg-surface);
             padding: 0 20px;
             position: relative;
             z-index: 2;
@@ -91,20 +93,20 @@
         
         .alert-error {
             background-color: rgba(255, 82, 82, 0.1);
-            color: #ff5252;
-            border-left: 4px solid #ff5252;
+            color: var(--danger);
+            border-left: 4px solid var(--danger);
         }
         
         .alert-success {
-            background-color: rgba(29, 185, 84, 0.1);
-            color: #1DB954;
-            border-left: 4px solid #1DB954;
+            background-color: var(--spotify-dim);
+            color: var(--spotify);
+            border-left: 4px solid var(--spotify);
         }
         
         .alert-info {
-            background-color: rgba(33, 150, 243, 0.1);
-            color: #2196F3;
-            border-left: 4px solid #2196F3;
+            background-color: rgba(99, 102, 241, 0.1);
+            color: var(--info);
+            border-left: 4px solid var(--info);
         }
         
         .auth-links {
@@ -113,7 +115,7 @@
         }
         
         .auth-links a {
-            color: #1DB954;
+            color: var(--spotify);
             text-decoration: none;
         }
         
@@ -122,28 +124,28 @@
         }
         
         .form-section {
-            background: #252525;
+            background: var(--bg-elevated);
             padding: 25px;
-            border-radius: 8px;
+            border-radius: var(--radius-sm);
             margin-bottom: 20px;
         }
         
         .guest-section {
             text-align: center;
             padding: 20px;
-            background: #111;
-            border-radius: 10px;
-            border: 1px solid #333;
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
         }
         
         .guest-section h3 {
-            color: #1DB954;
+            color: var(--spotify);
             margin-bottom: 15px;
         }
         
         .benefits-list {
             text-align: left;
-            color: #ccc;
+            color: var(--text-secondary);
             margin: 15px 0;
         }
         
@@ -155,7 +157,7 @@
         }
         
         .check-icon {
-            color: #1DB954;
+            color: var(--spotify);
             font-weight: bold;
         }
     </style>
@@ -176,8 +178,8 @@
         
         <!-- Spotify Login Section -->
         <div class="form-section">
-            <h3 style="color: #1DB954; text-align: center; margin-bottom: 15px;">Connect with Spotify</h3>
-            <p style="text-align: center; color: #ccc; margin-bottom: 20px;">
+            <h3 style="color: var(--spotify); text-align: center; margin-bottom: 15px;">Connect with Spotify</h3>
+            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 20px;">
                 Get the full experience with Spotify integration
             </p>
             
@@ -191,7 +193,7 @@
             </a>
             
             <div class="benefits-list">
-                <h4 style="color: #1DB954; margin-bottom: 10px;">Premium Benefits (bentakaki7@gmail.com):</h4>
+                <h4 style="color: var(--spotify); margin-bottom: 10px;">Premium Benefits (bentakaki7@gmail.com):</h4>
                 <ul style="list-style: none; padding: 0;">
                     <li><span class="check-icon">✓</span> Unlimited cover generations</li>
                     <li><span class="check-icon">✓</span> Edit playlist covers directly</li>
@@ -207,15 +209,15 @@
         
         <!-- Regular Login Form -->
         <div class="form-section">
-            <h3 style="color: #1DB954; margin-bottom: 15px;">Username Login</h3>
+            <h3 style="color: var(--spotify); margin-bottom: 15px;">Username Login</h3>
             <form method="POST">
                 <div class="form-group">
-                    <label for="username" style="color: #ccc;">Username:</label>
+                    <label for="username" style="color: var(--text-secondary);">Username:</label>
                     <input type="text" id="username" name="username" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="password" style="color: #ccc;">Password:</label>
+                    <label for="password" style="color: var(--text-secondary);">Password:</label>
                     <input type="password" id="password" name="password" required>
                 </div>
                 
@@ -224,13 +226,13 @@
         </div>
         
         <div class="auth-links">
-            <p style="color: #ccc;">Don't have an account? <a href="{{ url_for('register') }}">Sign up here</a></p>
+            <p style="color: var(--text-secondary);">Don't have an account? <a href="{{ url_for('register') }}">Sign up here</a></p>
         </div>
         
         <!-- Guest Access -->
         <div class="guest-section">
             <h3>Try as Guest</h3>
-            <p style="color: #ccc; margin-bottom: 15px;">Get 1 free generation per day without signing up</p>
+            <p style="color: var(--text-secondary); margin-bottom: 15px;">Get 1 free generation per day without signing up</p>
             <a href="{{ url_for('generate') }}" class="button secondary">Continue as Guest</a>
         </div>
     </div>

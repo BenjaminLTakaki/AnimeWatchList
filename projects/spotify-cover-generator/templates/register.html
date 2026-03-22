@@ -109,18 +109,18 @@
             text-align: center;
             margin-bottom: 30px;
             padding: 30px;
-            background: linear-gradient(135deg, #1a1a1a, #0f3c2b);
-            border-radius: 15px;
-            border: 2px solid #1DB954;
+            background: linear-gradient(135deg, var(--bg-base), rgba(29, 185, 84, 0.03));
+            border-radius: var(--radius);
+            border: 2px solid var(--border-accent);
         }
 
         .spotify-signup-btn {
             display: inline-flex;
             align-items: center;
-            background: #1DB954;
+            background: var(--spotify);
             color: white;
             padding: 15px 30px;
-            border-radius: 25px;
+            border-radius: var(--radius-pill);
             text-decoration: none;
             font-weight: bold;
             font-size: 18px;
@@ -129,7 +129,7 @@
         }
 
         .spotify-signup-btn:hover {
-            background: #1ed760;
+            background: var(--spotify-light);
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(29, 185, 84, 0.4);
         }
@@ -146,7 +146,7 @@
         }
 
         .spotify-benefits h3 {
-            color: #1DB954;
+            color: var(--spotify);
             margin-bottom: 15px;
             text-align: center;
         }
@@ -158,7 +158,7 @@
 
         .spotify-benefits li {
             margin: 8px 0;
-            color: #ccc;
+            color: var(--text-secondary);
             font-size: 14px;
         }
 
@@ -175,22 +175,22 @@
             left: 0;
             right: 0;
             height: 1px;
-            background: #333;
+            background: var(--border);
             z-index: 1;
         }
 
         .signup-divider span {
-            background: #000;
+            background: var(--bg-deep);
             padding: 0 20px;
-            color: #ccc;
+            color: var(--text-muted);
             position: relative;
             z-index: 2;
         }
 
         .traditional-signup-section {
-            background: #1a1a1a;
+            background: var(--bg-surface);
             padding: 30px;
-            border-radius: 15px;
+            border-radius: var(--radius);
             margin-bottom: 20px;
         }
 
@@ -201,16 +201,16 @@
         .signup-form label {
             display: block;
             margin-bottom: 5px;
-            color: #ccc;
+            color: var(--text-secondary);
             font-weight: bold;
         }
 
         .signup-form input {
             width: 100%;
             padding: 12px;
-            border: 1px solid #333;
-            border-radius: 8px;
-            background: #000;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-input);
             color: white;
             font-size: 16px;
             box-sizing: border-box;
@@ -218,12 +218,12 @@
 
         .signup-form input:focus {
             outline: none;
-            border-color: #1DB954;
-            box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.2);
+            border-color: var(--spotify);
+            box-shadow: 0 0 0 3px var(--spotify-dim);
         }
 
         .signup-form small {
-            color: #666;
+            color: var(--text-muted);
             font-size: 12px;
             margin-top: 5px;
             display: block;
@@ -232,12 +232,12 @@
         .free-benefits {
             margin-top: 25px;
             padding: 20px;
-            background: #0a0a0a;
-            border-radius: 10px;
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
         }
 
         .free-benefits h3 {
-            color: #1DB954;
+            color: var(--spotify);
             margin-bottom: 15px;
         }
 
@@ -248,7 +248,7 @@
 
         .free-benefits li {
             margin: 8px 0;
-            color: #ccc;
+            color: var(--text-secondary);
             font-size: 14px;
         }
 
@@ -258,7 +258,7 @@
         }
 
         .auth-links a {
-            color: #1DB954;
+            color: var(--spotify);
             text-decoration: none;
         }
 
@@ -269,8 +269,8 @@
         .guest-section {
             text-align: center;
             padding: 20px;
-            background: #111;
-            border-radius: 10px;
+            background: var(--bg-input);
+            border-radius: var(--radius-sm);
             margin-bottom: 30px;
         }
 
@@ -278,12 +278,12 @@
             text-align: center;
             margin-top: 20px;
             padding: 15px;
-            color: #666;
+            color: var(--text-muted);
             font-size: 12px;
         }
 
         .legal-notice a {
-            color: #1DB954;
+            color: var(--spotify);
             text-decoration: none;
         }
 
@@ -299,17 +299,17 @@
         }
 
         .flash-message.success {
-            background: #1DB954;
+            background: var(--spotify);
             color: white;
         }
 
         .flash-message.error {
-            background: #e74c3c;
+            background: var(--danger);
             color: white;
         }
 
         .flash-message.info {
-            background: #3498db;
+            background: var(--info);
             color: white;
         }
 
